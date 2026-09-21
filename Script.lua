@@ -1,15 +1,16 @@
---// Aura Futebol - ALL-IN-ONE (v22 - Detecta Jogadores e NPCs)
---// by: @willnzx.mt
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ============ CONFIGURAÇÕES ============
 local AUTO_SEGUIR = false
 local COOLDOWN_TP = 0.1
 local ULTIMO_TP = 0
 local DISTANCIA_FRENTE = 5
+
+local INTERCEPTAR_ATIVO = false
+local TEMPO_PREVISAO = 0.5
+local DISTANCIA_EXTRA = 3
 
 local ORBITAL_ATIVO = false
 local RAIO_ORB = 5
@@ -59,7 +60,6 @@ local counterLabel = nil
 local counterValor = 0
 local ultimoToque = 0
 local ANGULO_MARKER = 0
--- ========================================
 
 local function forcarVisivel(pai)
     for _, obj in ipairs(pai:GetChildren()) do
@@ -91,10 +91,8 @@ end
 local function temPosseReal(bola, hrp)
     local distVoce = (bola.Position - hrp.Position).Magnitude
     if distVoce > DISTANCIA_POSSE then return false end
-
     local menorDist = distVoce
     local outroMaisPerto = false
-
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
             local outroHrp = plr.Character:FindFirstChild("HumanoidRootPart")
@@ -107,7 +105,6 @@ local function temPosseReal(bola, hrp)
             end
         end
     end
-
     if not outroMaisPerto then
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("Humanoid") and obj.Health > 0 and obj.Parent ~= LocalPlayer.Character then
@@ -122,7 +119,6 @@ local function temPosseReal(bola, hrp)
             end
         end
     end
-
     if outroMaisPerto then return false end
     return true
 end
@@ -257,7 +253,6 @@ local function criarBallTrail(bola)
     ballTrail.Parent = bola
 end
 
--- ===== GUI =====
 local gui = nil
 local statusPosseLabel = nil
 
@@ -283,7 +278,6 @@ local function criarGUI()
     botaoAbrir.Active = true
     botaoAbrir.Draggable = true
     botaoAbrir.Parent = gui
-
     local cA = Instance.new("UICorner") cA.CornerRadius = UDim.new(1, 0) cA.Parent = botaoAbrir
     local strokeA = Instance.new("UIStroke") strokeA.Color = Color3.fromRGB(0, 200, 255) strokeA.Thickness = 2 strokeA.Parent = botaoAbrir
 
@@ -296,7 +290,6 @@ local function criarGUI()
     menu.Active = true
     menu.Draggable = true
     menu.Parent = gui
-
     local cM = Instance.new("UICorner") cM.CornerRadius = UDim.new(0, 14) cM.Parent = menu
     local gradienteMenu = Instance.new("UIGradient")
     gradienteMenu.Rotation = 90
@@ -305,7 +298,6 @@ local function criarGUI()
         ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
     })
     gradienteMenu.Parent = menu
-
     local strokeM = Instance.new("UIStroke")
     strokeM.Color = Color3.fromRGB(255, 0, 0)
     strokeM.Thickness = 2.5
@@ -347,14 +339,13 @@ local function criarGUI()
     statusPosseLabel.Position = UDim2.new(0.05, 0, 0, 88)
     statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     statusPosseLabel.BorderSizePixel = 0
-    statusPosseLabel.Text = "⚽ Status: SEM BOLA"
+    statusPosseLabel.Text = "Status: SEM BOLA"
     statusPosseLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
     statusPosseLabel.Font = Enum.Font.GothamBold
     statusPosseLabel.TextSize = 11
     statusPosseLabel.Parent = menu
     local cSP = Instance.new("UICorner") cSP.CornerRadius = UDim.new(0, 6) cSP.Parent = statusPosseLabel
 
-    -- ===== ABAS =====
     local abaWidth = 0.15
     local btnAbaMain = Instance.new("TextButton")
     btnAbaMain.Size = UDim2.new(abaWidth, 0, 0, 32)
@@ -428,8 +419,6 @@ local function criarGUI()
     btnAbaRest.Parent = menu
     local cAb6 = Instance.new("UICorner") cAb6.CornerRadius = UDim.new(0, 8) cAb6.Parent = btnAbaRest
 
-    -- ===== ABA MAIN =====
-
     local abaMain = Instance.new("Frame")
     abaMain.Size = UDim2.new(1, 0, 1, -150)
     abaMain.Position = UDim2.new(0, 0, 0, 115)
@@ -437,40 +426,30 @@ local function criarGUI()
     abaMain.Visible = true
     abaMain.Parent = menu
 
-    local labelTituloMain = Instance.new("TextLabel")
-    labelTituloMain.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloMain.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloMain.BackgroundTransparency = 1
-    labelTituloMain.Text = "🎯 SEGUIR NA FRENTE"
-    labelTituloMain.TextColor3 = Color3.fromRGB(100, 220, 255)
-    labelTituloMain.Font = Enum.Font.GothamBold
-    labelTituloMain.TextSize = 13
-    labelTituloMain.Parent = abaMain
-
     local btnSeguir = Instance.new("TextButton")
-    btnSeguir.Size = UDim2.new(0.9, 0, 0, 70)
-    btnSeguir.Position = UDim2.new(0.05, 0, 0, 40)
+    btnSeguir.Size = UDim2.new(0.9, 0, 0, 60)
+    btnSeguir.Position = UDim2.new(0.05, 0, 0, 10)
     btnSeguir.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     btnSeguir.BorderSizePixel = 0
-    btnSeguir.Text = "🎯 SEGUIR BOLA\n❌ OFF"
+    btnSeguir.Text = "SEGUIR BOLA\nOFF"
     btnSeguir.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnSeguir.Font = Enum.Font.GothamBold
-    btnSeguir.TextSize = 16
+    btnSeguir.TextSize = 14
     btnSeguir.Parent = abaMain
-    local cSB = Instance.new("UICorner") cSB.CornerRadius = UDim.new(0, 12) cSB.Parent = btnSeguir
+    local cSB = Instance.new("UICorner") cSB.CornerRadius = UDim.new(0, 10) cSB.Parent = btnSeguir
 
-    local infoMain = Instance.new("TextLabel")
-    infoMain.Size = UDim2.new(0.9, 0, 0, 80)
-    infoMain.Position = UDim2.new(0.05, 0, 0, 125)
-    infoMain.BackgroundTransparency = 1
-    infoMain.Text = "Fica NA FRENTE do dono da bola.\n✅ Funciona com jogador E NPC\n✅ Pausa se você tiver posse"
-    infoMain.TextColor3 = Color3.fromRGB(150, 150, 170)
-    infoMain.Font = Enum.Font.Gotham
-    infoMain.TextSize = 11
-    infoMain.TextWrapped = true
-    infoMain.Parent = abaMain
+    local btnInterceptar = Instance.new("TextButton")
+    btnInterceptar.Size = UDim2.new(0.9, 0, 0, 60)
+    btnInterceptar.Position = UDim2.new(0.05, 0, 0, 80)
+    btnInterceptar.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnInterceptar.BorderSizePixel = 0
+    btnInterceptar.Text = "INTERCEPTAR\nOFF"
+    btnInterceptar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnInterceptar.Font = Enum.Font.GothamBold
+    btnInterceptar.TextSize = 14
+    btnInterceptar.Parent = abaMain
+    local cInt = Instance.new("UICorner") cInt.CornerRadius = UDim.new(0, 10) cInt.Parent = btnInterceptar
 
-    -- ===== ABA ORBITAL =====
     local abaOrb = Instance.new("Frame")
     abaOrb.Size = UDim2.new(1, 0, 1, -150)
     abaOrb.Position = UDim2.new(0, 0, 0, 115)
@@ -478,22 +457,12 @@ local function criarGUI()
     abaOrb.Visible = false
     abaOrb.Parent = menu
 
-    local labelTituloOrb = Instance.new("TextLabel")
-    labelTituloOrb.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloOrb.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloOrb.BackgroundTransparency = 1
-    labelTituloOrb.Text = "🌀 ORBITAL (na frente do dono)"
-    labelTituloOrb.TextColor3 = Color3.fromRGB(200, 100, 255)
-    labelTituloOrb.Font = Enum.Font.GothamBold
-    labelTituloOrb.TextSize = 13
-    labelTituloOrb.Parent = abaOrb
-
     local btnOrbital = Instance.new("TextButton")
-    btnOrbital.Size = UDim2.new(0.9, 0, 0, 55)
-    btnOrbital.Position = UDim2.new(0.05, 0, 0, 40)
+    btnOrbital.Size = UDim2.new(0.9, 0, 0, 50)
+    btnOrbital.Position = UDim2.new(0.05, 0, 0, 10)
     btnOrbital.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     btnOrbital.BorderSizePixel = 0
-    btnOrbital.Text = "🌀 ORBITAL ATIVO\n❌ OFF"
+    btnOrbital.Text = "ORBITAL ATIVO\nOFF"
     btnOrbital.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnOrbital.Font = Enum.Font.GothamBold
     btnOrbital.TextSize = 14
@@ -502,7 +471,7 @@ local function criarGUI()
 
     local labelRaioOrb = Instance.new("TextLabel")
     labelRaioOrb.Size = UDim2.new(0.9, 0, 0, 20)
-    labelRaioOrb.Position = UDim2.new(0.05, 0, 0, 105)
+    labelRaioOrb.Position = UDim2.new(0.05, 0, 0, 70)
     labelRaioOrb.BackgroundTransparency = 1
     labelRaioOrb.Text = "Raio: " .. RAIO_ORB .. " studs"
     labelRaioOrb.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -512,9 +481,9 @@ local function criarGUI()
 
     local btnRaioMaisOrb = Instance.new("TextButton")
     btnRaioMaisOrb.Size = UDim2.new(0.42, 0, 0, 30)
-    btnRaioMaisOrb.Position = UDim2.new(0.05, 0, 0, 128)
+    btnRaioMaisOrb.Position = UDim2.new(0.05, 0, 0, 95)
     btnRaioMaisOrb.BackgroundColor3 = Color3.fromRGB(140, 60, 200)
-    btnRaioMaisOrb.Text = "➕ RAIO"
+    btnRaioMaisOrb.Text = "+ RAIO"
     btnRaioMaisOrb.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnRaioMaisOrb.Font = Enum.Font.GothamBold
     btnRaioMaisOrb.TextSize = 11
@@ -524,9 +493,9 @@ local function criarGUI()
 
     local btnRaioMenosOrb = Instance.new("TextButton")
     btnRaioMenosOrb.Size = UDim2.new(0.42, 0, 0, 30)
-    btnRaioMenosOrb.Position = UDim2.new(0.53, 0, 0, 128)
+    btnRaioMenosOrb.Position = UDim2.new(0.53, 0, 0, 95)
     btnRaioMenosOrb.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    btnRaioMenosOrb.Text = "➖ RAIO"
+    btnRaioMenosOrb.Text = "- RAIO"
     btnRaioMenosOrb.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnRaioMenosOrb.Font = Enum.Font.GothamBold
     btnRaioMenosOrb.TextSize = 11
@@ -536,7 +505,7 @@ local function criarGUI()
 
     local labelVelOrb = Instance.new("TextLabel")
     labelVelOrb.Size = UDim2.new(0.9, 0, 0, 20)
-    labelVelOrb.Position = UDim2.new(0.05, 0, 0, 165)
+    labelVelOrb.Position = UDim2.new(0.05, 0, 0, 135)
     labelVelOrb.BackgroundTransparency = 1
     labelVelOrb.Text = "Velocidade: " .. VELOCIDADE_ORB
     labelVelOrb.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -546,9 +515,9 @@ local function criarGUI()
 
     local btnVelMaisOrb = Instance.new("TextButton")
     btnVelMaisOrb.Size = UDim2.new(0.42, 0, 0, 30)
-    btnVelMaisOrb.Position = UDim2.new(0.05, 0, 0, 188)
+    btnVelMaisOrb.Position = UDim2.new(0.05, 0, 0, 160)
     btnVelMaisOrb.BackgroundColor3 = Color3.fromRGB(140, 60, 200)
-    btnVelMaisOrb.Text = "➕ VELOCIDADE"
+    btnVelMaisOrb.Text = "+ VELOCIDADE"
     btnVelMaisOrb.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnVelMaisOrb.Font = Enum.Font.GothamBold
     btnVelMaisOrb.TextSize = 11
@@ -558,9 +527,9 @@ local function criarGUI()
 
     local btnVelMenosOrb = Instance.new("TextButton")
     btnVelMenosOrb.Size = UDim2.new(0.42, 0, 0, 30)
-    btnVelMenosOrb.Position = UDim2.new(0.53, 0, 0, 188)
+    btnVelMenosOrb.Position = UDim2.new(0.53, 0, 0, 160)
     btnVelMenosOrb.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    btnVelMenosOrb.Text = "➖ VELOCIDADE"
+    btnVelMenosOrb.Text = "- VELOCIDADE"
     btnVelMenosOrb.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnVelMenosOrb.Font = Enum.Font.GothamBold
     btnVelMenosOrb.TextSize = 11
@@ -568,18 +537,6 @@ local function criarGUI()
     btnVelMenosOrb.Parent = abaOrb
     local cV2 = Instance.new("UICorner") cV2.CornerRadius = UDim.new(0, 8) cV2.Parent = btnVelMenosOrb
 
-    local infoOrb = Instance.new("TextLabel")
-    infoOrb.Size = UDim2.new(0.9, 0, 0, 60)
-    infoOrb.Position = UDim2.new(0.05, 0, 0, 228)
-    infoOrb.BackgroundTransparency = 1
-    infoOrb.Text = "🌀 Sempre orbita NA FRENTE do dono.\n✅ Jogador: usa direção do olhar\n✅ NPC: usa direção do movimento"
-    infoOrb.TextColor3 = Color3.fromRGB(150, 150, 170)
-    infoOrb.Font = Enum.Font.Gotham
-    infoOrb.TextSize = 10
-    infoOrb.TextWrapped = true
-    infoOrb.Parent = abaOrb
-
-    -- ===== ABA ESPIRAL =====
     local abaEsp = Instance.new("Frame")
     abaEsp.Size = UDim2.new(1, 0, 1, -150)
     abaEsp.Position = UDim2.new(0, 0, 0, 115)
@@ -587,22 +544,12 @@ local function criarGUI()
     abaEsp.Visible = false
     abaEsp.Parent = menu
 
-    local labelTituloEsp = Instance.new("TextLabel")
-    labelTituloEsp.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloEsp.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloEsp.BackgroundTransparency = 1
-    labelTituloEsp.Text = "🌪️ ESPIRAL BALL"
-    labelTituloEsp.TextColor3 = Color3.fromRGB(255, 200, 100)
-    labelTituloEsp.Font = Enum.Font.GothamBold
-    labelTituloEsp.TextSize = 14
-    labelTituloEsp.Parent = abaEsp
-
     local btnEspiral = Instance.new("TextButton")
-    btnEspiral.Size = UDim2.new(0.9, 0, 0, 50)
-    btnEspiral.Position = UDim2.new(0.05, 0, 0, 40)
+    btnEspiral.Size = UDim2.new(0.9, 0, 0, 45)
+    btnEspiral.Position = UDim2.new(0.05, 0, 0, 10)
     btnEspiral.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     btnEspiral.BorderSizePixel = 0
-    btnEspiral.Text = "🌪️ ESPIRAL ATIVA\n❌ OFF"
+    btnEspiral.Text = "ESPIRAL ATIVA\nOFF"
     btnEspiral.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnEspiral.Font = Enum.Font.GothamBold
     btnEspiral.TextSize = 13
@@ -611,7 +558,7 @@ local function criarGUI()
 
     local labelRaioEsp = Instance.new("TextLabel")
     labelRaioEsp.Size = UDim2.new(0.9, 0, 0, 20)
-    labelRaioEsp.Position = UDim2.new(0.05, 0, 0, 100)
+    labelRaioEsp.Position = UDim2.new(0.05, 0, 0, 65)
     labelRaioEsp.BackgroundTransparency = 1
     labelRaioEsp.Text = "Raio Inicial: " .. RAIO_INICIAL
     labelRaioEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -621,9 +568,9 @@ local function criarGUI()
 
     local btnRaioMaisEsp = Instance.new("TextButton")
     btnRaioMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnRaioMaisEsp.Position = UDim2.new(0.05, 0, 0, 122)
+    btnRaioMaisEsp.Position = UDim2.new(0.05, 0, 0, 88)
     btnRaioMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
-    btnRaioMaisEsp.Text = "➕ RAIO"
+    btnRaioMaisEsp.Text = "+ RAIO"
     btnRaioMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnRaioMaisEsp.Font = Enum.Font.GothamBold
     btnRaioMaisEsp.TextSize = 11
@@ -633,9 +580,9 @@ local function criarGUI()
 
     local btnRaioMenosEsp = Instance.new("TextButton")
     btnRaioMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnRaioMenosEsp.Position = UDim2.new(0.53, 0, 0, 122)
+    btnRaioMenosEsp.Position = UDim2.new(0.53, 0, 0, 88)
     btnRaioMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    btnRaioMenosEsp.Text = "➖ RAIO"
+    btnRaioMenosEsp.Text = "- RAIO"
     btnRaioMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnRaioMenosEsp.Font = Enum.Font.GothamBold
     btnRaioMenosEsp.TextSize = 11
@@ -645,7 +592,7 @@ local function criarGUI()
 
     local labelVelEsp = Instance.new("TextLabel")
     labelVelEsp.Size = UDim2.new(0.9, 0, 0, 20)
-    labelVelEsp.Position = UDim2.new(0.05, 0, 0, 158)
+    labelVelEsp.Position = UDim2.new(0.05, 0, 0, 125)
     labelVelEsp.BackgroundTransparency = 1
     labelVelEsp.Text = "Velocidade: " .. VELOCIDADE_ESP
     labelVelEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -655,9 +602,9 @@ local function criarGUI()
 
     local btnVelMaisEsp = Instance.new("TextButton")
     btnVelMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnVelMaisEsp.Position = UDim2.new(0.05, 0, 0, 180)
+    btnVelMaisEsp.Position = UDim2.new(0.05, 0, 0, 148)
     btnVelMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
-    btnVelMaisEsp.Text = "➕ VELOCIDADE"
+    btnVelMaisEsp.Text = "+ VELOCIDADE"
     btnVelMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnVelMaisEsp.Font = Enum.Font.GothamBold
     btnVelMaisEsp.TextSize = 11
@@ -667,9 +614,9 @@ local function criarGUI()
 
     local btnVelMenosEsp = Instance.new("TextButton")
     btnVelMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnVelMenosEsp.Position = UDim2.new(0.53, 0, 0, 180)
+    btnVelMenosEsp.Position = UDim2.new(0.53, 0, 0, 148)
     btnVelMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    btnVelMenosEsp.Text = "➖ VELOCIDADE"
+    btnVelMenosEsp.Text = "- VELOCIDADE"
     btnVelMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnVelMenosEsp.Font = Enum.Font.GothamBold
     btnVelMenosEsp.TextSize = 11
@@ -679,7 +626,7 @@ local function criarGUI()
 
     local labelAproxEsp = Instance.new("TextLabel")
     labelAproxEsp.Size = UDim2.new(0.9, 0, 0, 20)
-    labelAproxEsp.Position = UDim2.new(0.05, 0, 0, 216)
+    labelAproxEsp.Position = UDim2.new(0.05, 0, 0, 185)
     labelAproxEsp.BackgroundTransparency = 1
     labelAproxEsp.Text = "Aproximação: " .. VELOCIDADE_APROX
     labelAproxEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -689,9 +636,9 @@ local function criarGUI()
 
     local btnAproxMaisEsp = Instance.new("TextButton")
     btnAproxMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnAproxMaisEsp.Position = UDim2.new(0.05, 0, 0, 238)
+    btnAproxMaisEsp.Position = UDim2.new(0.05, 0, 0, 208)
     btnAproxMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
-    btnAproxMaisEsp.Text = "➕ APROXIMAR"
+    btnAproxMaisEsp.Text = "+ APROXIMAR"
     btnAproxMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnAproxMaisEsp.Font = Enum.Font.GothamBold
     btnAproxMaisEsp.TextSize = 11
@@ -701,9 +648,9 @@ local function criarGUI()
 
     local btnAproxMenosEsp = Instance.new("TextButton")
     btnAproxMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
-    btnAproxMenosEsp.Position = UDim2.new(0.53, 0, 0, 238)
+    btnAproxMenosEsp.Position = UDim2.new(0.53, 0, 0, 208)
     btnAproxMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    btnAproxMenosEsp.Text = "➖ APROXIMAR"
+    btnAproxMenosEsp.Text = "- APROXIMAR"
     btnAproxMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnAproxMenosEsp.Font = Enum.Font.GothamBold
     btnAproxMenosEsp.TextSize = 11
@@ -711,18 +658,6 @@ local function criarGUI()
     btnAproxMenosEsp.Parent = abaEsp
     local cAP2 = Instance.new("UICorner") cAP2.CornerRadius = UDim.new(0, 8) cAP2.Parent = btnAproxMenosEsp
 
-    local infoEsp = Instance.new("TextLabel")
-    infoEsp.Size = UDim2.new(0.9, 0, 0, 35)
-    infoEsp.Position = UDim2.new(0.05, 0, 0, 275)
-    infoEsp.BackgroundTransparency = 1
-    infoEsp.Text = "Aproxima da bola em espiral.\nCom suavização (não trava)."
-    infoEsp.TextColor3 = Color3.fromRGB(150, 150, 170)
-    infoEsp.Font = Enum.Font.Gotham
-    infoEsp.TextSize = 10
-    infoEsp.TextWrapped = true
-    infoEsp.Parent = abaEsp
-
-    -- ===== ABA STEAL =====
     local abaSteal = Instance.new("Frame")
     abaSteal.Size = UDim2.new(1, 0, 1, -150)
     abaSteal.Position = UDim2.new(0, 0, 0, 115)
@@ -730,40 +665,18 @@ local function criarGUI()
     abaSteal.Visible = false
     abaSteal.Parent = menu
 
-    local labelTituloSteal = Instance.new("TextLabel")
-    labelTituloSteal.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloSteal.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloSteal.BackgroundTransparency = 1
-    labelTituloSteal.Text = "🦶 AUTO STEAL (Q)"
-    labelTituloSteal.TextColor3 = Color3.fromRGB(255, 150, 100)
-    labelTituloSteal.Font = Enum.Font.GothamBold
-    labelTituloSteal.TextSize = 14
-    labelTituloSteal.Parent = abaSteal
-
     local btnSteal = Instance.new("TextButton")
     btnSteal.Size = UDim2.new(0.9, 0, 0, 65)
     btnSteal.Position = UDim2.new(0.05, 0, 0, 40)
     btnSteal.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
     btnSteal.BorderSizePixel = 0
-    btnSteal.Text = "🦶 AUTO STEAL\n❌ OFF"
+    btnSteal.Text = "AUTO STEAL\nOFF"
     btnSteal.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnSteal.Font = Enum.Font.GothamBold
     btnSteal.TextSize = 15
     btnSteal.Parent = abaSteal
     local cSt = Instance.new("UICorner") cSt.CornerRadius = UDim.new(0, 10) cSt.Parent = btnSteal
 
-    local infoSteal = Instance.new("TextLabel")
-    infoSteal.Size = UDim2.new(0.9, 0, 0, 100)
-    infoSteal.Position = UDim2.new(0.05, 0, 0, 120)
-    infoSteal.BackgroundTransparency = 1
-    infoSteal.Text = "Aperta Q automaticamente\nquando a bola tá perto (6 studs).\n\n✅ NUNCA pausa\n⚠️ Buga os botões mobile."
-    infoSteal.TextColor3 = Color3.fromRGB(150, 150, 170)
-    infoSteal.Font = Enum.Font.Gotham
-    infoSteal.TextSize = 11
-    infoSteal.TextWrapped = true
-    infoSteal.Parent = abaSteal
-
-    -- ===== ABA VISUAL =====
     local abaVisual = Instance.new("Frame")
     abaVisual.Size = UDim2.new(1, 0, 1, -150)
     abaVisual.Position = UDim2.new(0, 0, 0, 115)
@@ -771,19 +684,9 @@ local function criarGUI()
     abaVisual.Visible = false
     abaVisual.Parent = menu
 
-    local labelTituloVisual = Instance.new("TextLabel")
-    labelTituloVisual.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloVisual.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloVisual.BackgroundTransparency = 1
-    labelTituloVisual.Text = "👁️ VISUAL / INFO"
-    labelTituloVisual.TextColor3 = Color3.fromRGB(100, 255, 200)
-    labelTituloVisual.Font = Enum.Font.GothamBold
-    labelTituloVisual.TextSize = 14
-    labelTituloVisual.Parent = abaVisual
-
     local scrollV = Instance.new("ScrollingFrame")
-    scrollV.Size = UDim2.new(0.9, 0, 1, -50)
-    scrollV.Position = UDim2.new(0.05, 0, 0, 40)
+    scrollV.Size = UDim2.new(0.9, 0, 1, -10)
+    scrollV.Position = UDim2.new(0.05, 0, 0, 5)
     scrollV.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
     scrollV.BorderSizePixel = 0
     scrollV.ScrollBarThickness = 6
@@ -807,75 +710,73 @@ local function criarGUI()
         btn.Size = UDim2.new(1, -10, 0, 45)
         btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         btn.BorderSizePixel = 0
-        btn.Text = texto .. "\n❌ OFF"
+        btn.Text = texto .. "\nOFF"
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 12
         btn.LayoutOrder = ordem
         btn.Parent = scrollV
-
         local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, 8) c.Parent = btn
-
         local estado = false
         btn.MouseButton1Click:Connect(function()
             estado = not estado
-            btn.Text = texto .. (estado and "\n✅ ON" or "\n❌ OFF")
+            btn.Text = texto .. (estado and "\nON" or "\nOFF")
             btn.BackgroundColor3 = estado and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
             callback(estado)
         end)
     end
 
-    criarToggleVisual("📏 BALL TRACKER (distância)", 1, function(a)
+    criarToggleVisual("BALL TRACKER", 1, function(a)
         BALL_TRACKER = a
         if a then criarTrackerLabel() else
             if trackerLabel then trackerLabel:Destroy() trackerLabel = nil end
         end
     end)
 
-    criarToggleVisual("⭕ BALL RADIUS (círculo no chão)", 2, function(a)
+    criarToggleVisual("BALL RADIUS", 2, function(a)
         BALL_RADIUS = a
         if not a and ballRadiusPart then ballRadiusPart:Destroy() ballRadiusPart = nil end
     end)
 
-    criarToggleVisual("🔦 BALL HIGHLIGHT (brilho)", 3, function(a)
+    criarToggleVisual("BALL HIGHLIGHT", 3, function(a)
         BALL_HIGHLIGHT = a
         if not a and ballHighlight then ballHighlight:Destroy() ballHighlight = nil end
     end)
 
-    criarToggleVisual("🎯 BALL LINE (linha até a bola)", 4, function(a)
+    criarToggleVisual("BALL LINE", 4, function(a)
         BALL_LINE = a
         if not a and ballLine then ballLine:Destroy() ballLine = nil end
     end)
 
-    criarToggleVisual("📊 BALL SPEED (velocidade)", 5, function(a)
+    criarToggleVisual("BALL SPEED", 5, function(a)
         BALL_SPEED = a
         if a then criarSpeedLabel() else
             if speedLabel then speedLabel:Destroy() speedLabel = nil end
         end
     end)
 
-    criarToggleVisual("📍 BALL PIN (seta)", 6, function(a)
+    criarToggleVisual("BALL PIN", 6, function(a)
         BALL_PIN = a
         if a then criarBallPin() else
             if ballPin then ballPin:Destroy() ballPin = nil end
         end
     end)
 
-    criarToggleVisual("🖼️ BALL MARKER (anel girando)", 7, function(a)
+    criarToggleVisual("BALL MARKER", 7, function(a)
         BALL_MARKER = a
         if not a and ballMarker then ballMarker:Destroy() ballMarker = nil end
     end)
 
-    criarToggleVisual("🌈 RAINBOW BALL (cor muda)", 8, function(a)
+    criarToggleVisual("RAINBOW BALL", 8, function(a)
         RAINBOW_BALL = a
     end)
 
-    criarToggleVisual("🌐 BALL TRAIL (rastro)", 9, function(a)
+    criarToggleVisual("BALL TRAIL", 9, function(a)
         BALL_TRAIL = a
         if not a and ballTrail then ballTrail:Destroy() ballTrail = nil end
     end)
 
-    criarToggleVisual("🔢 BALL COUNTER (contador)", 10, function(a)
+    criarToggleVisual("BALL COUNTER", 10, function(a)
         BALL_COUNTER = a
         if a then
             counterValor = 0
@@ -888,7 +789,6 @@ local function criarGUI()
     task.wait(0.1)
     scrollV.CanvasSize = UDim2.new(0, 0, 0, layoutV.AbsoluteContentSize.Y + 20)
 
-    -- ===== ABA REST =====
     local abaRest = Instance.new("Frame")
     abaRest.Size = UDim2.new(1, 0, 1, -150)
     abaRest.Position = UDim2.new(0, 0, 0, 115)
@@ -896,22 +796,12 @@ local function criarGUI()
     abaRest.Visible = false
     abaRest.Parent = menu
 
-    local labelTituloRest = Instance.new("TextLabel")
-    labelTituloRest.Size = UDim2.new(0.9, 0, 0, 30)
-    labelTituloRest.Position = UDim2.new(0.05, 0, 0, 5)
-    labelTituloRest.BackgroundTransparency = 1
-    labelTituloRest.Text = "🔄 RESTAURAR CONTROLES"
-    labelTituloRest.TextColor3 = Color3.fromRGB(100, 255, 100)
-    labelTituloRest.Font = Enum.Font.GothamBold
-    labelTituloRest.TextSize = 14
-    labelTituloRest.Parent = abaRest
-
     local btnRestaurar = Instance.new("TextButton")
     btnRestaurar.Size = UDim2.new(0.9, 0, 0, 75)
-    btnRestaurar.Position = UDim2.new(0.05, 0, 0, 45)
+    btnRestaurar.Position = UDim2.new(0.05, 0, 0, 20)
     btnRestaurar.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
     btnRestaurar.BorderSizePixel = 0
-    btnRestaurar.Text = "🔄 RESTAURAR\n(turbo 7x)"
+    btnRestaurar.Text = "RESTAURAR\n(turbo 7x)"
     btnRestaurar.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnRestaurar.Font = Enum.Font.GothamBold
     btnRestaurar.TextSize = 15
@@ -919,14 +809,13 @@ local function criarGUI()
     local cRP = Instance.new("UICorner") cRP.CornerRadius = UDim.new(0, 12) cRP.Parent = btnRestaurar
 
     btnRestaurar.MouseButton1Click:Connect(function()
-        btnRestaurar.Text = "⏳ RESTAURANDO..."
+        btnRestaurar.Text = "RESTAURANDO..."
         btnRestaurar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
         btnRestaurar.Active = false
-
         task.spawn(function()
             restaurarControles()
             task.wait(0.3)
-            btnRestaurar.Text = "🔄 RESTAURAR\n(turbo 7x)"
+            btnRestaurar.Text = "RESTAURAR\n(turbo 7x)"
             btnRestaurar.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
             btnRestaurar.Active = true
         end)
@@ -934,32 +823,21 @@ local function criarGUI()
 
     local avisoRest = Instance.new("TextLabel")
     avisoRest.Size = UDim2.new(0.9, 0, 0, 30)
-    avisoRest.Position = UDim2.new(0.05, 0, 0, 130)
+    avisoRest.Position = UDim2.new(0.05, 0, 0, 105)
     avisoRest.BackgroundColor3 = Color3.fromRGB(60, 40, 20)
     avisoRest.BorderSizePixel = 0
-    avisoRest.Text = "⚠️ Apertar de 3 a 6 vezes pra voltar"
+    avisoRest.Text = "Apertar de 3 a 6 vezes pra voltar"
     avisoRest.TextColor3 = Color3.fromRGB(255, 200, 100)
     avisoRest.Font = Enum.Font.GothamBold
     avisoRest.TextSize = 12
     avisoRest.Parent = abaRest
     local cAv = Instance.new("UICorner") cAv.CornerRadius = UDim.new(0, 8) cAv.Parent = avisoRest
 
-    local infoRest = Instance.new("TextLabel")
-    infoRest.Size = UDim2.new(0.9, 0, 0, 70)
-    infoRest.Position = UDim2.new(0.05, 0, 0, 170)
-    infoRest.BackgroundTransparency = 1
-    infoRest.Text = "Toca quando os botões sumirem.\nForça TUDO visível 7x turbo.\n✅ Nunca pausa."
-    infoRest.TextColor3 = Color3.fromRGB(150, 150, 170)
-    infoRest.Font = Enum.Font.Gotham
-    infoRest.TextSize = 11
-    infoRest.TextWrapped = true
-    infoRest.Parent = abaRest
-
     local btnFechar = Instance.new("TextButton")
     btnFechar.Size = UDim2.new(0.9, 0, 0, 32)
     btnFechar.Position = UDim2.new(0.05, 0, 1, -42)
     btnFechar.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
-    btnFechar.Text = "✖ FECHAR"
+    btnFechar.Text = "FECHAR"
     btnFechar.TextColor3 = Color3.fromRGB(255, 255, 255)
     btnFechar.Font = Enum.Font.GothamBold
     btnFechar.TextSize = 12
@@ -974,7 +852,6 @@ local function criarGUI()
         abaSteal.Visible = (abaAtiva == 4)
         abaVisual.Visible = (abaAtiva == 5)
         abaRest.Visible = (abaAtiva == 6)
-
         btnAbaMain.BackgroundColor3 = (abaAtiva == 1) and Color3.fromRGB(0, 150, 220) or Color3.fromRGB(60, 60, 90)
         btnAbaOrb.BackgroundColor3 = (abaAtiva == 2) and Color3.fromRGB(140, 60, 200) or Color3.fromRGB(60, 60, 90)
         btnAbaEsp.BackgroundColor3 = (abaAtiva == 3) and Color3.fromRGB(200, 140, 60) or Color3.fromRGB(60, 60, 90)
@@ -994,15 +871,23 @@ local function criarGUI()
     btnSeguir.MouseButton1Click:Connect(function()
         seguirOn = not seguirOn
         AUTO_SEGUIR = seguirOn
-        btnSeguir.Text = "🎯 SEGUIR BOLA\n" .. (seguirOn and "✅ ON" or "❌ OFF")
+        btnSeguir.Text = "SEGUIR BOLA\n" .. (seguirOn and "ON" or "OFF")
         btnSeguir.BackgroundColor3 = seguirOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+    end)
+
+    local interceptarOn = false
+    btnInterceptar.MouseButton1Click:Connect(function()
+        interceptarOn = not interceptarOn
+        INTERCEPTAR_ATIVO = interceptarOn
+        btnInterceptar.Text = "INTERCEPTAR\n" .. (interceptarOn and "ON" or "OFF")
+        btnInterceptar.BackgroundColor3 = interceptarOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
     local orbitalOn = false
     btnOrbital.MouseButton1Click:Connect(function()
         orbitalOn = not orbitalOn
         ORBITAL_ATIVO = orbitalOn
-        btnOrbital.Text = "🌀 ORBITAL ATIVO\n" .. (orbitalOn and "✅ ON" or "❌ OFF")
+        btnOrbital.Text = "ORBITAL ATIVO\n" .. (orbitalOn and "ON" or "OFF")
         btnOrbital.BackgroundColor3 = orbitalOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
@@ -1031,7 +916,7 @@ local function criarGUI()
             RAIO_ATUAL = RAIO_INICIAL
             ANGULO_ESP = 0
         end
-        btnEspiral.Text = "🌪️ ESPIRAL ATIVA\n" .. (espiralOn and "✅ ON" or "❌ OFF")
+        btnEspiral.Text = "ESPIRAL ATIVA\n" .. (espiralOn and "ON" or "OFF")
         btnEspiral.BackgroundColor3 = espiralOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
@@ -1066,7 +951,7 @@ local function criarGUI()
     btnSteal.MouseButton1Click:Connect(function()
         stealOn = not stealOn
         AUTO_STEAL = stealOn
-        btnSteal.Text = "🦶 AUTO STEAL\n" .. (stealOn and "✅ ON" or "❌ OFF")
+        btnSteal.Text = "AUTO STEAL\n" .. (stealOn and "ON" or "OFF")
         btnSteal.BackgroundColor3 = stealOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
@@ -1096,7 +981,6 @@ local function encontrarBola()
     if not char then return nil, math.huge end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil, math.huge end
-
     local maisPerto, menorDist = nil, math.huge
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
@@ -1141,17 +1025,16 @@ RunService.Heartbeat:Connect(function(deltaTime)
 
     if statusPosseLabel then
         if TEM_BOLA then
-            statusPosseLabel.Text = "✅ Status: COM BOLA"
+            statusPosseLabel.Text = "Status: COM BOLA"
             statusPosseLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
             statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
         else
-            statusPosseLabel.Text = "⚽ Status: SEM BOLA"
+            statusPosseLabel.Text = "Status: SEM BOLA"
             statusPosseLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
             statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
         end
     end
 
-    -- ===== ACHA O DONO E A DIREÇÃO =====
     local donoHrp = nil
     local ehJogador = false
     local menorDistBola = math.huge
@@ -1210,7 +1093,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
 
     if not TEM_BOLA then
         local alvoPosicao = nil
-
         if ESPIRAL_ATIVO then
             ANGULO_ESP = ANGULO_ESP + VELOCIDADE_ESP * deltaTime
             RAIO_ATUAL = RAIO_ATUAL - VELOCIDADE_APROX * deltaTime * 3
@@ -1221,19 +1103,23 @@ RunService.Heartbeat:Connect(function(deltaTime)
             local offsetX = math.cos(ANGULO_ESP) * RAIO_ATUAL
             local offsetZ = math.sin(ANGULO_ESP) * RAIO_ATUAL
             alvoPosicao = bola.Position + Vector3.new(offsetX, ALTURA_ESP, offsetZ)
-
         elseif ORBITAL_ATIVO then
             ANGULO_ORB = ANGULO_ORB + VELOCIDADE_ORB * deltaTime
             local centroOrbita = bola.Position + (direcaoFrente * RAIO_ORB)
             local offsetX = math.cos(ANGULO_ORB) * RAIO_ORB
             local offsetZ = math.sin(ANGULO_ORB) * RAIO_ORB
             alvoPosicao = centroOrbita + Vector3.new(offsetX, ALTURA_ORB, offsetZ)
-
+        elseif INTERCEPTAR_ATIVO then
+            local velBola = bola.Velocity
+            local destino = bola.Position + (velBola * TEMPO_PREVISAO)
+            if velBola.Magnitude > 1 then
+                destino = destino + (velBola.Unit * DISTANCIA_EXTRA)
+            end
+            alvoPosicao = destino + Vector3.new(0, 3, 0)
         elseif AUTO_SEGUIR then
             local posicaoFrente = bola.Position + (direcaoFrente * DISTANCIA_FRENTE)
             alvoPosicao = posicaoFrente + Vector3.new(0, 3, 0)
         end
-
         if alvoPosicao then
             local posAtual = hrp.Position
             local posNova = posAtual:Lerp(alvoPosicao, SUAVIZACAO)
@@ -1249,7 +1135,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
     end
 
     if BALL_TRACKER and trackerLabel then
-        trackerLabel.Text = string.format("⚽ Bola: %.1f studs", dist)
+        trackerLabel.Text = string.format("Bola: %.1f studs", dist)
         if dist <= 5 then
             trackerLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
         elseif dist <= 15 then
@@ -1296,7 +1182,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
 
     if BALL_SPEED and speedLabel then
         local velocidade = bola.Velocity.Magnitude
-        speedLabel.Text = string.format("📊 Velocidade: %.1f", velocidade)
+        speedLabel.Text = string.format("Velocidade: %.1f", velocidade)
     end
 
     if BALL_PIN and ballPin then
@@ -1343,7 +1229,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
         if dist <= 3 and tick() - ultimoToque > 1 then
             ultimoToque = tick()
             counterValor = counterValor + 1
-            counterLabel.Text = "🔢 Toques: " .. counterValor
+            counterLabel.Text = "Toques: " .. counterValor
         end
     end
 end)
@@ -1356,11 +1242,6 @@ task.spawn(function()
     end
 end)
 
-print("===========================================")
-print("SCRIPT BY: @willnzx.mt | v22")
-print("===========================================")
-print("🎯 Seguir + 🌀 Orbital: NA FRENTE do dono")
-print("✅ Detecta jogadores E NPCs")
-print("✅ NPC: usa velocidade pra direção")
-print("✅ Jogador: usa olhar (LookVector)")
-print("===========================================")
+print("SCRIPT BY: @willnzx.mt | v23")
+print("Seguir + Orbital + Interceptar: na frente do dono")
+print("Detecta jogadores E NPCs")
