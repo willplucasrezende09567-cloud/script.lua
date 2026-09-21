@@ -6,7 +6,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local AUTO_SEGUIR = false
 local COOLDOWN_TP = 0.1
 local ULTIMO_TP = 0
-local DISTANCIA_FRENTE = 5
+local DISTANCIA_FRENTE = 8
 
 local INTERCEPTAR_ATIVO = false
 local TEMPO_PREVISAO = 0.5
@@ -1243,5 +1243,5 @@ task.spawn(function()
 end)
 
 print("SCRIPT BY: @willnzx.mt | v23")
-print("Seguir + Orbital + Interceptar: na frente do dono")
+print("Seguir 8 studs + Orbital + Interceptar: na frente do dono")
 print("Detecta jogadores E NPCs")
