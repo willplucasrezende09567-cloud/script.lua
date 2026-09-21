@@ -602,4 +602,741 @@ local function criarGUI()
     labelTituloEsp.Parent = abaEsp
 
     local btnEspiral = Instance.new("TextButton")
-    btnEspiral.Size =
+    btnEspiral.Size = UDim2.new(0.9, 0, 0, 50)
+    btnEspiral.Position = UDim2.new(0.05, 0, 0, 40)
+    btnEspiral.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnEspiral.BorderSizePixel = 0
+    btnEspiral.Text = "🌪️ ESPIRAL ATIVA\n❌ OFF"
+    btnEspiral.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnEspiral.Font = Enum.Font.GothamBold
+    btnEspiral.TextSize = 13
+    btnEspiral.Parent = abaEsp
+    local cE = Instance.new("UICorner") cE.CornerRadius = UDim.new(0, 10) cE.Parent = btnEspiral
+
+    local labelRaioEsp = Instance.new("TextLabel")
+    labelRaioEsp.Size = UDim2.new(0.9, 0, 0, 20)
+    labelRaioEsp.Position = UDim2.new(0.05, 0, 0, 100)
+    labelRaioEsp.BackgroundTransparency = 1
+    labelRaioEsp.Text = "Raio Inicial: " .. RAIO_INICIAL
+    labelRaioEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
+    labelRaioEsp.Font = Enum.Font.GothamBold
+    labelRaioEsp.TextSize = 11
+    labelRaioEsp.Parent = abaEsp
+
+    local btnRaioMaisEsp = Instance.new("TextButton")
+    btnRaioMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnRaioMaisEsp.Position = UDim2.new(0.05, 0, 0, 122)
+    btnRaioMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
+    btnRaioMaisEsp.Text = "➕ RAIO"
+    btnRaioMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnRaioMaisEsp.Font = Enum.Font.GothamBold
+    btnRaioMaisEsp.TextSize = 11
+    btnRaioMaisEsp.BorderSizePixel = 0
+    btnRaioMaisEsp.Parent = abaEsp
+    local cRE1 = Instance.new("UICorner") cRE1.CornerRadius = UDim.new(0, 8) cRE1.Parent = btnRaioMaisEsp
+
+    local btnRaioMenosEsp = Instance.new("TextButton")
+    btnRaioMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnRaioMenosEsp.Position = UDim2.new(0.53, 0, 0, 122)
+    btnRaioMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnRaioMenosEsp.Text = "➖ RAIO"
+    btnRaioMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnRaioMenosEsp.Font = Enum.Font.GothamBold
+    btnRaioMenosEsp.TextSize = 11
+    btnRaioMenosEsp.BorderSizePixel = 0
+    btnRaioMenosEsp.Parent = abaEsp
+    local cRE2 = Instance.new("UICorner") cRE2.CornerRadius = UDim.new(0, 8) cRE2.Parent = btnRaioMenosEsp
+
+    local labelVelEsp = Instance.new("TextLabel")
+    labelVelEsp.Size = UDim2.new(0.9, 0, 0, 20)
+    labelVelEsp.Position = UDim2.new(0.05, 0, 0, 158)
+    labelVelEsp.BackgroundTransparency = 1
+    labelVelEsp.Text = "Velocidade: " .. VELOCIDADE_ESP
+    labelVelEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
+    labelVelEsp.Font = Enum.Font.GothamBold
+    labelVelEsp.TextSize = 11
+    labelVelEsp.Parent = abaEsp
+
+    local btnVelMaisEsp = Instance.new("TextButton")
+    btnVelMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnVelMaisEsp.Position = UDim2.new(0.05, 0, 0, 180)
+    btnVelMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
+    btnVelMaisEsp.Text = "➕ VELOCIDADE"
+    btnVelMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnVelMaisEsp.Font = Enum.Font.GothamBold
+    btnVelMaisEsp.TextSize = 11
+    btnVelMaisEsp.BorderSizePixel = 0
+    btnVelMaisEsp.Parent = abaEsp
+    local cVE1 = Instance.new("UICorner") cVE1.CornerRadius = UDim.new(0, 8) cVE1.Parent = btnVelMaisEsp
+
+    local btnVelMenosEsp = Instance.new("TextButton")
+    btnVelMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnVelMenosEsp.Position = UDim2.new(0.53, 0, 0, 180)
+    btnVelMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnVelMenosEsp.Text = "➖ VELOCIDADE"
+    btnVelMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnVelMenosEsp.Font = Enum.Font.GothamBold
+    btnVelMenosEsp.TextSize = 11
+    btnVelMenosEsp.BorderSizePixel = 0
+    btnVelMenosEsp.Parent = abaEsp
+    local cVE2 = Instance.new("UICorner") cVE2.CornerRadius = UDim.new(0, 8) cVE2.Parent = btnVelMenosEsp
+
+    local labelAproxEsp = Instance.new("TextLabel")
+    labelAproxEsp.Size = UDim2.new(0.9, 0, 0, 20)
+    labelAproxEsp.Position = UDim2.new(0.05, 0, 0, 216)
+    labelAproxEsp.BackgroundTransparency = 1
+    labelAproxEsp.Text = "Aproximação: " .. VELOCIDADE_APROX
+    labelAproxEsp.TextColor3 = Color3.fromRGB(200, 200, 220)
+    labelAproxEsp.Font = Enum.Font.GothamBold
+    labelAproxEsp.TextSize = 11
+    labelAproxEsp.Parent = abaEsp
+
+    local btnAproxMaisEsp = Instance.new("TextButton")
+    btnAproxMaisEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnAproxMaisEsp.Position = UDim2.new(0.05, 0, 0, 238)
+    btnAproxMaisEsp.BackgroundColor3 = Color3.fromRGB(200, 140, 60)
+    btnAproxMaisEsp.Text = "➕ APROXIMAR"
+    btnAproxMaisEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnAproxMaisEsp.Font = Enum.Font.GothamBold
+    btnAproxMaisEsp.TextSize = 11
+    btnAproxMaisEsp.BorderSizePixel = 0
+    btnAproxMaisEsp.Parent = abaEsp
+    local cAP1 = Instance.new("UICorner") cAP1.CornerRadius = UDim.new(0, 8) cAP1.Parent = btnAproxMaisEsp
+
+    local btnAproxMenosEsp = Instance.new("TextButton")
+    btnAproxMenosEsp.Size = UDim2.new(0.42, 0, 0, 28)
+    btnAproxMenosEsp.Position = UDim2.new(0.53, 0, 0, 238)
+    btnAproxMenosEsp.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnAproxMenosEsp.Text = "➖ APROXIMAR"
+    btnAproxMenosEsp.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnAproxMenosEsp.Font = Enum.Font.GothamBold
+    btnAproxMenosEsp.TextSize = 11
+    btnAproxMenosEsp.BorderSizePixel = 0
+    btnAproxMenosEsp.Parent = abaEsp
+    local cAP2 = Instance.new("UICorner") cAP2.CornerRadius = UDim.new(0, 8) cAP2.Parent = btnAproxMenosEsp
+
+    local infoEsp = Instance.new("TextLabel")
+    infoEsp.Size = UDim2.new(0.9, 0, 0, 35)
+    infoEsp.Position = UDim2.new(0.05, 0, 0, 275)
+    infoEsp.BackgroundTransparency = 1
+    infoEsp.Text = "Aproxima da bola em espiral.\nCom suavização (não trava)."
+    infoEsp.TextColor3 = Color3.fromRGB(150, 150, 170)
+    infoEsp.Font = Enum.Font.Gotham
+    infoEsp.TextSize = 10
+    infoEsp.TextWrapped = true
+    infoEsp.Parent = abaEsp
+
+    -- ===== ABA STEAL =====
+    local abaSteal = Instance.new("Frame")
+    abaSteal.Size = UDim2.new(1, 0, 1, -150)
+    abaSteal.Position = UDim2.new(0, 0, 0, 115)
+    abaSteal.BackgroundTransparency = 1
+    abaSteal.Visible = false
+    abaSteal.Parent = menu
+
+    local labelTituloSteal = Instance.new("TextLabel")
+    labelTituloSteal.Size = UDim2.new(0.9, 0, 0, 30)
+    labelTituloSteal.Position = UDim2.new(0.05, 0, 0, 5)
+    labelTituloSteal.BackgroundTransparency = 1
+    labelTituloSteal.Text = "🦶 AUTO STEAL (Q)"
+    labelTituloSteal.TextColor3 = Color3.fromRGB(255, 150, 100)
+    labelTituloSteal.Font = Enum.Font.GothamBold
+    labelTituloSteal.TextSize = 14
+    labelTituloSteal.Parent = abaSteal
+
+    local btnSteal = Instance.new("TextButton")
+    btnSteal.Size = UDim2.new(0.9, 0, 0, 65)
+    btnSteal.Position = UDim2.new(0.05, 0, 0, 40)
+    btnSteal.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btnSteal.BorderSizePixel = 0
+    btnSteal.Text = "🦶 AUTO STEAL\n❌ OFF"
+    btnSteal.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnSteal.Font = Enum.Font.GothamBold
+    btnSteal.TextSize = 15
+    btnSteal.Parent = abaSteal
+    local cSt = Instance.new("UICorner") cSt.CornerRadius = UDim.new(0, 10) cSt.Parent = btnSteal
+
+    local infoSteal = Instance.new("TextLabel")
+    infoSteal.Size = UDim2.new(0.9, 0, 0, 100)
+    infoSteal.Position = UDim2.new(0.05, 0, 0, 120)
+    infoSteal.BackgroundTransparency = 1
+    infoSteal.Text = "Aperta Q automaticamente\nquando a bola tá perto (6 studs).\n\n✅ NUNCA pausa\n⚠️ Buga os botões mobile."
+    infoSteal.TextColor3 = Color3.fromRGB(150, 150, 170)
+    infoSteal.Font = Enum.Font.Gotham
+    infoSteal.TextSize = 11
+    infoSteal.TextWrapped = true
+    infoSteal.Parent = abaSteal
+
+    -- ===== ABA VISUAL =====
+    local abaVisual = Instance.new("Frame")
+    abaVisual.Size = UDim2.new(1, 0, 1, -150)
+    abaVisual.Position = UDim2.new(0, 0, 0, 115)
+    abaVisual.BackgroundTransparency = 1
+    abaVisual.Visible = false
+    abaVisual.Parent = menu
+
+    local labelTituloVisual = Instance.new("TextLabel")
+    labelTituloVisual.Size = UDim2.new(0.9, 0, 0, 30)
+    labelTituloVisual.Position = UDim2.new(0.05, 0, 0, 5)
+    labelTituloVisual.BackgroundTransparency = 1
+    labelTituloVisual.Text = "👁️ VISUAL / INFO"
+    labelTituloVisual.TextColor3 = Color3.fromRGB(100, 255, 200)
+    labelTituloVisual.Font = Enum.Font.GothamBold
+    labelTituloVisual.TextSize = 14
+    labelTituloVisual.Parent = abaVisual
+
+    local scrollV = Instance.new("ScrollingFrame")
+    scrollV.Size = UDim2.new(0.9, 0, 1, -50)
+    scrollV.Position = UDim2.new(0.05, 0, 0, 40)
+    scrollV.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+    scrollV.BorderSizePixel = 0
+    scrollV.ScrollBarThickness = 6
+    scrollV.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollV.Parent = abaVisual
+    local cSV = Instance.new("UICorner") cSV.CornerRadius = UDim.new(0, 10) cSV.Parent = scrollV
+
+    local layoutV = Instance.new("UIListLayout")
+    layoutV.Padding = UDim.new(0, 5)
+    layoutV.SortOrder = Enum.SortOrder.LayoutOrder
+    layoutV.Parent = scrollV
+
+    local paddingV = Instance.new("UIPadding")
+    paddingV.PaddingTop = UDim.new(0, 5)
+    paddingV.PaddingLeft = UDim.new(0, 5)
+    paddingV.PaddingRight = UDim.new(0, 5)
+    paddingV.Parent = scrollV
+
+    local function criarToggleVisual(texto, ordem, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -10, 0, 45)
+        btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        btn.BorderSizePixel = 0
+        btn.Text = texto .. "\n❌ OFF"
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 12
+        btn.LayoutOrder = ordem
+        btn.Parent = scrollV
+
+        local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, 8) c.Parent = btn
+
+        local estado = false
+        btn.MouseButton1Click:Connect(function()
+            estado = not estado
+            btn.Text = texto .. (estado and "\n✅ ON" or "\n❌ OFF")
+            btn.BackgroundColor3 = estado and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+            callback(estado)
+        end)
+    end
+
+    criarToggleVisual("📏 BALL TRACKER (distância)", 1, function(a)
+        BALL_TRACKER = a
+        if a then criarTrackerLabel() else
+            if trackerLabel then trackerLabel:Destroy() trackerLabel = nil end
+        end
+    end)
+
+    criarToggleVisual("⭕ BALL RADIUS (círculo no chão)", 2, function(a)
+        BALL_RADIUS = a
+        if not a and ballRadiusPart then ballRadiusPart:Destroy() ballRadiusPart = nil end
+    end)
+
+    criarToggleVisual("🔦 BALL HIGHLIGHT (brilho)", 3, function(a)
+        BALL_HIGHLIGHT = a
+        if not a and ballHighlight then ballHighlight:Destroy() ballHighlight = nil end
+    end)
+
+    criarToggleVisual("🎯 BALL LINE (linha até a bola)", 4, function(a)
+        BALL_LINE = a
+        if not a and ballLine then ballLine:Destroy() ballLine = nil end
+    end)
+
+    criarToggleVisual("📊 BALL SPEED (velocidade)", 5, function(a)
+        BALL_SPEED = a
+        if a then criarSpeedLabel() else
+            if speedLabel then speedLabel:Destroy() speedLabel = nil end
+        end
+    end)
+
+    criarToggleVisual("📍 BALL PIN (seta)", 6, function(a)
+        BALL_PIN = a
+        if a then criarBallPin() else
+            if ballPin then ballPin:Destroy() ballPin = nil end
+        end
+    end)
+
+    criarToggleVisual("🖼️ BALL MARKER (anel girando)", 7, function(a)
+        BALL_MARKER = a
+        if not a and ballMarker then ballMarker:Destroy() ballMarker = nil end
+    end)
+
+    criarToggleVisual("🌈 RAINBOW BALL (cor muda)", 8, function(a)
+        RAINBOW_BALL = a
+    end)
+
+    criarToggleVisual("🌐 BALL TRAIL (rastro)", 9, function(a)
+        BALL_TRAIL = a
+        if not a and ballTrail then ballTrail:Destroy() ballTrail = nil end
+    end)
+
+    criarToggleVisual("🔢 BALL COUNTER (contador)", 10, function(a)
+        BALL_COUNTER = a
+        if a then
+            counterValor = 0
+            criarCounterLabel()
+        else
+            if counterLabel then counterLabel:Destroy() counterLabel = nil end
+        end
+    end)
+
+    task.wait(0.1)
+    scrollV.CanvasSize = UDim2.new(0, 0, 0, layoutV.AbsoluteContentSize.Y + 20)
+
+    -- ===== ABA REST =====
+    local abaRest = Instance.new("Frame")
+    abaRest.Size = UDim2.new(1, 0, 1, -150)
+    abaRest.Position = UDim2.new(0, 0, 0, 115)
+    abaRest.BackgroundTransparency = 1
+    abaRest.Visible = false
+    abaRest.Parent = menu
+
+    local labelTituloRest = Instance.new("TextLabel")
+    labelTituloRest.Size = UDim2.new(0.9, 0, 0, 30)
+    labelTituloRest.Position = UDim2.new(0.05, 0, 0, 5)
+    labelTituloRest.BackgroundTransparency = 1
+    labelTituloRest.Text = "🔄 RESTAURAR CONTROLES"
+    labelTituloRest.TextColor3 = Color3.fromRGB(100, 255, 100)
+    labelTituloRest.Font = Enum.Font.GothamBold
+    labelTituloRest.TextSize = 14
+    labelTituloRest.Parent = abaRest
+
+    local btnRestaurar = Instance.new("TextButton")
+    btnRestaurar.Size = UDim2.new(0.9, 0, 0, 75)
+    btnRestaurar.Position = UDim2.new(0.05, 0, 0, 45)
+    btnRestaurar.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+    btnRestaurar.BorderSizePixel = 0
+    btnRestaurar.Text = "🔄 RESTAURAR\n(turbo 7x)"
+    btnRestaurar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnRestaurar.Font = Enum.Font.GothamBold
+    btnRestaurar.TextSize = 15
+    btnRestaurar.Parent = abaRest
+    local cRP = Instance.new("UICorner") cRP.CornerRadius = UDim.new(0, 12) cRP.Parent = btnRestaurar
+
+    btnRestaurar.MouseButton1Click:Connect(function()
+        btnRestaurar.Text = "⏳ RESTAURANDO..."
+        btnRestaurar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        btnRestaurar.Active = false
+
+        task.spawn(function()
+            restaurarControles()
+            task.wait(0.3)
+            btnRestaurar.Text = "🔄 RESTAURAR\n(turbo 7x)"
+            btnRestaurar.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+            btnRestaurar.Active = true
+        end)
+    end)
+
+    local avisoRest = Instance.new("TextLabel")
+    avisoRest.Size = UDim2.new(0.9, 0, 0, 30)
+    avisoRest.Position = UDim2.new(0.05, 0, 0, 130)
+    avisoRest.BackgroundColor3 = Color3.fromRGB(60, 40, 20)
+    avisoRest.BorderSizePixel = 0
+    avisoRest.Text = "⚠️ Apertar de 3 a 6 vezes pra voltar"
+    avisoRest.TextColor3 = Color3.fromRGB(255, 200, 100)
+    avisoRest.Font = Enum.Font.GothamBold
+    avisoRest.TextSize = 12
+    avisoRest.Parent = abaRest
+    local cAv = Instance.new("UICorner") cAv.CornerRadius = UDim.new(0, 8) cAv.Parent = avisoRest
+
+    local infoRest = Instance.new("TextLabel")
+    infoRest.Size = UDim2.new(0.9, 0, 0, 70)
+    infoRest.Position = UDim2.new(0.05, 0, 0, 170)
+    infoRest.BackgroundTransparency = 1
+    infoRest.Text = "Toca quando os botões sumirem.\nForça TUDO visível 7x turbo.\n✅ Nunca pausa."
+    infoRest.TextColor3 = Color3.fromRGB(150, 150, 170)
+    infoRest.Font = Enum.Font.Gotham
+    infoRest.TextSize = 11
+    infoRest.TextWrapped = true
+    infoRest.Parent = abaRest
+
+    -- Fechar
+    local btnFechar = Instance.new("TextButton")
+    btnFechar.Size = UDim2.new(0.9, 0, 0, 32)
+    btnFechar.Position = UDim2.new(0.05, 0, 1, -42)
+    btnFechar.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+    btnFechar.Text = "✖ FECHAR"
+    btnFechar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnFechar.Font = Enum.Font.GothamBold
+    btnFechar.TextSize = 12
+    btnFechar.BorderSizePixel = 0
+    btnFechar.Parent = menu
+    local cF = Instance.new("UICorner") cF.CornerRadius = UDim.new(0, 8) cF.Parent = btnFechar
+
+    -- ===== LÓGICA DAS ABAS =====
+    local function mudarAba(abaAtiva)
+        abaMain.Visible = (abaAtiva == 1)
+        abaOrb.Visible = (abaAtiva == 2)
+        abaEsp.Visible = (abaAtiva == 3)
+        abaSteal.Visible = (abaAtiva == 4)
+        abaVisual.Visible = (abaAtiva == 5)
+        abaRest.Visible = (abaAtiva == 6)
+
+        btnAbaMain.BackgroundColor3 = (abaAtiva == 1) and Color3.fromRGB(0, 150, 220) or Color3.fromRGB(60, 60, 90)
+        btnAbaOrb.BackgroundColor3 = (abaAtiva == 2) and Color3.fromRGB(140, 60, 200) or Color3.fromRGB(60, 60, 90)
+        btnAbaEsp.BackgroundColor3 = (abaAtiva == 3) and Color3.fromRGB(200, 140, 60) or Color3.fromRGB(60, 60, 90)
+        btnAbaSteal.BackgroundColor3 = (abaAtiva == 4) and Color3.fromRGB(200, 100, 50) or Color3.fromRGB(60, 60, 90)
+        btnAbaVisual.BackgroundColor3 = (abaAtiva == 5) and Color3.fromRGB(50, 180, 150) or Color3.fromRGB(60, 60, 90)
+        btnAbaRest.BackgroundColor3 = (abaAtiva == 6) and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(60, 60, 90)
+    end
+
+    btnAbaMain.MouseButton1Click:Connect(function() mudarAba(1) end)
+    btnAbaOrb.MouseButton1Click:Connect(function() mudarAba(2) end)
+    btnAbaEsp.MouseButton1Click:Connect(function() mudarAba(3) end)
+    btnAbaSteal.MouseButton1Click:Connect(function() mudarAba(4) end)
+    btnAbaVisual.MouseButton1Click:Connect(function() mudarAba(5) end)
+    btnAbaRest.MouseButton1Click:Connect(function() mudarAba(6) end)
+
+    -- Toggle Seguir
+    local seguirOn = false
+    btnSeguir.MouseButton1Click:Connect(function()
+        seguirOn = not seguirOn
+        AUTO_SEGUIR = seguirOn
+        btnSeguir.Text = "🎯 SEGUIR BOLA\n" .. (seguirOn and "✅ ON" or "❌ OFF")
+        btnSeguir.BackgroundColor3 = seguirOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+    end)
+
+    -- Toggle Orbital
+    local orbitalOn = false
+    btnOrbital.MouseButton1Click:Connect(function()
+        orbitalOn = not orbitalOn
+        ORBITAL_ATIVO = orbitalOn
+        btnOrbital.Text = "🌀 ORBITAL ATIVO\n" .. (orbitalOn and "✅ ON" or "❌ OFF")
+        btnOrbital.BackgroundColor3 = orbitalOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+    end)
+
+    btnRaioMaisOrb.MouseButton1Click:Connect(function()
+        RAIO_ORB = math.min(RAIO_ORB + 1, 20)
+        labelRaioOrb.Text = "Raio: " .. RAIO_ORB .. " studs"
+    end)
+    btnRaioMenosOrb.MouseButton1Click:Connect(function()
+        RAIO_ORB = math.max(RAIO_ORB - 1, 2)
+        labelRaioOrb.Text = "Raio: " .. RAIO_ORB .. " studs"
+    end)
+    btnVelMaisOrb.MouseButton1Click:Connect(function()
+        VELOCIDADE_ORB = math.min(VELOCIDADE_ORB + 0.5, 15)
+        labelVelOrb.Text = "Velocidade: " .. VELOCIDADE_ORB
+    end)
+    btnVelMenosOrb.MouseButton1Click:Connect(function()
+        VELOCIDADE_ORB = math.max(VELOCIDADE_ORB - 0.5, 0.5)
+        labelVelOrb.Text = "Velocidade: " .. VELOCIDADE_ORB
+    end)
+
+    -- Toggle Espiral
+    local espiralOn = false
+    btnEspiral.MouseButton1Click:Connect(function()
+        espiralOn = not espiralOn
+        ESPIRAL_ATIVO = espiralOn
+        if espiralOn then
+            RAIO_ATUAL = RAIO_INICIAL
+            ANGULO_ESP = 0
+        end
+        btnEspiral.Text = "🌪️ ESPIRAL ATIVA\n" .. (espiralOn and "✅ ON" or "❌ OFF")
+        btnEspiral.BackgroundColor3 = espiralOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+    end)
+
+    btnRaioMaisEsp.MouseButton1Click:Connect(function()
+        RAIO_INICIAL = math.min(RAIO_INICIAL + 2, 40)
+        labelRaioEsp.Text = "Raio Inicial: " .. RAIO_INICIAL
+        if ESPIRAL_ATIVO then RAIO_ATUAL = RAIO_INICIAL end
+    end)
+    btnRaioMenosEsp.MouseButton1Click:Connect(function()
+        RAIO_INICIAL = math.max(RAIO_INICIAL - 2, 5)
+        labelRaioEsp.Text = "Raio Inicial: " .. RAIO_INICIAL
+        if ESPIRAL_ATIVO then RAIO_ATUAL = RAIO_INICIAL end
+    end)
+    btnVelMaisEsp.MouseButton1Click:Connect(function()
+        VELOCIDADE_ESP = math.min(VELOCIDADE_ESP + 0.5, 10)
+        labelVelEsp.Text = "Velocidade: " .. VELOCIDADE_ESP
+    end)
+    btnVelMenosEsp.MouseButton1Click:Connect(function()
+        VELOCIDADE_ESP = math.max(VELOCIDADE_ESP - 0.5, 0.5)
+        labelVelEsp.Text = "Velocidade: " .. VELOCIDADE_ESP
+    end)
+    btnAproxMaisEsp.MouseButton1Click:Connect(function()
+        VELOCIDADE_APROX = math.min(VELOCIDADE_APROX + 0.5, 10)
+        labelAproxEsp.Text = "Aproximação: " .. VELOCIDADE_APROX
+    end)
+    btnAproxMenosEsp.MouseButton1Click:Connect(function()
+        VELOCIDADE_APROX = math.max(VELOCIDADE_APROX - 0.5, 0.1)
+        labelAproxEsp.Text = "Aproximação: " .. VELOCIDADE_APROX
+    end)
+
+    -- Toggle Steal
+    local stealOn = false
+    btnSteal.MouseButton1Click:Connect(function()
+        stealOn = not stealOn
+        AUTO_STEAL = stealOn
+        btnSteal.Text = "🦶 AUTO STEAL\n" .. (stealOn and "✅ ON" or "❌ OFF")
+        btnSteal.BackgroundColor3 = stealOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
+    end)
+
+    -- Abrir/fechar
+    local menuAberto = false
+    botaoAbrir.MouseButton1Click:Connect(function()
+        menuAberto = not menuAberto
+        menu.Visible = menuAberto
+    end)
+    btnFechar.MouseButton1Click:Connect(function()
+        menuAberto = false
+        menu.Visible = false
+    end)
+end
+
+criarGUI()
+
+-- ===== DETECÇÃO DA BOLA =====
+local NOMES_BOLA = {
+    ["soccerball"] = true,
+    ["ball"] = true,
+    ["bola"] = true,
+    ["football"] = true,
+    ["soccer"] = true,
+}
+
+local function encontrarBola()
+    local char = LocalPlayer.Character
+    if not char then return nil, math.huge end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil, math.huge end
+
+    local maisPerto, menorDist = nil, math.huge
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local nome = obj.Name:lower()
+            if NOMES_BOLA[nome] then
+                local d = (obj.Position - hrp.Position).Magnitude
+                if d < menorDist then
+                    menorDist = d
+                    maisPerto = obj
+                end
+            end
+        end
+    end
+    return maisPerto, menorDist
+end
+
+-- ===== STEAL =====
+local function executarSteal()
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+        task.wait(0.03)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+    end)
+end
+
+-- ===== LOOP PRINCIPAL =====
+RunService.Heartbeat:Connect(function(deltaTime)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local bola, dist = encontrarBola()
+    if not bola then return end
+
+    -- ===== DETECÇÃO DE POSSE =====
+    local TEM_BOLA = temPosseReal(bola, hrp)
+
+    if ESTAVA_COM_BOLA and not TEM_BOLA then
+        RAIO_ATUAL = RAIO_INICIAL
+        ANGULO_ESP = 0
+    end
+    ESTAVA_COM_BOLA = TEM_BOLA
+
+    -- Status
+    if statusPosseLabel then
+        if TEM_BOLA then
+            statusPosseLabel.Text = "✅ Status: COM BOLA (funções pausadas)"
+            statusPosseLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+            statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+        else
+            statusPosseLabel.Text = "⚽ Status: SEM BOLA"
+            statusPosseLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+            statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+        end
+    end
+
+    -- ===== MUTEX + SUAVIZAÇÃO =====
+    if not TEM_BOLA then
+        local alvoPosicao = nil
+
+        if ESPIRAL_ATIVO then
+            ANGULO_ESP = ANGULO_ESP + VELOCIDADE_ESP * deltaTime
+            RAIO_ATUAL = RAIO_ATUAL - VELOCIDADE_APROX * deltaTime * 3
+
+            if RAIO_ATUAL < 2 then
+                RAIO_ATUAL = RAIO_INICIAL
+                ANGULO_ESP = 0
+            end
+
+            local offsetX = math.cos(ANGULO_ESP) * RAIO_ATUAL
+            local offsetZ = math.sin(ANGULO_ESP) * RAIO_ATUAL
+            alvoPosicao = bola.Position + Vector3.new(offsetX, ALTURA_ESP, offsetZ)
+
+        elseif ORBITAL_ATIVO then
+            ANGULO_ORB = ANGULO_ORB + VELOCIDADE_ORB * deltaTime
+            
+            -- ===== ORBITAL ADAPTATIVO =====
+            local velocidadeBola = bola.Velocity.Magnitude
+            local centroOrbita = bola.Position
+            
+            -- Se a bola tá andando, orbita na frente
+            if velocidadeBola > VELOCIDADE_MINIMA_BOLA then
+                local direcao = bola.Velocity.Unit
+                centroOrbita = bola.Position + (direcao * RAIO_ORB)
+            end
+            
+            local offsetX = math.cos(ANGULO_ORB) * RAIO_ORB
+            local offsetZ = math.sin(ANGULO_ORB) * RAIO_ORB
+            alvoPosicao = centroOrbita + Vector3.new(offsetX, ALTURA_ORB, offsetZ)
+
+        elseif AUTO_SEGUIR then
+            if tick() - ULTIMO_TP >= COOLDOWN_TP then
+                ULTIMO_TP = tick()
+                alvoPosicao = bola.Position + Vector3.new(0, 3, 0)
+            end
+        end
+
+        if alvoPosicao then
+            local posAtual = hrp.Position
+            local posNova = posAtual:Lerp(alvoPosicao, SUAVIZACAO)
+            hrp.CFrame = CFrame.new(posNova) * (hrp.CFrame - hrp.CFrame.Position)
+        end
+    end
+
+    -- ===== AUTO STEAL =====
+    if AUTO_STEAL and dist <= DISTANCIA_STEAL then
+        if tick() - ULTIMO_STEAL >= COOLDOWN_STEAL then
+            ULTIMO_STEAL = tick()
+            executarSteal()
+        end
+    end
+
+    -- ===== VISUAIS =====
+    if BALL_TRACKER and trackerLabel then
+        trackerLabel.Text = string.format("⚽ Bola: %.1f studs", dist)
+        if dist <= 5 then
+            trackerLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        elseif dist <= 15 then
+            trackerLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+        else
+            trackerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    end
+
+    if BALL_RADIUS then
+        if not ballRadiusPart or not ballRadiusPart.Parent then
+            criarBallRadius(bola)
+        else
+            ballRadiusPart.CFrame = CFrame.new(bola.Position) * CFrame.Angles(0, 0, math.rad(90))
+        end
+    end
+
+    if BALL_HIGHLIGHT then
+        if not ballHighlight or not ballHighlight.Parent then
+            criarBallHighlight(bola)
+        else
+            ballHighlight.Adornee = bola
+        end
+    end
+
+    if BALL_LINE then
+        if not ballLine or not ballLine.Parent then
+            ballLine = Instance.new("Part")
+            ballLine.Name = "BallLineVisual"
+            ballLine.Anchored = true
+            ballLine.CanCollide = false
+            ballLine.CanQuery = false
+            ballLine.CanTouch = false
+            ballLine.Material = Enum.Material.Neon
+            ballLine.Color = Color3.fromRGB(0, 255, 100)
+            ballLine.Transparency = 0.5
+            ballLine.Parent = workspace
+        end
+        local distancia = (bola.Position - hrp.Position).Magnitude
+        local meio = (bola.Position + hrp.Position) / 2
+        ballLine.Size = Vector3.new(0.2, 0.2, distancia)
+        ballLine.CFrame = CFrame.new(meio, bola.Position)
+    end
+
+    if BALL_SPEED and speedLabel then
+        local velocidade = bola.Velocity.Magnitude
+        speedLabel.Text = string.format("📊 Velocidade: %.1f", velocidade)
+    end
+
+    if BALL_PIN and ballPin then
+        local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(bola.Position)
+        if onScreen then
+            ballPin.Visible = false
+        else
+            ballPin.Visible = true
+            local viewportSize = workspace.CurrentCamera.ViewportSize
+            local centro = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+            local dir = Vector2.new(screenPos.X - centro.X, screenPos.Y - centro.Y).Unit
+            ballPin.Position = UDim2.new(0.5, dir.X * 150 - 20, 0.5, dir.Y * 150 - 20)
+            local angulo = math.deg(math.atan2(dir.Y, dir.X)) + 90
+            ballPin.Rotation = angulo
+        end
+    end
+
+    if BALL_MARKER then
+        if not ballMarker or not ballMarker.Parent then
+            criarBallMarker(bola)
+        else
+            ANGULO_MARKER = ANGULO_MARKER + 2
+            ballMarker.CFrame = CFrame.new(bola.Position) * CFrame.Angles(0, 0, math.rad(ANGULO_MARKER))
+        end
+    end
+
+    if RAINBOW_BALL and bola then
+        local tempo = tick()
+        local r = math.sin(tempo * 2) * 0.5 + 0.5
+        local g = math.sin(tempo * 2 + 2) * 0.5 + 0.5
+        local b = math.sin(tempo * 2 + 4) * 0.5 + 0.5
+        pcall(function()
+            bola.Color = Color3.new(r, g, b)
+        end)
+    end
+
+    if BALL_TRAIL then
+        if not ballTrail or not ballTrail.Parent then
+            criarBallTrail(bola)
+        end
+    end
+
+    if BALL_COUNTER and counterLabel then
+        if dist <= 3 and tick() - ultimoToque > 1 then
+            ultimoToque = tick()
+            counterValor = counterValor + 1
+            counterLabel.Text = "🔢 Toques: " .. counterValor
+        end
+    end
+end)
+
+-- ===== GUI NÃO SOME =====
+task.spawn(function()
+    while task.wait(2) do
+        if not gui or not gui.Parent then
+            criarGUI()
+        end
+    end
+end)
+
+print("===========================================")
+print("SCRIPT BY: @willnzx.mt | v18")
+print("===========================================")
+print("🌀 ORBITAL ADAPTATIVO:")
+print("   • Bola parada → orbita no centro")
+print("   • Bola andando → orbita na FRENTE")
+print("===========================================")
