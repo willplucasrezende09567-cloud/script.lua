@@ -1,4 +1,4 @@
---// Aura Futebol - ALL-IN-ONE (v18 - Orbital Adaptativo)
+--// Aura Futebol - ALL-IN-ONE (v22 - Detecta Jogadores e NPCs)
 --// by: @willnzx.mt
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,20 +6,17 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============ CONFIGURAÇÕES ============
--- Seguir
 local AUTO_SEGUIR = false
 local COOLDOWN_TP = 0.1
 local ULTIMO_TP = 0
+local DISTANCIA_FRENTE = 5
 
--- Orbital
 local ORBITAL_ATIVO = false
 local RAIO_ORB = 5
 local VELOCIDADE_ORB = 5
 local ALTURA_ORB = 3
 local ANGULO_ORB = 0
-local VELOCIDADE_MINIMA_BOLA = 1  -- Velocidade mínima pra considerar "andando"
 
--- Espiral
 local ESPIRAL_ATIVO = false
 local RAIO_INICIAL = 15
 local VELOCIDADE_ESP = 3
@@ -28,24 +25,17 @@ local ALTURA_ESP = 3
 local ANGULO_ESP = 0
 local RAIO_ATUAL = 15
 
--- Steal
 local AUTO_STEAL = false
 local COOLDOWN_STEAL = 0.3
 local DISTANCIA_STEAL = 6
 local ULTIMO_STEAL = 0
 
--- Posse
 local DISTANCIA_POSSE = 3
 local ESTAVA_COM_BOLA = false
-
--- Suavização
 local SUAVIZACAO = 0.2
-
--- Borda RGB
 local BORDA_RGB = true
 local VELOCIDADE_RGB = 1
 
--- ===== VISUAL / INFO =====
 local BALL_TRACKER = false
 local BALL_RADIUS = false
 local BALL_HIGHLIGHT = false
@@ -71,7 +61,6 @@ local ultimoToque = 0
 local ANGULO_MARKER = 0
 -- ========================================
 
--- ===== FUNÇÃO FORÇAR VISÍVEL =====
 local function forcarVisivel(pai)
     for _, obj in ipairs(pai:GetChildren()) do
         if obj:IsA("GuiObject") then
@@ -99,7 +88,6 @@ local function restaurarControles()
     end
 end
 
--- ===== DETECÇÃO INTELIGENTE DE POSSE =====
 local function temPosseReal(bola, hrp)
     local distVoce = (bola.Position - hrp.Position).Magnitude
     if distVoce > DISTANCIA_POSSE then return false end
@@ -120,11 +108,25 @@ local function temPosseReal(bola, hrp)
         end
     end
 
+    if not outroMaisPerto then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Humanoid") and obj.Health > 0 and obj.Parent ~= LocalPlayer.Character then
+                local npcHrp = obj.Parent:FindFirstChild("HumanoidRootPart")
+                if npcHrp then
+                    local d = (bola.Position - npcHrp.Position).Magnitude
+                    if d < menorDist and d < 5 then
+                        menorDist = d
+                        outroMaisPerto = true
+                    end
+                end
+            end
+        end
+    end
+
     if outroMaisPerto then return false end
     return true
 end
 
--- ===== LABELS =====
 local function criarTrackerLabel()
     if trackerLabel then trackerLabel:Destroy() end
     trackerLabel = Instance.new("TextLabel")
@@ -261,7 +263,6 @@ local statusPosseLabel = nil
 
 local function criarGUI()
     if gui then gui:Destroy() end
-
     gui = Instance.new("ScreenGui")
     gui.Name = "AuraAllInOne"
     gui.ResetOnSpawn = false
@@ -297,7 +298,6 @@ local function criarGUI()
     menu.Parent = gui
 
     local cM = Instance.new("UICorner") cM.CornerRadius = UDim.new(0, 14) cM.Parent = menu
-
     local gradienteMenu = Instance.new("UIGradient")
     gradienteMenu.Rotation = 90
     gradienteMenu.Color = ColorSequence.new({
@@ -319,9 +319,7 @@ local function criarGUI()
             local r = math.sin(tempo) * 0.5 + 0.5
             local g = math.sin(tempo + 2) * 0.5 + 0.5
             local b = math.sin(tempo + 4) * 0.5 + 0.5
-            pcall(function()
-                strokeM.Color = Color3.new(r, g, b)
-            end)
+            pcall(function() strokeM.Color = Color3.new(r, g, b) end)
             task.wait(0.05)
         end
     end)
@@ -335,9 +333,7 @@ local function criarGUI()
     titulo.Font = Enum.Font.GothamBold
     titulo.TextSize = 15
     titulo.Parent = menu
-
     local cT = Instance.new("UICorner") cT.CornerRadius = UDim.new(0, 14) cT.Parent = titulo
-
     local gradienteTitulo = Instance.new("UIGradient")
     gradienteTitulo.Rotation = 90
     gradienteTitulo.Color = ColorSequence.new({
@@ -356,7 +352,6 @@ local function criarGUI()
     statusPosseLabel.Font = Enum.Font.GothamBold
     statusPosseLabel.TextSize = 11
     statusPosseLabel.Parent = menu
-
     local cSP = Instance.new("UICorner") cSP.CornerRadius = UDim.new(0, 6) cSP.Parent = statusPosseLabel
 
     -- ===== ABAS =====
@@ -434,6 +429,7 @@ local function criarGUI()
     local cAb6 = Instance.new("UICorner") cAb6.CornerRadius = UDim.new(0, 8) cAb6.Parent = btnAbaRest
 
     -- ===== ABA MAIN =====
+
     local abaMain = Instance.new("Frame")
     abaMain.Size = UDim2.new(1, 0, 1, -150)
     abaMain.Position = UDim2.new(0, 0, 0, 115)
@@ -445,10 +441,10 @@ local function criarGUI()
     labelTituloMain.Size = UDim2.new(0.9, 0, 0, 30)
     labelTituloMain.Position = UDim2.new(0.05, 0, 0, 5)
     labelTituloMain.BackgroundTransparency = 1
-    labelTituloMain.Text = "🎯 SEGUIR BOLA"
+    labelTituloMain.Text = "🎯 SEGUIR NA FRENTE"
     labelTituloMain.TextColor3 = Color3.fromRGB(100, 220, 255)
     labelTituloMain.Font = Enum.Font.GothamBold
-    labelTituloMain.TextSize = 14
+    labelTituloMain.TextSize = 13
     labelTituloMain.Parent = abaMain
 
     local btnSeguir = Instance.new("TextButton")
@@ -467,7 +463,7 @@ local function criarGUI()
     infoMain.Size = UDim2.new(0.9, 0, 0, 80)
     infoMain.Position = UDim2.new(0.05, 0, 0, 125)
     infoMain.BackgroundTransparency = 1
-    infoMain.Text = "Teleporta pra bola com suavização.\n\n✅ Pausa se você tiver posse\n✅ Não trava nem gira doidamente"
+    infoMain.Text = "Fica NA FRENTE do dono da bola.\n✅ Funciona com jogador E NPC\n✅ Pausa se você tiver posse"
     infoMain.TextColor3 = Color3.fromRGB(150, 150, 170)
     infoMain.Font = Enum.Font.Gotham
     infoMain.TextSize = 11
@@ -486,10 +482,10 @@ local function criarGUI()
     labelTituloOrb.Size = UDim2.new(0.9, 0, 0, 30)
     labelTituloOrb.Position = UDim2.new(0.05, 0, 0, 5)
     labelTituloOrb.BackgroundTransparency = 1
-    labelTituloOrb.Text = "🌀 ORBITAL BALL (ADAPTATIVO)"
+    labelTituloOrb.Text = "🌀 ORBITAL (na frente do dono)"
     labelTituloOrb.TextColor3 = Color3.fromRGB(200, 100, 255)
     labelTituloOrb.Font = Enum.Font.GothamBold
-    labelTituloOrb.TextSize = 14
+    labelTituloOrb.TextSize = 13
     labelTituloOrb.Parent = abaOrb
 
     local btnOrbital = Instance.new("TextButton")
@@ -576,7 +572,7 @@ local function criarGUI()
     infoOrb.Size = UDim2.new(0.9, 0, 0, 60)
     infoOrb.Position = UDim2.new(0.05, 0, 0, 228)
     infoOrb.BackgroundTransparency = 1
-    infoOrb.Text = "🌀 ADAPTATIVO:\n• Bola parada → orbita no centro\n• Bola andando → orbita na FRENTE"
+    infoOrb.Text = "🌀 Sempre orbita NA FRENTE do dono.\n✅ Jogador: usa direção do olhar\n✅ NPC: usa direção do movimento"
     infoOrb.TextColor3 = Color3.fromRGB(150, 150, 170)
     infoOrb.Font = Enum.Font.Gotham
     infoOrb.TextSize = 10
@@ -959,7 +955,6 @@ local function criarGUI()
     infoRest.TextWrapped = true
     infoRest.Parent = abaRest
 
-    -- Fechar
     local btnFechar = Instance.new("TextButton")
     btnFechar.Size = UDim2.new(0.9, 0, 0, 32)
     btnFechar.Position = UDim2.new(0.05, 0, 1, -42)
@@ -972,7 +967,6 @@ local function criarGUI()
     btnFechar.Parent = menu
     local cF = Instance.new("UICorner") cF.CornerRadius = UDim.new(0, 8) cF.Parent = btnFechar
 
-    -- ===== LÓGICA DAS ABAS =====
     local function mudarAba(abaAtiva)
         abaMain.Visible = (abaAtiva == 1)
         abaOrb.Visible = (abaAtiva == 2)
@@ -996,7 +990,6 @@ local function criarGUI()
     btnAbaVisual.MouseButton1Click:Connect(function() mudarAba(5) end)
     btnAbaRest.MouseButton1Click:Connect(function() mudarAba(6) end)
 
-    -- Toggle Seguir
     local seguirOn = false
     btnSeguir.MouseButton1Click:Connect(function()
         seguirOn = not seguirOn
@@ -1005,7 +998,6 @@ local function criarGUI()
         btnSeguir.BackgroundColor3 = seguirOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
-    -- Toggle Orbital
     local orbitalOn = false
     btnOrbital.MouseButton1Click:Connect(function()
         orbitalOn = not orbitalOn
@@ -1031,7 +1023,6 @@ local function criarGUI()
         labelVelOrb.Text = "Velocidade: " .. VELOCIDADE_ORB
     end)
 
-    -- Toggle Espiral
     local espiralOn = false
     btnEspiral.MouseButton1Click:Connect(function()
         espiralOn = not espiralOn
@@ -1071,7 +1062,6 @@ local function criarGUI()
         labelAproxEsp.Text = "Aproximação: " .. VELOCIDADE_APROX
     end)
 
-    -- Toggle Steal
     local stealOn = false
     btnSteal.MouseButton1Click:Connect(function()
         stealOn = not stealOn
@@ -1080,7 +1070,6 @@ local function criarGUI()
         btnSteal.BackgroundColor3 = stealOn and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(180, 50, 50)
     end)
 
-    -- Abrir/fechar
     local menuAberto = false
     botaoAbrir.MouseButton1Click:Connect(function()
         menuAberto = not menuAberto
@@ -1094,7 +1083,6 @@ end
 
 criarGUI()
 
--- ===== DETECÇÃO DA BOLA =====
 local NOMES_BOLA = {
     ["soccerball"] = true,
     ["ball"] = true,
@@ -1125,7 +1113,6 @@ local function encontrarBola()
     return maisPerto, menorDist
 end
 
--- ===== STEAL =====
 local function executarSteal()
     local VirtualInputManager = game:GetService("VirtualInputManager")
     pcall(function()
@@ -1135,7 +1122,6 @@ local function executarSteal()
     end)
 end
 
--- ===== LOOP PRINCIPAL =====
 RunService.Heartbeat:Connect(function(deltaTime)
     local char = LocalPlayer.Character
     if not char then return end
@@ -1145,7 +1131,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
     local bola, dist = encontrarBola()
     if not bola then return end
 
-    -- ===== DETECÇÃO DE POSSE =====
     local TEM_BOLA = temPosseReal(bola, hrp)
 
     if ESTAVA_COM_BOLA and not TEM_BOLA then
@@ -1154,10 +1139,9 @@ RunService.Heartbeat:Connect(function(deltaTime)
     end
     ESTAVA_COM_BOLA = TEM_BOLA
 
-    -- Status
     if statusPosseLabel then
         if TEM_BOLA then
-            statusPosseLabel.Text = "✅ Status: COM BOLA (funções pausadas)"
+            statusPosseLabel.Text = "✅ Status: COM BOLA"
             statusPosseLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
             statusPosseLabel.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
         else
@@ -1167,45 +1151,87 @@ RunService.Heartbeat:Connect(function(deltaTime)
         end
     end
 
-    -- ===== MUTEX + SUAVIZAÇÃO =====
+    -- ===== ACHA O DONO E A DIREÇÃO =====
+    local donoHrp = nil
+    local ehJogador = false
+    local menorDistBola = math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local outroHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if outroHrp then
+                local d = (bola.Position - outroHrp.Position).Magnitude
+                if d < menorDistBola then
+                    menorDistBola = d
+                    donoHrp = outroHrp
+                    ehJogador = true
+                end
+            end
+        end
+    end
+
+    if not donoHrp then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Humanoid") and obj.Health > 0 then
+                local npcChar = obj.Parent
+                if npcChar and npcChar ~= LocalPlayer.Character then
+                    local npcHrp = npcChar:FindFirstChild("HumanoidRootPart")
+                    if npcHrp then
+                        local d = (bola.Position - npcHrp.Position).Magnitude
+                        if d < menorDistBola and d < 5 then
+                            menorDistBola = d
+                            donoHrp = npcHrp
+                            ehJogador = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local direcaoFrente = Vector3.new(0, 0, 1)
+    if donoHrp then
+        if ehJogador then
+            direcaoFrente = donoHrp.CFrame.LookVector
+        else
+            local velNpc = donoHrp.Velocity
+            if velNpc.Magnitude > 1 then
+                direcaoFrente = Vector3.new(velNpc.X, 0, velNpc.Z).Unit
+            else
+                direcaoFrente = donoHrp.CFrame.LookVector
+            end
+        end
+    else
+        local velBola = bola.Velocity
+        if velBola.Magnitude > 1 then
+            direcaoFrente = Vector3.new(velBola.X, 0, velBola.Z).Unit
+        end
+    end
+
     if not TEM_BOLA then
         local alvoPosicao = nil
 
         if ESPIRAL_ATIVO then
             ANGULO_ESP = ANGULO_ESP + VELOCIDADE_ESP * deltaTime
             RAIO_ATUAL = RAIO_ATUAL - VELOCIDADE_APROX * deltaTime * 3
-
             if RAIO_ATUAL < 2 then
                 RAIO_ATUAL = RAIO_INICIAL
                 ANGULO_ESP = 0
             end
-
             local offsetX = math.cos(ANGULO_ESP) * RAIO_ATUAL
             local offsetZ = math.sin(ANGULO_ESP) * RAIO_ATUAL
             alvoPosicao = bola.Position + Vector3.new(offsetX, ALTURA_ESP, offsetZ)
 
         elseif ORBITAL_ATIVO then
             ANGULO_ORB = ANGULO_ORB + VELOCIDADE_ORB * deltaTime
-            
-            -- ===== ORBITAL ADAPTATIVO =====
-            local velocidadeBola = bola.Velocity.Magnitude
-            local centroOrbita = bola.Position
-            
-            -- Se a bola tá andando, orbita na frente
-            if velocidadeBola > VELOCIDADE_MINIMA_BOLA then
-                local direcao = bola.Velocity.Unit
-                centroOrbita = bola.Position + (direcao * RAIO_ORB)
-            end
-            
+            local centroOrbita = bola.Position + (direcaoFrente * RAIO_ORB)
             local offsetX = math.cos(ANGULO_ORB) * RAIO_ORB
             local offsetZ = math.sin(ANGULO_ORB) * RAIO_ORB
             alvoPosicao = centroOrbita + Vector3.new(offsetX, ALTURA_ORB, offsetZ)
 
         elseif AUTO_SEGUIR then
-            if tick() - ULTIMO_TP >= COOLDOWN_TP then
-                ULTIMO_TP = tick()
-                alvoPosicao = bola.Position + Vector3.new(0, 3, 0)
-            end
+            local posicaoFrente = bola.Position + (direcaoFrente * DISTANCIA_FRENTE)
+            alvoPosicao = posicaoFrente + Vector3.new(0, 3, 0)
         end
 
         if alvoPosicao then
@@ -1215,7 +1241,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
         end
     end
 
-    -- ===== AUTO STEAL =====
     if AUTO_STEAL and dist <= DISTANCIA_STEAL then
         if tick() - ULTIMO_STEAL >= COOLDOWN_STEAL then
             ULTIMO_STEAL = tick()
@@ -1223,7 +1248,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
         end
     end
 
-    -- ===== VISUAIS =====
     if BALL_TRACKER and trackerLabel then
         trackerLabel.Text = string.format("⚽ Bola: %.1f studs", dist)
         if dist <= 5 then
@@ -1324,7 +1348,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
     end
 end)
 
--- ===== GUI NÃO SOME =====
 task.spawn(function()
     while task.wait(2) do
         if not gui or not gui.Parent then
@@ -1334,9 +1357,10 @@ task.spawn(function()
 end)
 
 print("===========================================")
-print("SCRIPT BY: @willnzx.mt | v18")
+print("SCRIPT BY: @willnzx.mt | v22")
 print("===========================================")
-print("🌀 ORBITAL ADAPTATIVO:")
-print("   • Bola parada → orbita no centro")
-print("   • Bola andando → orbita na FRENTE")
+print("🎯 Seguir + 🌀 Orbital: NA FRENTE do dono")
+print("✅ Detecta jogadores E NPCs")
+print("✅ NPC: usa velocidade pra direção")
+print("✅ Jogador: usa olhar (LookVector)")
 print("===========================================")
