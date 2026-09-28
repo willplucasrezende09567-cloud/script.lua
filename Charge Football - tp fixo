@@ -1,0 +1,335 @@
+-- TP com Y FIXO (não sobe mais) + Interceptação
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local root
+local tpAtivo = false
+local interceptarAtivo = false
+
+-- Altura fixa do chão (não mais relativa à bola)
+local Y_FIXO = 3.5
+
+local DIST_CAPTURA = 8
+local DIST_COLAR = 5
+local ANTECIPACAO_MAX = 0.4
+
+-- Referência pra travar a física
+local bodyPos = nil
+local humanoid = nil
+
+player.CharacterAdded:Connect(function(char)
+    root = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+    bodyPos = nil -- recria quando respawnar
+end)
+if player.Character then
+    root = player.Character:WaitForChild("HumanoidRootPart")
+    humanoid = player.Character:WaitForChild("Humanoid")
+end
+
+-- ==================== Anti-flutuação ====================
+-- Cria um BodyPosition que trava o personagem no lugar
+local function garantirTrava()
+    if not root or not root.Parent then return end
+    if bodyPos and bodyPos.Parent then return end
+
+    bodyPos = Instance.new("BodyPosition")
+    bodyPos.MaxForce = Vector3.new(50000, 50000, 50000)
+    bodyPos.P = 10000
+    bodyPos.D = 500
+    bodyPos.Position = root.Position
+    bodyPos.Parent = root
+end
+
+local function removerTrava()
+    if bodyPos then
+        bodyPos:Destroy()
+        bodyPos = nil
+    end
+end
+
+-- Desativa estados que fazem o personagem subir/voar
+local function desativarEstados()
+    if not humanoid then return end
+    pcall(function()
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+    end)
+end
+
+local function reativarEstados()
+    if not humanoid then return end
+    pcall(function()
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+    end)
+end
+
+-- ==================== Bola e Snapshot ====================
+local bolaCache = nil
+local ultimoSnapshot = { Position = Vector3.zero, Velocity = Vector3.zero }
+
+local function getBola()
+    if bolaCache and bolaCache.Parent then return bolaCache end
+    bolaCache = workspace:FindFirstChild("LocalBall")
+    return bolaCache
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ok, remotes = pcall(function()
+    return ReplicatedStorage:WaitForChild("Framework"):WaitForChild("Remotes", 5)
+end)
+
+if ok and remotes then
+    local BallSnapshot = remotes:FindFirstChild("BallSnapshot")
+    if BallSnapshot then
+        BallSnapshot.OnClientEvent:Connect(function(dados)
+            if type(dados) == "table" then
+                ultimoSnapshot.Position = dados.Position or ultimoSnapshot.Position
+                ultimoSnapshot.Velocity = dados.Velocity or ultimoSnapshot.Velocity
+            end
+        end)
+    end
+end
+
+-- ==================== GUI ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+pcall(function() screenGui.Parent = game:GetService("CoreGui") end)
+if not screenGui.Parent then screenGui.Parent = player:WaitForChild("PlayerGui") end
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 280, 0, 220)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundTransparency = 1
+title.Text = "⚽ CF Helper - Y Fixo"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 13
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0, 130, 0, 35)
+tpBtn.Position = UDim2.new(0, 5, 0, 30)
+tpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+tpBtn.Text = "TP na Bola"
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.TextSize = 13
+tpBtn.Font = Enum.Font.Gotham
+tpBtn.Parent = frame
+
+local interceptBtn = Instance.new("TextButton")
+interceptBtn.Size = UDim2.new(0, 130, 0, 35)
+interceptBtn.Position = UDim2.new(0, 140, 0, 30)
+interceptBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+interceptBtn.Text = "INTERCEPTAR"
+interceptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+interceptBtn.TextSize = 13
+interceptBtn.Font = Enum.Font.GothamBold
+interceptBtn.Parent = frame
+
+-- Controle de altura
+local yLabel = Instance.new("TextLabel")
+yLabel.Size = UDim2.new(1, -10, 0, 20)
+yLabel.Position = UDim2.new(0, 5, 0, 70)
+yLabel.BackgroundTransparency = 1
+yLabel.Text = "Altura (Y): 3.5 studs"
+yLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+yLabel.TextSize = 12
+yLabel.TextXAlignment = Enum.TextXAlignment.Left
+yLabel.Font = Enum.Font.Gotham
+yLabel.Parent = frame
+
+local yUp = Instance.new("TextButton")
+yUp.Size = UDim2.new(0, 40, 0, 30)
+yUp.Position = UDim2.new(0, 5, 0, 92)
+yUp.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+yUp.Text = "+"
+yUp.TextColor3 = Color3.fromRGB(255, 255, 255)
+yUp.TextSize = 16
+yUp.Font = Enum.Font.GothamBold
+yUp.Parent = frame
+
+local yDown = Instance.new("TextButton")
+yDown.Size = UDim2.new(0, 40, 0, 30)
+yDown.Position = UDim2.new(0, 50, 0, 92)
+yDown.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+yDown.Text = "−"
+yDown.TextColor3 = Color3.fromRGB(255, 255, 255)
+yDown.TextSize = 16
+yUp.Font = Enum.Font.GothamBold
+yDown.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -10, 0, 20)
+status.Position = UDim2.new(0, 5, 0, 128)
+status.BackgroundTransparency = 1
+status.Text = "Inativo"
+status.TextColor3 = Color3.fromRGB(150, 200, 255)
+status.TextSize = 12
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Font = Enum.Font.Gotham
+status.Parent = frame
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(1, -10, 0, 60)
+info.Position = UDim2.new(0, 5, 0, 152)
+info.BackgroundTransparency = 1
+info.Text = ""
+info.TextColor3 = Color3.fromRGB(180, 180, 180)
+info.TextSize = 11
+info.TextWrapped = true
+info.TextXAlignment = Enum.TextXAlignment.Left
+info.TextYAlignment = Enum.TextYAlignment.Top
+info.Font = Enum.Font.Code
+info.Parent = frame
+
+-- ==================== Toggles ====================
+tpBtn.MouseButton1Click:Connect(function()
+    tpAtivo = not tpAtivo
+    interceptarAtivo = false
+    interceptBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+    interceptBtn.Text = "INTERCEPTAR"
+    tpBtn.BackgroundColor3 = tpAtivo and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+    tpBtn.Text = tpAtivo and "TP ON" or "TP na Bola"
+
+    if tpAtivo then
+        garantirTrava()
+        desativarEstados()
+    else
+        removerTrava()
+        reativarEstados()
+    end
+end)
+
+interceptBtn.MouseButton1Click:Connect(function()
+    interceptarAtivo = not interceptarAtivo
+    tpAtivo = false
+    tpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    tpBtn.Text = "TP na Bola"
+    interceptBtn.BackgroundColor3 = interceptarAtivo and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(100, 100, 200)
+    interceptBtn.Text = interceptarAtivo and "INTERCEPTANDO" or "INTERCEPTAR"
+
+    if interceptarAtivo then
+        garantirTrava()
+        desativarEstados()
+    else
+        removerTrava()
+        reativarEstados()
+    end
+end)
+
+yUp.MouseButton1Click:Connect(function()
+    Y_FIXO = Y_FIXO + 0.5
+    yLabel.Text = "Altura (Y): " .. Y_FIXO .. " studs"
+end)
+
+yDown.MouseButton1Click:Connect(function()
+    if Y_FIXO > 0.5 then
+        Y_FIXO = Y_FIXO - 0.5
+        yLabel.Text = "Altura (Y): " .. Y_FIXO .. " studs"
+    end
+end)
+
+-- ==================== Interceptação ====================
+local function calcularAntecipacao(distancia)
+    if distancia < DIST_COLAR then
+        return 0
+    elseif distancia < DIST_CAPTURA then
+        local fator = (distancia - DIST_COLAR) / (DIST_CAPTURA - DIST_COLAR)
+        return ANTECIPACAO_MAX * fator
+    else
+        return ANTECIPACAO_MAX
+    end
+end
+
+-- ==================== Loop principal ====================
+RunService.RenderStepped:Connect(function()
+    if not root or not root.Parent then return end
+    local bola = getBola()
+    if not bola then return end
+
+    -- === TP NORMAL (Y FIXO) ===
+    if tpAtivo then
+        local posBola = bola.Position
+        local rot = root.CFrame - root.CFrame.Position
+
+        -- USAR Y FIXO, não bola.Y + ALTURA
+        local novaPos = Vector3.new(posBola.X, Y_FIXO, posBola.Z)
+        root.CFrame = CFrame.new(novaPos) * rot
+
+        -- Zera velocidade E trava com BodyPosition
+        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        if bodyPos and bodyPos.Parent then
+            bodyPos.Position = novaPos
+        end
+
+        status.Text = "TP na bola (Y=" .. Y_FIXO .. ")"
+        status.TextColor3 = Color3.fromRGB(150, 255, 150)
+    end
+
+    -- === INTERCEPTAÇÃO ===
+    if interceptarAtivo then
+        local posBola = bola.Position
+        local velBola = ultimoSnapshot.Velocity
+        if velBola.Magnitude < 0.5 then
+            velBola = bola.AssemblyLinearVelocity
+        end
+
+        local dist = (root.Position - posBola).Magnitude
+        local antecipacao = calcularAntecipacao(dist)
+
+        local posAlvo
+        if antecipacao > 0 and velBola.Magnitude > 1 then
+            posAlvo = posBola + (velBola * antecipacao)
+        else
+            posAlvo = posBola
+        end
+
+        local rot = root.CFrame - root.CFrame.Position
+
+        -- Y FIXO aqui também
+        local novaPos = Vector3.new(posAlvo.X, Y_FIXO, posAlvo.Z)
+        root.CFrame = CFrame.new(novaPos) * rot
+        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        if bodyPos and bodyPos.Parent then
+            bodyPos.Position = novaPos
+        end
+
+        if dist < DIST_COLAR then
+            status.Text = "COLADO"
+            status.TextColor3 = Color3.fromRGB(100, 255, 100)
+        elseif dist < DIST_CAPTURA then
+            status.Text = "APROXIMANDO"
+            status.TextColor3 = Color3.fromRGB(255, 255, 100)
+        else
+            status.Text = "INTERCEPTANDO"
+            status.TextColor3 = Color3.fromRGB(100, 200, 255)
+        end
+
+        info.Text = string.format(
+            "Dist: %.1f\nVel: %.1f\nAntec: %.2fs\nY: %.1f",
+            dist, velBola.Magnitude, antecipacao, Y_FIXO
+        )
+    end
+
+    if not tpAtivo and not interceptarAtivo then
+        status.Text = "Inativo"
+        status.TextColor3 = Color3.fromRGB(180, 180, 180)
+        info.Text = ""
+    end
+end)
