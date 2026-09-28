@@ -1,39 +1,43 @@
--- TP com Y FIXO (não sobe mais) + Interceptação
+-- CF Helper by: @willnzx.mt - UI Futurista
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local root
 local tpAtivo = false
 local interceptarAtivo = false
-
--- Altura fixa do chão (não mais relativa à bola)
 local Y_FIXO = 3.5
-
 local DIST_CAPTURA = 8
 local DIST_COLAR = 5
 local ANTECIPACAO_MAX = 0.4
 
--- Referência pra travar a física
 local bodyPos = nil
 local humanoid = nil
 
 player.CharacterAdded:Connect(function(char)
     root = char:WaitForChild("HumanoidRootPart")
     humanoid = char:WaitForChild("Humanoid")
-    bodyPos = nil -- recria quando respawnar
+    bodyPos = nil
 end)
 if player.Character then
     root = player.Character:WaitForChild("HumanoidRootPart")
     humanoid = player.Character:WaitForChild("Humanoid")
 end
 
+-- ==================== Cores neon ====================
+local COR_FUNDO = Color3.fromRGB(15, 15, 25)
+local COR_NEON = Color3.fromRGB(0, 255, 200)      -- ciano neon
+local COR_NEON2 = Color3.fromRGB(180, 0, 255)     -- roxo neon
+local COR_TEXTO = Color3.fromRGB(230, 230, 255)
+local COR_VERDE = Color3.fromRGB(0, 255, 130)
+local COR_VERMELHO = Color3.fromRGB(255, 50, 100)
+local COR_AZUL = Color3.fromRGB(60, 130, 255)
+
 -- ==================== Anti-flutuação ====================
--- Cria um BodyPosition que trava o personagem no lugar
 local function garantirTrava()
     if not root or not root.Parent then return end
     if bodyPos and bodyPos.Parent then return end
-
     bodyPos = Instance.new("BodyPosition")
     bodyPos.MaxForce = Vector3.new(50000, 50000, 50000)
     bodyPos.P = 10000
@@ -43,13 +47,9 @@ local function garantirTrava()
 end
 
 local function removerTrava()
-    if bodyPos then
-        bodyPos:Destroy()
-        bodyPos = nil
-    end
+    if bodyPos then bodyPos:Destroy(); bodyPos = nil end
 end
 
--- Desativa estados que fazem o personagem subir/voar
 local function desativarEstados()
     if not humanoid then return end
     pcall(function()
@@ -70,7 +70,7 @@ local function reativarEstados()
     end)
 end
 
--- ==================== Bola e Snapshot ====================
+-- ==================== Bola ====================
 local bolaCache = nil
 local ultimoSnapshot = { Position = Vector3.zero, Velocity = Vector3.zero }
 
@@ -97,115 +97,362 @@ if ok and remotes then
     end
 end
 
--- ==================== GUI ====================
+-- ==================== Funções de UI ====================
+local function criarCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 12)
+    c.Parent = parent
+    return c
+end
+
+local function criarStroke(parent, cor, espessura)
+    local s = Instance.new("UIStroke")
+    s.Color = cor or COR_NEON
+    s.Thickness = espessura or 1.5
+    s.Transparency = 0.3
+    s.Parent = parent
+    return s
+end
+
+local function criarGradient(parent, cor1, cor2, rotacao)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new(cor1, cor2)
+    g.Rotation = rotacao or 45
+    g.Parent = parent
+    return g
+end
+
+-- ==================== GUI Principal ====================
 local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CFHelper_Willnzx"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() screenGui.Parent = game:GetService("CoreGui") end)
 if not screenGui.Parent then screenGui.Parent = player:WaitForChild("PlayerGui") end
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 220)
-frame.Position = UDim2.new(0, 10, 0, 10)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-frame.BackgroundTransparency = 0.2
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+-- ===== Frame principal =====
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 290, 0, 260)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = COR_FUNDO
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 25)
-title.BackgroundTransparency = 1
-title.Text = "⚽ CF Helper - Y Fixo"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 13
-title.Font = Enum.Font.GothamBold
-title.Parent = frame
+criarCorner(mainFrame, 14)
+local strokeMain = criarStroke(mainFrame, COR_NEON, 1.5)
+criarGradient(mainFrame, Color3.fromRGB(20, 20, 35), Color3.fromRGB(10, 10, 20), 90)
 
-local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0, 130, 0, 35)
-tpBtn.Position = UDim2.new(0, 5, 0, 30)
-tpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-tpBtn.Text = "TP na Bola"
-tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpBtn.TextSize = 13
-tpBtn.Font = Enum.Font.Gotham
-tpBtn.Parent = frame
+-- ===== Barra superior =====
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 40)
+topBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+topBar.BackgroundTransparency = 0.7
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+criarCorner(topBar, 14)
 
-local interceptBtn = Instance.new("TextButton")
-interceptBtn.Size = UDim2.new(0, 130, 0, 35)
-interceptBtn.Position = UDim2.new(0, 140, 0, 30)
-interceptBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
-interceptBtn.Text = "INTERCEPTAR"
-interceptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-interceptBtn.TextSize = 13
-interceptBtn.Font = Enum.Font.GothamBold
-interceptBtn.Parent = frame
+-- Ajusta o canto inferior pra ficar reto
+local fixCorner = Instance.new("Frame")
+fixCorner.Size = UDim2.new(1, 0, 0, 14)
+fixCorner.Position = UDim2.new(0, 0, 1, -14)
+fixCorner.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+fixCorner.BackgroundTransparency = 0.7
+fixCorner.BorderSizePixel = 0
+fixCorner.Parent = topBar
 
--- Controle de altura
+-- Título (nome do autor)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -90, 1, 0)
+titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "by: @willnzx.mt"
+titleLabel.TextColor3 = COR_NEON
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = topBar
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, COR_NEON),
+    ColorSequenceKeypoint.new(0.5, COR_NEON2),
+    ColorSequenceKeypoint.new(1, COR_NEON),
+})
+titleGradient.Parent = titleLabel
+
+-- Ícone decorativo
+local dotIcon = Instance.new("Frame")
+dotIcon.Size = UDim2.new(0, 8, 0, 8)
+dotIcon.Position = UDim2.new(0, 5, 0.5, -4)
+dotIcon.BackgroundColor3 = COR_NEON
+dotIcon.BorderSizePixel = 0
+dotIcon.Parent = topBar
+criarCorner(dotIcon, 4)
+criarStroke(dotIcon, COR_NEON, 2)
+
+-- ===== Botão Minimizar =====
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 28, 0, 28)
+minBtn.Position = UDim2.new(1, -38, 0.5, -14)
+minBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+minBtn.Text = "−"
+minBtn.TextColor3 = COR_NEON
+minBtn.TextSize = 22
+minBtn.Font = Enum.Font.GothamBold
+minBtn.BorderSizePixel = 0
+minBtn.AutoButtonColor = false
+minBtn.Parent = topBar
+criarCorner(minBtn, 8)
+criarStroke(minBtn, COR_NEON, 1)
+
+minBtn.MouseEnter:Connect(function()
+    TweenService:Create(minBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = COR_NEON,
+        TextColor3 = COR_FUNDO
+    }):Play()
+end)
+minBtn.MouseLeave:Connect(function()
+    TweenService:Create(minBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(40, 40, 55),
+        TextColor3 = COR_NEON
+    }):Play()
+end)
+
+-- ===== Botões principais =====
+local function criarBotaoPrincipal(nome, texto, cor, posicao)
+    local btn = Instance.new("TextButton")
+    btn.Name = nome
+    btn.Size = UDim2.new(0, 130, 0, 40)
+    btn.Position = posicao
+    btn.BackgroundColor3 = cor
+    btn.Text = texto
+    btn.TextColor3 = COR_TEXTO
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Parent = mainFrame
+    criarCorner(btn, 10)
+    local s = criarStroke(btn, cor, 1.5)
+    s.Transparency = 0.5
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {
+            BackgroundColor3 = cor:Lerp(Color3.new(1, 1, 1), 0.3)
+        }):Play()
+        s.Transparency = 0.2
+    end)
+    btn.MouseLeave:Connect(function()
+        if btn.Name == "TP" and tpAtivo then return end
+        if btn.Name == "INTERCEPT" and interceptarAtivo then return end
+        TweenService:Create(btn, TweenInfo.new(0.2), {
+            BackgroundColor3 = cor
+        }):Play()
+        s.Transparency = 0.5
+    end)
+
+    return btn, s
+end
+
+local tpBtn, tpStroke = criarBotaoPrincipal("TP", "TP NA BOLA", COR_VERMELHO, UDim2.new(0, 10, 0, 50))
+local interceptBtn, intStroke = criarBotaoPrincipal("INTERCEPT", "INTERCEPTAR", COR_AZUL, UDim2.new(0, 150, 0, 50))
+
+-- ===== Label de altura =====
+local yContainer = Instance.new("Frame")
+yContainer.Size = UDim2.new(1, -20, 0, 55)
+yContainer.Position = UDim2.new(0, 10, 0, 100)
+yContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+yContainer.BorderSizePixel = 0
+yContainer.Parent = mainFrame
+criarCorner(yContainer, 10)
+criarStroke(yContainer, COR_NEON2, 1)
+
 local yLabel = Instance.new("TextLabel")
 yLabel.Size = UDim2.new(1, -10, 0, 20)
-yLabel.Position = UDim2.new(0, 5, 0, 70)
+yLabel.Position = UDim2.new(0, 5, 0, 3)
 yLabel.BackgroundTransparency = 1
-yLabel.Text = "Altura (Y): 3.5 studs"
-yLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+yLabel.Text = "ALTURA  ▶  3.5 studs"
+yLabel.TextColor3 = COR_NEON2
 yLabel.TextSize = 12
-yLabel.TextXAlignment = Enum.TextXAlignment.Left
-yLabel.Font = Enum.Font.Gotham
-yLabel.Parent = frame
-
-local yUp = Instance.new("TextButton")
-yUp.Size = UDim2.new(0, 40, 0, 30)
-yUp.Position = UDim2.new(0, 5, 0, 92)
-yUp.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-yUp.Text = "+"
-yUp.TextColor3 = Color3.fromRGB(255, 255, 255)
-yUp.TextSize = 16
-yUp.Font = Enum.Font.GothamBold
-yUp.Parent = frame
+yLabel.Font = Enum.Font.GothamBold
+yLabel.TextXAlignment = Enum.TextXAlignment.Center
+yLabel.Parent = yContainer
 
 local yDown = Instance.new("TextButton")
-yDown.Size = UDim2.new(0, 40, 0, 30)
-yDown.Position = UDim2.new(0, 50, 0, 92)
-yDown.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-yDown.Text = "−"
-yDown.TextColor3 = Color3.fromRGB(255, 255, 255)
-yDown.TextSize = 16
+yDown.Size = UDim2.new(0, 60, 0, 25)
+yDown.Position = UDim2.new(0, 10, 0, 25)
+yDown.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+yDown.Text = "−  0.5"
+yDown.TextColor3 = COR_NEON2
+yDown.TextSize = 12
+yDown.Font = Enum.Font.GothamBold
+yDown.BorderSizePixel = 0
+yDown.AutoButtonColor = false
+yDown.Parent = yContainer
+criarCorner(yDown, 6)
+
+local yUp = Instance.new("TextButton")
+yUp.Size = UDim2.new(0, 60, 0, 25)
+yUp.Position = UDim2.new(1, -70, 0, 25)
+yUp.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+yUp.Text = "+  0.5"
+yUp.TextColor3 = COR_NEON2
+yUp.TextSize = 12
 yUp.Font = Enum.Font.GothamBold
-yDown.Parent = frame
+yUp.BorderSizePixel = 0
+yUp.AutoButtonColor = false
+yUp.Parent = yContainer
+criarCorner(yUp, 6)
 
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -10, 0, 20)
-status.Position = UDim2.new(0, 5, 0, 128)
-status.BackgroundTransparency = 1
-status.Text = "Inativo"
-status.TextColor3 = Color3.fromRGB(150, 200, 255)
-status.TextSize = 12
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.Font = Enum.Font.Gotham
-status.Parent = frame
+-- ===== Painel de status =====
+local statusFrame = Instance.new("Frame")
+statusFrame.Size = UDim2.new(1, -20, 0, 75)
+statusFrame.Position = UDim2.new(0, 10, 0, 165)
+statusFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+statusFrame.BackgroundTransparency = 0.3
+statusFrame.BorderSizePixel = 0
+statusFrame.Parent = mainFrame
+criarCorner(statusFrame, 10)
+criarStroke(statusFrame, COR_NEON, 1)
 
-local info = Instance.new("TextLabel")
-info.Size = UDim2.new(1, -10, 0, 60)
-info.Position = UDim2.new(0, 5, 0, 152)
-info.BackgroundTransparency = 1
-info.Text = ""
-info.TextColor3 = Color3.fromRGB(180, 180, 180)
-info.TextSize = 11
-info.TextWrapped = true
-info.TextXAlignment = Enum.TextXAlignment.Left
-info.TextYAlignment = Enum.TextYAlignment.Top
-info.Font = Enum.Font.Code
-info.Parent = frame
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -16, 0, 20)
+statusLabel.Position = UDim2.new(0, 8, 0, 5)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "● INATIVO"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+statusLabel.TextSize = 11
+statusLabel.Font = Enum.Font.GothamBold
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = statusFrame
 
--- ==================== Toggles ====================
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, -16, 0, 45)
+infoLabel.Position = UDim2.new(0, 8, 0, 25)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = ""
+infoLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+infoLabel.TextSize = 10
+infoLabel.TextWrapped = true
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+infoLabel.TextYAlignment = Enum.TextYAlignment.Top
+infoLabel.Font = Enum.Font.Code
+infoLabel.Parent = statusFrame
+
+-- ==================== Bolhinha (minimizado) ====================
+local bubble = Instance.new("TextButton")
+bubble.Name = "Bubble"
+bubble.Size = UDim2.new(0, 50, 0, 50)
+bubble.Position = UDim2.new(0, 20, 0, 20)
+bubble.BackgroundColor3 = COR_FUNDO
+bubble.Text = "⚽"
+bubble.TextColor3 = COR_NEON
+bubble.TextSize = 24
+bubble.Font = Enum.Font.GothamBold
+bubble.BorderSizePixel = 0
+bubble.AutoButtonColor = false
+bubble.Active = true
+bubble.Draggable = true
+bubble.Visible = false
+bubble.Parent = screenGui
+
+criarCorner(bubble, 25) -- metade do tamanho = círculo
+local bubbleStroke = criarStroke(bubble, COR_NEON, 2)
+criarGradient(bubble, Color3.fromRGB(20, 20, 35), Color3.fromRGB(10, 10, 20), 90)
+
+-- Animação de pulso da bolhinha
+task.spawn(function()
+    while true do
+        task.wait(0.8)
+        if bubble.Visible then
+            TweenService:Create(bubbleStroke, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {
+                Transparency = 0.7,
+                Thickness = 3
+            }):Play()
+            task.wait(0.4)
+            TweenService:Create(bubbleStroke, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {
+                Transparency = 0.2,
+                Thickness = 2
+            }):Play()
+        end
+    end
+end)
+
+-- ==================== Sistema de minimize ====================
+local minimizado = false
+
+local function minimizar()
+    if minimizado then return end
+    minimizado = true
+
+    -- Guarda posição atual da GUI
+    bubble.Position = mainFrame.Position
+
+    -- Anima fechando
+    local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset + 145, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset + 130)
+    })
+    tween:Play()
+
+    tween.Completed:Connect(function()
+        mainFrame.Visible = false
+        bubble.Visible = true
+        bubble.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(bubble, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 50, 0, 50)
+        }):Play()
+    end)
+end
+
+local function expandir()
+    if not minimizado then return end
+    minimizado = false
+
+    bubble.Size = UDim2.new(0, 50, 0, 50)
+    TweenService:Create(bubble, TweenInfo.new(0.2), {
+        Size = UDim2.new(0, 0, 0, 0)
+    }):Play()
+
+    task.wait(0.15)
+    bubble.Visible = false
+    mainFrame.Visible = true
+
+    -- Guarda posição da bolha pra expandir lá
+    mainFrame.Position = bubble.Position
+
+    local tween = TweenService:Create(mainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 290, 0, 260)
+    })
+    tween:Play()
+end
+
+minBtn.MouseButton1Click:Connect(minimizar)
+bubble.MouseButton1Click:Connect(expandir)
+
+-- ==================== Toggles dos botões ====================
+local function atualizarBotao(btn, stroke, ativo, textoOn, textoOff, corOn, corOff)
+    btn.BackgroundColor3 = ativo and corOn or corOff
+    btn.Text = ativo and textoOn or textoOff
+    stroke.Color = ativo and corOn or corOff
+
+    -- Efeito de glow quando ativo
+    if ativo then
+        TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 0.1, Thickness = 2.5}):Play()
+    else
+        TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 0.5, Thickness = 1.5}):Play()
+    end
+end
+
 tpBtn.MouseButton1Click:Connect(function()
     tpAtivo = not tpAtivo
     interceptarAtivo = false
-    interceptBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
-    interceptBtn.Text = "INTERCEPTAR"
-    tpBtn.BackgroundColor3 = tpAtivo and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
-    tpBtn.Text = tpAtivo and "TP ON" or "TP na Bola"
+    atualizarBotao(tpBtn, tpStroke, tpAtivo, "● TP ATIVO", "TP NA BOLA", COR_VERDE, COR_VERMELHO)
+    atualizarBotao(interceptBtn, intStroke, false, "INTERCEPTANDO", "INTERCEPTAR", COR_VERDE, COR_AZUL)
 
     if tpAtivo then
         garantirTrava()
@@ -219,10 +466,8 @@ end)
 interceptBtn.MouseButton1Click:Connect(function()
     interceptarAtivo = not interceptarAtivo
     tpAtivo = false
-    tpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    tpBtn.Text = "TP na Bola"
-    interceptBtn.BackgroundColor3 = interceptarAtivo and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(100, 100, 200)
-    interceptBtn.Text = interceptarAtivo and "INTERCEPTANDO" or "INTERCEPTAR"
+    atualizarBotao(interceptBtn, intStroke, interceptarAtivo, "● INTERCEPTANDO", "INTERCEPTAR", COR_VERDE, COR_AZUL)
+    atualizarBotao(tpBtn, tpStroke, false, "TP ATIVO", "TP NA BOLA", COR_VERDE, COR_VERMELHO)
 
     if interceptarAtivo then
         garantirTrava()
@@ -235,13 +480,13 @@ end)
 
 yUp.MouseButton1Click:Connect(function()
     Y_FIXO = Y_FIXO + 0.5
-    yLabel.Text = "Altura (Y): " .. Y_FIXO .. " studs"
+    yLabel.Text = "ALTURA  ▶  " .. string.format("%.1f", Y_FIXO) .. " studs"
 end)
 
 yDown.MouseButton1Click:Connect(function()
-    if Y_FIXO > 0.5 then
+    if Y_FIXO > 1 then
         Y_FIXO = Y_FIXO - 0.5
-        yLabel.Text = "Altura (Y): " .. Y_FIXO .. " studs"
+        yLabel.Text = "ALTURA  ▶  " .. string.format("%.1f", Y_FIXO) .. " studs"
     end
 end)
 
@@ -263,26 +508,18 @@ RunService.RenderStepped:Connect(function()
     local bola = getBola()
     if not bola then return end
 
-    -- === TP NORMAL (Y FIXO) ===
     if tpAtivo then
         local posBola = bola.Position
         local rot = root.CFrame - root.CFrame.Position
-
-        -- USAR Y FIXO, não bola.Y + ALTURA
         local novaPos = Vector3.new(posBola.X, Y_FIXO, posBola.Z)
         root.CFrame = CFrame.new(novaPos) * rot
-
-        -- Zera velocidade E trava com BodyPosition
         root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        if bodyPos and bodyPos.Parent then
-            bodyPos.Position = novaPos
-        end
+        if bodyPos and bodyPos.Parent then bodyPos.Position = novaPos end
 
-        status.Text = "TP na bola (Y=" .. Y_FIXO .. ")"
-        status.TextColor3 = Color3.fromRGB(150, 255, 150)
+        statusLabel.Text = "● TP ATIVO"
+        statusLabel.TextColor3 = COR_VERDE
     end
 
-    -- === INTERCEPTAÇÃO ===
     if interceptarAtivo then
         local posBola = bola.Position
         local velBola = ultimoSnapshot.Velocity
@@ -301,35 +538,31 @@ RunService.RenderStepped:Connect(function()
         end
 
         local rot = root.CFrame - root.CFrame.Position
-
-        -- Y FIXO aqui também
         local novaPos = Vector3.new(posAlvo.X, Y_FIXO, posAlvo.Z)
         root.CFrame = CFrame.new(novaPos) * rot
         root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        if bodyPos and bodyPos.Parent then
-            bodyPos.Position = novaPos
-        end
+        if bodyPos and bodyPos.Parent then bodyPos.Position = novaPos end
 
+        local modo, cor
         if dist < DIST_COLAR then
-            status.Text = "COLADO"
-            status.TextColor3 = Color3.fromRGB(100, 255, 100)
+            modo = "● COLADO"; cor = COR_VERDE
         elseif dist < DIST_CAPTURA then
-            status.Text = "APROXIMANDO"
-            status.TextColor3 = Color3.fromRGB(255, 255, 100)
+            modo = "● APROXIMANDO"; cor = COR_NEON
         else
-            status.Text = "INTERCEPTANDO"
-            status.TextColor3 = Color3.fromRGB(100, 200, 255)
+            modo = "● INTERCEPTANDO"; cor = COR_AZUL
         end
 
-        info.Text = string.format(
-            "Dist: %.1f\nVel: %.1f\nAntec: %.2fs\nY: %.1f",
+        statusLabel.Text = modo
+        statusLabel.TextColor3 = cor
+        infoLabel.Text = string.format(
+            "dist %.1f  ▸  vel %.1f\nantec %.2fs  ▸  y %.1f",
             dist, velBola.Magnitude, antecipacao, Y_FIXO
         )
     end
 
     if not tpAtivo and not interceptarAtivo then
-        status.Text = "Inativo"
-        status.TextColor3 = Color3.fromRGB(180, 180, 180)
-        info.Text = ""
+        statusLabel.Text = "● INATIVO"
+        statusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+        infoLabel.Text = ""
     end
 end)
