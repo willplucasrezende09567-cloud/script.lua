@@ -1,0 +1,1063 @@
+--[[
+    🌌 WILLNZX SCANNER GUI
+    Para: Delta Executor
+    FIX: Tela preta/travada ao fechar foi corrigida
+--]]
+
+-- ═══════════════════════════════════════════════
+-- SERVIÇOS
+-- ═══════════════════════════════════════════════
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
+local GuiService = game:GetService("GuiService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ═══════════════════════════════════════════════
+-- PROTEÇÃO CONTRA DUPLICATA
+-- ═══════════════════════════════════════════════
+if CoreGui:FindFirstChild("NeonScannerGUI") then
+    CoreGui.NeonScannerGUI:Destroy()
+end
+
+-- ═══════════════════════════════════════════════
+-- PALETA DE CORES
+-- ═══════════════════════════════════════════════
+local Colors = {
+    Background   = Color3.fromRGB(10, 14, 39),
+    Panel        = Color3.fromRGB(18, 18, 32),
+    PanelLight   = Color3.fromRGB(25, 25, 45),
+    Cyan         = Color3.fromRGB(0, 255, 255),
+    Magenta      = Color3.fromRGB(255, 0, 200),
+    Purple       = Color3.fromRGB(150, 60, 255),
+    TextPrimary  = Color3.fromRGB(240, 240, 255),
+    TextSecondary= Color3.fromRGB(150, 160, 200),
+    TextDim      = Color3.fromRGB(100, 110, 150),
+    Success      = Color3.fromRGB(80, 255, 160),
+    Warning      = Color3.fromRGB(255, 200, 80),
+    Error        = Color3.fromRGB(255, 80, 120),
+}
+
+-- ═══════════════════════════════════════════════
+-- HELPERS
+-- ═══════════════════════════════════════════════
+local function new(className, props)
+    local inst = Instance.new(className)
+    for k, v in pairs(props or {}) do inst[k] = v end
+    return inst
+end
+
+local function addCorner(parent, radius)
+    return new("UICorner", { CornerRadius = UDim.new(0, radius or 12), Parent = parent })
+end
+
+local function addStroke(parent, color, thickness, transparency)
+    return new("UIStroke", {
+        Color = color or Colors.Cyan, Thickness = thickness or 1.5,
+        Transparency = transparency or 0.3,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = parent
+    })
+end
+
+local function addGradient(parent, color1, color2, rotation)
+    return new("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, color1),
+            ColorSequenceKeypoint.new(1, color2)
+        }),
+        Rotation = rotation or 0, Parent = parent
+    })
+end
+
+local function tween(inst, time, props, style, dir)
+    local ti = TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
+    local t = TweenService:Create(inst, ti, props)
+    t:Play()
+    return t
+end
+
+-- ═══════════════════════════════════════════════
+-- SCREEN GUI
+-- ═══════════════════════════════════════════════
+local ScreenGui = new("ScreenGui", {
+    Name = "NeonScannerGUI",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    DisplayOrder = 999
+})
+
+local parented = pcall(function() ScreenGui.Parent = CoreGui end)
+if not parented then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- ═══════════════════════════════════════════════
+-- CONTAINER DE FUNDO
+-- ═══════════════════════════════════════════════
+local BackgroundContainer = new("Frame", {
+    Name = "BackgroundContainer",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Colors.Background,
+    BackgroundTransparency = 0.15,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    Visible = true,
+    Parent = ScreenGui
+})
+
+local GridContainer = new("Frame", {
+    Name = "Grid",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Parent = BackgroundContainer
+})
+
+local hLines, vLines = {}, {}
+
+for i = 0, 30 do
+    local line = new("Frame", {
+        Name = "HLine" .. i,
+        Size = UDim2.new(1, 0, 0, 1),
+        Position = UDim2.new(0, 0, i / 30, 0),
+        BackgroundColor3 = Colors.Cyan,
+        BackgroundTransparency = 0.93,
+        BorderSizePixel = 0,
+        Parent = GridContainer
+    })
+    table.insert(hLines, {obj = line, basePos = line.Position, baseTrans = 0.93})
+end
+
+for i = 0, 50 do
+    local line = new("Frame", {
+        Name = "VLine" .. i,
+        Size = UDim2.new(0, 1, 1, 0),
+        Position = UDim2.new(i / 50, 0, 0, 0),
+        BackgroundColor3 = Colors.Purple,
+        BackgroundTransparency = 0.93,
+        BorderSizePixel = 0,
+        Parent = GridContainer
+    })
+    table.insert(vLines, {obj = line, basePos = line.Position, baseTrans = 0.93})
+end
+
+-- ═══════════════════════════════════════════════
+-- BOLHA
+-- ═══════════════════════════════════════════════
+local BUBBLE_POS = UDim2.new(0, 20, 0.5, -25)
+
+local FloatBtn = new("TextButton", {
+    Name = "FloatBtn",
+    Size = UDim2.new(0, 50, 0, 50),
+    Position = BUBBLE_POS,
+    BackgroundColor3 = Colors.Panel,
+    BackgroundTransparency = 0.1,
+    Text = "◆",
+    Font = Enum.Font.GothamBold,
+    TextSize = 24,
+    TextColor3 = Colors.Cyan,
+    BorderSizePixel = 0,
+    Visible = false,
+    Parent = ScreenGui
+})
+addCorner(FloatBtn, 25)
+local floatStroke = addStroke(FloatBtn, Colors.Cyan, 2, 0.2)
+addGradient(FloatBtn, Color3.fromRGB(20, 20, 50), Color3.fromRGB(40, 15, 60), 135)
+
+local floatGlow = new("Frame", {
+    Name = "Glow",
+    Size = UDim2.new(1, 20, 1, 20),
+    Position = UDim2.new(0, -10, 0, -10),
+    BackgroundColor3 = Colors.Cyan,
+    BackgroundTransparency = 0.7,
+    BorderSizePixel = 0,
+    ZIndex = -1,
+    Parent = FloatBtn
+})
+addCorner(floatGlow, 30)
+
+-- ═══════════════════════════════════════════════
+-- PAINEL PRINCIPAL
+-- ═══════════════════════════════════════════════
+local MainPanel = new("Frame", {
+    Name = "MainPanel",
+    Size = UDim2.new(0, 420, 0, 380),
+    Position = UDim2.new(0.5, -210, 0.5, -190),
+    BackgroundColor3 = Colors.Panel,
+    BackgroundTransparency = 0.1,
+    BorderSizePixel = 0,
+    Parent = ScreenGui
+})
+addCorner(MainPanel, 16)
+addStroke(MainPanel, Colors.Cyan, 1.5, 0.4)
+
+local panelGradient = addGradient(MainPanel, Color3.fromRGB(18, 18, 45), Color3.fromRGB(35, 15, 55), 135)
+panelGradient.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.05),
+    NumberSequenceKeypoint.new(1, 0.25)
+})
+
+local GlowFrame = new("Frame", {
+    Name = "Glow",
+    Size = UDim2.new(1, 30, 1, 30),
+    Position = UDim2.new(0, -15, 0, -15),
+    BackgroundColor3 = Colors.Cyan,
+    BackgroundTransparency = 0.85,
+    BorderSizePixel = 0,
+    ZIndex = -1,
+    Parent = MainPanel
+})
+addCorner(GlowFrame, 20)
+
+task.spawn(function()
+    while GlowFrame.Parent do
+        tween(GlowFrame, 2, {BackgroundTransparency = 0.92}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(2)
+        tween(GlowFrame, 2, {BackgroundTransparency = 0.82}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(2)
+    end
+end)
+
+-- ═══════════════════════════════════════════════
+-- BARRA DE TÍTULO
+-- ═══════════════════════════════════════════════
+local TitleBar = new("Frame", {
+    Name = "TitleBar",
+    Size = UDim2.new(1, 0, 0, 55),
+    BackgroundTransparency = 1,
+    Parent = MainPanel
+})
+
+local TitleLabel = new("TextLabel", {
+    Name = "Title",
+    Size = UDim2.new(1, -60, 1, 0),
+    Position = UDim2.new(0, 20, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "◆ WILLNZX SCANNER ◆",
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextColor3 = Colors.TextPrimary,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = TitleBar
+})
+addGradient(TitleLabel, Colors.Cyan, Colors.Magenta, 0)
+
+new("TextLabel", {
+    Name = "Subtitle",
+    Size = UDim2.new(1, -60, 0, 14),
+    Position = UDim2.new(0, 20, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "WILLNZX SYSTEM v2.0 // NEURAL INTERFACE",
+    Font = Enum.Font.Gotham,
+    TextSize = 9,
+    TextColor3 = Colors.TextDim,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = TitleBar
+})
+
+local CloseBtn = new("TextButton", {
+    Name = "CloseBtn",
+    Size = UDim2.new(0, 32, 0, 32),
+    Position = UDim2.new(1, -44, 0, 12),
+    BackgroundColor3 = Colors.PanelLight,
+    BackgroundTransparency = 0.3,
+    Text = "✕",
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextColor3 = Colors.TextSecondary,
+    BorderSizePixel = 0,
+    AutoButtonColor = false,
+    Parent = TitleBar
+})
+addCorner(CloseBtn, 8)
+local closeStroke = addStroke(CloseBtn, Colors.Magenta, 1, 0.5)
+
+CloseBtn.MouseEnter:Connect(function()
+    tween(CloseBtn, 0.2, {BackgroundColor3 = Colors.Magenta, TextColor3 = Colors.TextPrimary})
+    tween(closeStroke, 0.2, {Transparency = 0.1})
+end)
+CloseBtn.MouseLeave:Connect(function()
+    tween(CloseBtn, 0.2, {BackgroundColor3 = Colors.PanelLight, TextColor3 = Colors.TextSecondary})
+    tween(closeStroke, 0.2, {Transparency = 0.5})
+end)
+
+local Divider = new("Frame", {
+    Name = "Divider",
+    Size = UDim2.new(1, -32, 0, 1),
+    Position = UDim2.new(0, 16, 0, 55),
+    BackgroundColor3 = Colors.Cyan,
+    BackgroundTransparency = 0.6,
+    BorderSizePixel = 0,
+    Parent = MainPanel
+})
+addGradient(Divider, Colors.Cyan, Colors.Magenta, 0)
+
+-- ═══════════════════════════════════════════════
+-- STATUS BAR
+-- ═══════════════════════════════════════════════
+local StatusFrame = new("Frame", {
+    Name = "StatusFrame",
+    Size = UDim2.new(1, -32, 0, 24),
+    Position = UDim2.new(0, 16, 0, 66),
+    BackgroundColor3 = Colors.PanelLight,
+    BackgroundTransparency = 0.6,
+    BorderSizePixel = 0,
+    Parent = MainPanel
+})
+addCorner(StatusFrame, 6)
+
+local StatusDot = new("Frame", {
+    Name = "Dot",
+    Size = UDim2.new(0, 8, 0, 8),
+    Position = UDim2.new(0, 10, 0.5, -4),
+    BackgroundColor3 = Colors.Success,
+    BorderSizePixel = 0,
+    Parent = StatusFrame
+})
+addCorner(StatusDot, 4)
+
+task.spawn(function()
+    while StatusDot.Parent do
+        tween(StatusDot, 0.8, {BackgroundTransparency = 0.6}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(0.8)
+        tween(StatusDot, 0.8, {BackgroundTransparency = 0}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(0.8)
+    end
+end)
+
+local StatusLabel = new("TextLabel", {
+    Name = "Status",
+    Size = UDim2.new(1, -30, 1, 0),
+    Position = UDim2.new(0, 26, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "STATUS: ONLINE // PRONTO PARA SCAN",
+    Font = Enum.Font.Gotham,
+    TextSize = 10,
+    TextColor3 = Colors.Success,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = StatusFrame
+})
+
+local function setStatus(text, color)
+    StatusLabel.Text = "STATUS: " .. text
+    StatusLabel.TextColor3 = color or Colors.Success
+    StatusDot.BackgroundColor3 = color or Colors.Success
+end
+
+-- ═══════════════════════════════════════════════
+-- BOTÃO SCANNER
+-- ═══════════════════════════════════════════════
+local ScanBtn = new("TextButton", {
+    Name = "ScanBtn",
+    Size = UDim2.new(1, -32, 0, 60),
+    Position = UDim2.new(0, 16, 0, 102),
+    BackgroundColor3 = Color3.fromRGB(0, 60, 80),
+    BackgroundTransparency = 0.2,
+    Text = "",
+    BorderSizePixel = 0,
+    AutoButtonColor = false,
+    Parent = MainPanel
+})
+addCorner(ScanBtn, 10)
+local scanStroke = addStroke(ScanBtn, Colors.Cyan, 2, 0.2)
+
+local scanGradient = new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 40, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 80, 100)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 40, 80))
+    }),
+    Rotation = 90, Parent = ScanBtn
+})
+
+task.spawn(function()
+    while scanGradient.Parent do
+        tween(scanGradient, 3, {Rotation = 90 + 360}, Enum.EasingStyle.Linear)
+        task.wait(3)
+    end
+end)
+
+local scanIcon = new("TextLabel", {
+    Name = "Icon",
+    Size = UDim2.new(0, 40, 1, 0),
+    Position = UDim2.new(0, 20, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "◉", Font = Enum.Font.GothamBold, TextSize = 32,
+    TextColor3 = Colors.Cyan, Parent = ScanBtn
+})
+
+local scanText = new("TextLabel", {
+    Name = "Text",
+    Size = UDim2.new(1, -80, 0, 24),
+    Position = UDim2.new(0, 70, 0, 10),
+    BackgroundTransparency = 1,
+    Text = "SCANNER", Font = Enum.Font.GothamBold, TextSize = 16,
+    TextColor3 = Colors.TextPrimary,
+    TextXAlignment = Enum.TextXAlignment.Left, Parent = ScanBtn
+})
+addGradient(scanText, Colors.Cyan, Colors.TextPrimary, 0)
+
+new("TextLabel", {
+    Name = "Desc",
+    Size = UDim2.new(1, -80, 0, 14),
+    Position = UDim2.new(0, 70, 0, 34),
+    BackgroundTransparency = 1,
+    Text = "Iniciar varredura completa de remotes",
+    Font = Enum.Font.Gotham, TextSize = 10,
+    TextColor3 = Colors.TextSecondary,
+    TextXAlignment = Enum.TextXAlignment.Left, Parent = ScanBtn
+})
+
+-- ═══════════════════════════════════════════════
+-- BOTÃO CONSOLE
+-- ═══════════════════════════════════════════════
+local ConsoleBtn = new("TextButton", {
+    Name = "ConsoleBtn",
+    Size = UDim2.new(1, -32, 0, 60),
+    Position = UDim2.new(0, 16, 0, 172),
+    BackgroundColor3 = Color3.fromRGB(80, 20, 80),
+    BackgroundTransparency = 0.2,
+    Text = "",
+    BorderSizePixel = 0,
+    AutoButtonColor = false,
+    Parent = MainPanel
+})
+addCorner(ConsoleBtn, 10)
+local consoleStroke = addStroke(ConsoleBtn, Colors.Magenta, 2, 0.2)
+
+local consoleGradient = new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 15, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 20, 90)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 15, 70))
+    }),
+    Rotation = 90, Parent = ConsoleBtn
+})
+
+task.spawn(function()
+    while consoleGradient.Parent do
+        tween(consoleGradient, 3, {Rotation = 90 + 360}, Enum.EasingStyle.Linear)
+        task.wait(3)
+    end
+end)
+
+local consoleIcon = new("TextLabel", {
+    Name = "Icon",
+    Size = UDim2.new(0, 40, 1, 0),
+    Position = UDim2.new(0, 20, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "▣", Font = Enum.Font.GothamBold, TextSize = 30,
+    TextColor3 = Colors.Magenta, Parent = ConsoleBtn
+})
+
+local consoleText = new("TextLabel", {
+    Name = "Text",
+    Size = UDim2.new(1, -80, 0, 24),
+    Position = UDim2.new(0, 70, 0, 10),
+    BackgroundTransparency = 1,
+    Text = "CONSOLE", Font = Enum.Font.GothamBold, TextSize = 16,
+    TextColor3 = Colors.TextPrimary,
+    TextXAlignment = Enum.TextXAlignment.Left, Parent = ConsoleBtn
+})
+addGradient(consoleText, Colors.Magenta, Colors.TextPrimary, 0)
+
+new("TextLabel", {
+    Name = "Desc",
+    Size = UDim2.new(1, -80, 0, 14),
+    Position = UDim2.new(0, 70, 0, 34),
+    BackgroundTransparency = 1,
+    Text = "Abrir console do desenvolvedor",
+    Font = Enum.Font.Gotham, TextSize = 10,
+    TextColor3 = Colors.TextSecondary,
+    TextXAlignment = Enum.TextXAlignment.Left, Parent = ConsoleBtn
+})
+
+-- ═══════════════════════════════════════════════
+-- PAINEL DE LOG
+-- ═══════════════════════════════════════════════
+local LogFrame = new("Frame", {
+    Name = "LogFrame",
+    Size = UDim2.new(1, -32, 0, 80),
+    Position = UDim2.new(0, 16, 0, 244),
+    BackgroundColor3 = Color3.fromRGB(8, 8, 20),
+    BackgroundTransparency = 0.3,
+    BorderSizePixel = 0, Parent = MainPanel
+})
+addCorner(LogFrame, 8)
+addStroke(LogFrame, Colors.Purple, 1, 0.6)
+
+local ProgressBg = new("Frame", {
+    Name = "ProgressBg",
+    Size = UDim2.new(1, -20, 0, 4),
+    Position = UDim2.new(0, 10, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 50),
+    BorderSizePixel = 0, Parent = LogFrame
+})
+addCorner(ProgressBg, 2)
+
+local ProgressFill = new("Frame", {
+    Name = "Fill",
+    Size = UDim2.new(0, 0, 1, 0),
+    BackgroundColor3 = Colors.Cyan,
+    BorderSizePixel = 0, Parent = ProgressBg
+})
+addCorner(ProgressFill, 2)
+addGradient(ProgressFill, Colors.Cyan, Colors.Magenta, 0)
+
+local LogText = new("TextLabel", {
+    Name = "LogText",
+    Size = UDim2.new(1, -20, 1, -30),
+    Position = UDim2.new(0, 10, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "> Aguardando comando...\n> Sistema pronto. Clique em SCANNER para iniciar.",
+    Font = Enum.Font.Code, TextSize = 11,
+    TextColor3 = Colors.TextSecondary,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    TextWrapped = true, Parent = LogFrame
+})
+
+local logLines = {}
+local function pushLog(msg, color)
+    table.insert(logLines, {Text = msg, Color = color or Colors.TextSecondary})
+    if #logLines > 4 then table.remove(logLines, 1) end
+    local out = {}
+    for _, line in ipairs(logLines) do table.insert(out, line.Text) end
+    LogText.Text = table.concat(out, "\n")
+    LogText.TextColor3 = color or Colors.TextSecondary
+end
+
+local function setProgress(percent)
+    tween(ProgressFill, 0.3, {Size = UDim2.new(percent, 0, 1, 0)})
+end
+
+-- ═══════════════════════════════════════════════
+-- FOOTER
+-- ═══════════════════════════════════════════════
+local Footer = new("TextLabel", {
+    Name = "Footer",
+    Size = UDim2.new(1, -32, 0, 16),
+    Position = UDim2.new(0, 16, 1, -24),
+    BackgroundTransparency = 1,
+    Text = "◈ WILLNZX ENGINE v2.0 ◈ " .. os.date("%H:%M:%S"),
+    Font = Enum.Font.Gotham, TextSize = 9,
+    TextColor3 = Colors.TextDim, Parent = MainPanel
+})
+
+task.spawn(function()
+    while Footer.Parent do
+        Footer.Text = "◈ WILLNZX ENGINE v2.0 ◈ " .. os.date("%H:%M:%S")
+        task.wait(1)
+    end
+end)
+
+-- ═══════════════════════════════════════════════
+-- HOVER
+-- ═══════════════════════════════════════════════
+ScanBtn.MouseEnter:Connect(function()
+    tween(ScanBtn, 0.25, {Size = UDim2.new(1, -24, 0, 62), Position = UDim2.new(0, 12, 0, 101)})
+    tween(scanStroke, 0.25, {Transparency = 0.0, Thickness = 2.5})
+    tween(scanIcon, 0.25, {TextSize = 36})
+end)
+ScanBtn.MouseLeave:Connect(function()
+    tween(ScanBtn, 0.25, {Size = UDim2.new(1, -32, 0, 60), Position = UDim2.new(0, 16, 0, 102)})
+    tween(scanStroke, 0.25, {Transparency = 0.2, Thickness = 2})
+    tween(scanIcon, 0.25, {TextSize = 32})
+end)
+
+ConsoleBtn.MouseEnter:Connect(function()
+    tween(ConsoleBtn, 0.25, {Size = UDim2.new(1, -24, 0, 62), Position = UDim2.new(0, 12, 0, 171)})
+    tween(consoleStroke, 0.25, {Transparency = 0.0, Thickness = 2.5})
+    tween(consoleIcon, 0.25, {TextSize = 34})
+end)
+ConsoleBtn.MouseLeave:Connect(function()
+    tween(ConsoleBtn, 0.25, {Size = UDim2.new(1, -32, 0, 60), Position = UDim2.new(0, 16, 0, 172)})
+    tween(consoleStroke, 0.25, {Transparency = 0.2, Thickness = 2})
+    tween(consoleIcon, 0.25, {TextSize = 30})
+end)
+
+-- ═══════════════════════════════════════════════
+-- DRAG
+-- ═══════════════════════════════════════════════
+local dragging = false
+local dragStart, startPos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainPanel.Position
+    end
+end)
+
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement 
+    or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainPanel.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ═══════════════════════════════════════════════
+-- ✨ ANIMAÇÕES DE GRID (VERSÃO CORRIGIDA)
+-- ═══════════════════════════════════════════════
+local function resetGridToBubble()
+    -- Coloca todas as linhas no centro da bolha (estado "sugado")
+    for _, entry in ipairs(hLines) do
+        entry.obj.Position = UDim2.new(0, 45, 0.5, 0)
+        entry.obj.Size = UDim2.new(0, 0, 0, 1)
+        entry.obj.BackgroundTransparency = 1
+    end
+    for _, entry in ipairs(vLines) do
+        entry.obj.Position = UDim2.new(0, 45, 0.5, 0)
+        entry.obj.Size = UDim2.new(0, 1, 0, 0)
+        entry.obj.BackgroundTransparency = 1
+    end
+end
+
+local function gridSuckIntoBubble(duration)
+    duration = duration or 0.4
+    local ti = TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    
+    for _, entry in ipairs(hLines) do
+        TweenService:Create(entry.obj, ti, {
+            Position = UDim2.new(0, 45, 0.5, 0),
+            Size = UDim2.new(0, 0, 0, 1),
+            BackgroundTransparency = 1
+        }):Play()
+    end
+    for _, entry in ipairs(vLines) do
+        TweenService:Create(entry.obj, ti, {
+            Position = UDim2.new(0, 45, 0.5, 0),
+            Size = UDim2.new(0, 1, 0, 0),
+            BackgroundTransparency = 1
+        }):Play()
+    end
+    
+    -- Fundo fade out RÁPIDO junto
+    TweenService:Create(BackgroundContainer, 
+        TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.In), 
+        { BackgroundTransparency = 1 }
+    ):Play()
+end
+
+local function gridEmergeFromBubble(duration)
+    duration = duration or 0.55
+    local ti = TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    
+    resetGridToBubble()
+    BackgroundContainer.BackgroundTransparency = 1
+    BackgroundContainer.Visible = true
+    
+    task.wait(0.03)
+    
+    for _, entry in ipairs(hLines) do
+        TweenService:Create(entry.obj, ti, {
+            Position = entry.basePos,
+            Size = UDim2.new(1, 0, 0, 1),
+            BackgroundTransparency = entry.baseTrans
+        }):Play()
+    end
+    for _, entry in ipairs(vLines) do
+        TweenService:Create(entry.obj, ti, {
+            Position = entry.basePos,
+            Size = UDim2.new(0, 1, 1, 0),
+            BackgroundTransparency = entry.baseTrans
+        }):Play()
+    end
+    
+    TweenService:Create(BackgroundContainer, 
+        TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), 
+        { BackgroundTransparency = 0.15 }
+    ):Play()
+end
+
+-- ═══════════════════════════════════════════════
+-- ABRIR / FECHAR (CORRIGIDO)
+-- ═══════════════════════════════════════════════
+local isAnimating = false
+
+local function abrirGUI()
+    if isAnimating then return end
+    isAnimating = true
+    
+    -- Bolha expande e some
+    tween(FloatBtn, 0.2, {Size = UDim2.new(0, 70, 0, 70), Position = UDim2.new(0, 10, 0.5, -35), BackgroundTransparency = 1})
+    tween(floatStroke, 0.2, {Transparency = 1})
+    tween(floatGlow, 0.2, {BackgroundTransparency = 1})
+    
+    -- Grid emerge
+    gridEmergeFromBubble(0.55)
+    
+    -- Painel cresce
+    task.wait(0.03)
+    MainPanel.Visible = true
+    MainPanel.Size = UDim2.new(0, 0, 0, 0)
+    MainPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    MainPanel.BackgroundTransparency = 1
+    
+    tween(MainPanel, 0.55, {
+        Size = UDim2.new(0, 420, 0, 380),
+        Position = UDim2.new(0.5, -210, 0.5, -190),
+        BackgroundTransparency = 0.1
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    
+    task.wait(0.55)
+    FloatBtn.Visible = false
+    FloatBtn.Size = UDim2.new(0, 50, 0, 50)
+    FloatBtn.Position = BUBBLE_POS
+    FloatBtn.BackgroundTransparency = 0.1
+    floatStroke.Transparency = 0.2
+    floatGlow.BackgroundTransparency = 0.7
+    
+    isAnimating = false
+end
+
+local function fecharGUI()
+    if isAnimating then return end
+    isAnimating = true
+    
+    -- ═══ CORREÇÃO PRINCIPAL ═══
+    -- Bolha aparece JÁ no centro (invisível, pequena)
+    FloatBtn.Visible = true
+    FloatBtn.Size = UDim2.new(0, 0, 0, 0)
+    FloatBtn.Position = UDim2.new(0, 45, 0.5, -25)
+    FloatBtn.BackgroundTransparency = 1
+    floatStroke.Transparency = 1
+    floatGlow.BackgroundTransparency = 1
+    
+    -- Painel encolhe RÁPIDO
+    tween(MainPanel, 0.35, {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundTransparency = 1
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    
+    -- Grid é sugado + fundo desaparece JUNTO
+    gridSuckIntoBubble(0.35)
+    
+    -- ⚠️ FIX: esconder o painel ANTES do background sumir completamente
+    -- para não ver tela escura "presa"
+    task.wait(0.35)
+    MainPanel.Visible = false
+    BackgroundContainer.Visible = false  -- ⬅️ ISSO resolve a tela preta!
+    
+    -- Bolha surge com Back Out
+    tween(FloatBtn, 0.4, {
+        Size = UDim2.new(0, 55, 0, 55),
+        Position = UDim2.new(0, 17, 0.5, -27),
+        BackgroundTransparency = 0.1
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    tween(floatStroke, 0.4, {Transparency = 0.2})
+    tween(floatGlow, 0.4, {BackgroundTransparency = 0.7})
+    
+    task.wait(0.4)
+    -- Assentar
+    tween(FloatBtn, 0.2, {
+        Size = UDim2.new(0, 50, 0, 50),
+        Position = BUBBLE_POS
+    })
+    
+    isAnimating = false
+end
+
+CloseBtn.MouseButton1Click:Connect(fecharGUI)
+
+FloatBtn.MouseButton1Click:Connect(function()
+    if not isAnimating then abrirGUI() end
+end)
+
+FloatBtn.MouseEnter:Connect(function()
+    tween(FloatBtn, 0.2, {Size = UDim2.new(0, 55, 0, 55), Position = UDim2.new(0, 17, 0.5, -27)})
+    tween(floatStroke, 0.2, {Transparency = 0})
+end)
+FloatBtn.MouseLeave:Connect(function()
+    tween(FloatBtn, 0.2, {Size = UDim2.new(0, 50, 0, 50), Position = BUBBLE_POS})
+    tween(floatStroke, 0.2, {Transparency = 0.2})
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if MainPanel.Visible then
+            fecharGUI()
+        else
+            abrirGUI()
+        end
+    end
+end)
+
+-- ═══════════════════════════════════════════════
+-- FUNÇÕES DO SCANNER
+-- ═══════════════════════════════════════════════
+local function classificarRemote(obj)
+    if obj:IsA("RemoteEvent") then return "RemoteEvent"
+    elseif obj:IsA("RemoteFunction") then return "RemoteFunction"
+    elseif obj:IsA("UnreliableRemoteEvent") then return "UnreliableRemoteEvent"
+    elseif obj:IsA("BindableEvent") then return "BindableEvent"
+    elseif obj:IsA("BindableFunction") then return "BindableFunction"
+    end
+    return "Desconhecido"
+end
+
+local function identificarFuncao(nome)
+    nome = nome:lower()
+    if nome:find("attack") or nome:find("atacar") or nome:find("hit") then return "⚔️ Ataque/Dano"
+    elseif nome:find("damage") or nome:find("dano") then return "💥 Dano"
+    elseif nome:find("kill") or nome:find("matar") then return "💀 Kill"
+    elseif nome:find("money") or nome:find("cash") or nome:find("coin") then return "💰 Dinheiro"
+    elseif nome:find("buy") or nome:find("purchase") then return "🛒 Compra"
+    elseif nome:find("sell") then return "💵 Venda"
+    elseif nome:find("equip") then return "🎒 Equipar"
+    elseif nome:find("drop") then return "📦 Drop"
+    elseif nome:find("teleport") or nome:find("tp") then return "🌀 Teleporte"
+    elseif nome:find("speed") then return "🏃 Velocidade"
+    elseif nome:find("jump") then return "🦘 Pulo"
+    elseif nome:find("health") then return "❤️ Vida"
+    elseif nome:find("respawn") or nome:find("revive") then return "🔄 Respawn"
+    elseif nome:find("chat") or nome:find("message") then return "💬 Chat"
+    elseif nome:find("trade") then return "🔁 Troca"
+    elseif nome:find("quest") or nome:find("missao") then return "📜 Missão"
+    elseif nome:find("level") or nome:find("xp") or nome:find("exp") then return "⭐ Level/XP"
+    elseif nome:find("admin") or nome:find("command") then return "👑 Admin"
+    elseif nome:find("ban") or nome:find("kick") then return "🚫 Moderação"
+    elseif nome:find("update") or nome:find("sync") then return "🔄 Sync"
+    elseif nome:find("request") or nome:find("get") then return "📡 Requisição"
+    elseif nome:find("give") or nome:find("add") then return "🎁 Dar"
+    elseif nome:find("remove") or nome:find("delete") then return "🗑️ Remover"
+    elseif nome:find("spawn") then return "✨ Spawn"
+    elseif nome:find("skill") or nome:find("ability") then return "✨ Habilidade"
+    elseif nome:find("pet") then return "🐾 Pet"
+    elseif nome:find("inventory") or nome:find("inv") then return "🎒 Inventário"
+    elseif nome:find("shop") then return "🏪 Loja"
+    elseif nome:find("reward") then return "🏆 Recompensa"
+    elseif nome:find("spin") then return "🎰 Roleta"
+    elseif nome:find("claim") then return "📥 Resgatar"
+    elseif nome:find("daily") then return "📅 Diário"
+    elseif nome:find("code") then return "🎟️ Código"
+    end
+    return "❓ Desconhecido"
+end
+
+local function getCaminho(obj)
+    local caminho = obj.Name
+    local pai = obj.Parent
+    while pai and pai ~= game do
+        caminho = pai.Name .. "." .. caminho
+        pai = pai.Parent
+    end
+    return caminho
+end
+
+local function executarScanner()
+    print("\n========================================")
+    print("   WILLNZX SCANNER - GUI MODE           ")
+    print("========================================")
+    print("Jogo: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
+    print("PlaceId: " .. game.PlaceId)
+    print("Data: " .. os.date("%d/%m/%Y %H:%M:%S"))
+    print("========================================\n")
+    
+    logLines = {}
+    pushLog("> Iniciando varredura neural...", Colors.Cyan)
+    setProgress(0.05)
+    
+    local contador = {RemoteEvent=0, RemoteFunction=0, UnreliableRemoteEvent=0, BindableEvent=0, BindableFunction=0, Total=0}
+    local remotesEncontrados = {}
+    
+    local locais = {
+        {ReplicatedStorage, "ReplicatedStorage"},
+        {game:GetService("ServerScriptService"), "ServerScriptService"},
+        {game:GetService("ServerStorage"), "ServerStorage"},
+        {game:GetService("StarterGui"), "StarterGui"},
+        {game:GetService("StarterPlayer"), "StarterPlayer"},
+        {workspace, "Workspace"},
+        {game:GetService("Lighting"), "Lighting"},
+        {game:GetService("Chat"), "Chat"},
+        {LocalPlayer, "Player"},
+        {LocalPlayer:FindFirstChild("PlayerGui"), "PlayerGui"},
+        {LocalPlayer.Character, "Character"},
+        {LocalPlayer:FindFirstChild("Backpack"), "Backpack"},
+        {Players, "Players"},
+    }
+    
+    local total = #locais
+    
+    for idx, entry in ipairs(locais) do
+        local container, nome = entry[1], entry[2]
+        if container then
+            pushLog("> Escaneando " .. nome .. "...", Colors.Purple)
+            setProgress(idx / total)
+            
+            for _, obj in ipairs(container:GetDescendants()) do
+                if obj:IsA("RemoteEvent") 
+                or obj:IsA("RemoteFunction") 
+                or obj:IsA("UnreliableRemoteEvent")
+                or obj:IsA("BindableEvent")
+                or obj:IsA("BindableFunction") then
+                    
+                    local tipo = classificarRemote(obj)
+                    local caminho = getCaminho(obj)
+                    local funcao = identificarFuncao(obj.Name)
+                    
+                    contador[tipo] = (contador[tipo] or 0) + 1
+                    contador.Total = contador.Total + 1
+                    
+                    table.insert(remotesEncontrados, {
+                        Nome = obj.Name, Tipo = tipo, Caminho = caminho,
+                        Local = nome, Funcao = funcao,
+                    })
+                end
+            end
+            task.wait(0.1)
+        end
+    end
+    
+    print("\n========== RESULTADOS ==========\n")
+    local localAtual = ""
+    for i, remote in ipairs(remotesEncontrados) do
+        if remote.Local ~= localAtual then
+            localAtual = remote.Local
+            print("\n📁 === " .. localAtual .. " ===\n")
+        end
+        print(string.format("[%d] 📡 %s", i, remote.Nome))
+        print(string.format("    ├─ Tipo: %s", remote.Tipo))
+        print(string.format("    ├─ Caminho: %s", remote.Caminho))
+        print(string.format("    └─ Função: %s", remote.Funcao))
+        print("")
+    end
+    
+    print("\n========== RESUMO ==========")
+    print(string.format("🔹 RemoteEvents:        %d", contador.RemoteEvent))
+    print(string.format("🔹 RemoteFunctions:     %d", contador.RemoteFunction))
+    print(string.format("🔹 UnreliableRemotes:   %d", contador.UnreliableRemoteEvent))
+    print(string.format("🔹 BindableEvents:      %d", contador.BindableEvent))
+    print(string.format("🔹 BindableFunctions:   %d", contador.BindableFunction))
+    print("----------------------------------------")
+    print(string.format("🔸 TOTAL:               %d", contador.Total))
+    print("============================\n")
+    
+    pcall(function()
+        if writefile then
+            local texto = "=== WILLNZX SCANNER ===\n"
+            texto = texto .. "Jogo: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name .. "\n"
+            texto = texto .. "PlaceId: " .. game.PlaceId .. "\n"
+            texto = texto .. "Data: " .. os.date("%d/%m/%Y %H:%M:%S") .. "\n\n"
+            for i, remote in ipairs(remotesEncontrados) do
+                texto = texto .. string.format("[%d] %s\n    Tipo: %s\n    Caminho: %s\n    Função: %s\n\n", i, remote.Nome, remote.Tipo, remote.Caminho, remote.Funcao)
+            end
+            texto = texto .. "\n=== RESUMO ===\n"
+            texto = texto .. "RemoteEvents: " .. contador.RemoteEvent .. "\n"
+            texto = texto .. "RemoteFunctions: " .. contador.RemoteFunction .. "\n"
+            texto = texto .. "TOTAL: " .. contador.Total .. "\n"
+            writefile("willnzx_scanner.txt", texto)
+            print("💾 Lista salva em: willnzx_scanner.txt")
+        end
+    end)
+    
+    setProgress(1)
+    pushLog("> Scan completo! " .. contador.Total .. " remotes encontrados.", Colors.Success)
+    setStatus("SCAN COMPLETO // " .. contador.Total .. " REMOTES", Colors.Success)
+    print("\n✅ Scan completo!")
+    
+    task.wait(3)
+    setProgress(0)
+end
+
+ScanBtn.MouseButton1Click:Connect(function()
+    tween(ScanBtn, 0.1, {BackgroundTransparency = 0}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    task.wait(0.1)
+    tween(ScanBtn, 0.3, {BackgroundTransparency = 0.2})
+    
+    setStatus("ESCANEANDO...", Colors.Warning)
+    
+    task.spawn(function()
+        local ok, err = pcall(executarScanner)
+        if not ok then
+            pushLog("> Erro: " .. tostring(err), Colors.Error)
+            setStatus("ERRO NO SCAN", Colors.Error)
+        end
+    end)
+end)
+
+ConsoleBtn.MouseButton1Click:Connect(function()
+    tween(ConsoleBtn, 0.1, {BackgroundTransparency = 0}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    task.wait(0.1)
+    tween(ConsoleBtn, 0.3, {BackgroundTransparency = 0.2})
+    
+    pushLog("> Abrindo console...", Colors.Magenta)
+    setStatus("CONSOLE ABERTO", Colors.Magenta)
+    
+    local aberto = false
+    
+    pcall(function()
+        GuiService:SetDevConsoleVisible(true)
+        aberto = true
+    end)
+    
+    if not aberto then
+        pcall(function()
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F9, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F9, false, game)
+            aberto = true
+        end)
+    end
+    
+    if not aberto then
+        pcall(function()
+            StarterGui:SetCore("ToggleDevConsole")
+            aberto = true
+        end)
+    end
+    
+    if aberto then
+        pushLog("> Console aberto com sucesso!", Colors.Success)
+        print("═══════════════════════════════════")
+        print("🖥️  CONSOLE ABERTO PELO WILLNZX GUI")
+        print("═══════════════════════════════════")
+    else
+        pushLog("> Pressione F9 manualmente para abrir.", Colors.Warning)
+    end
+end)
+
+-- ═══════════════════════════════════════════════
+-- ANIMAÇÃO INICIAL
+-- ═══════════════════════════════════════════════
+FloatBtn.Visible = true
+MainPanel.Visible = false
+BackgroundContainer.BackgroundTransparency = 1
+BackgroundContainer.Visible = true
+
+resetGridToBubble()
+
+task.wait(0.5)
+abrirGUI()
+
+-- ═══════════════════════════════════════════════
+-- MENSAGEM INICIAL
+-- ═══════════════════════════════════════════════
+print("═══════════════════════════════════════════")
+print("🌌 WILLNZX SCANNER GUI CARREGADO COM SUCESSO")
+print("═══════════════════════════════════════════")
+print("📌 SCANNER: Lista todos os remotes do jogo")
+print("📌 CONSOLE: Abre o console (F9)")
+print("📌 RightShift: Esconde/Mostra a GUI")
+print("📌 Arraste pela barra de título para mover")
+print("═══════════════════════════════════════════")
