@@ -1,0 +1,831 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+local ATIVO = true
+local MODO = "center"
+local TEMPO_PREVISAO = 0.35
+local OFFSET_FRENTE = 4
+local JOGADOR_FIXO = nil
+local alvoAtual = nil
+local fetchMouseAtual = nil
+local overrideAtivo = false
+local gui = nil
+local bolinha = nil
+local statusLabel = nil
+local btnToggleArmas = nil
+
+local ALTERNAR_ATIVO = false
+local INTERVALO_ALTERNAR = 0.5
+local ULTIMO_ALTERNAR = 0
+local ARMAS = {"RocketLauncher", "WindRocketLauncher"}
+local INDICE_ARMA = 1
+
+local COR_PRIMARIA = Color3.fromRGB(0, 220, 255)
+local COR_SECUNDARIA = Color3.fromRGB(180, 0, 255)
+local COR_ALERTA = Color3.fromRGB(255, 50, 150)
+local COR_FUNDO = Color3.fromRGB(10, 10, 20)
+local COR_FUNDO2 = Color3.fromRGB(25, 25, 45)
+local COR_VERDE = Color3.fromRGB(100, 255, 150)
+
+local function acharArma(nome)
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if char then
+        local arma = char:FindFirstChild(nome)
+        if arma and arma:IsA("Tool") then return arma end
+    end
+    if backpack then
+        local arma = backpack:FindFirstChild(nome)
+        if arma and arma:IsA("Tool") then return arma end
+    end
+    return nil
+end
+
+local function equiparArma(nome)
+    local arma = acharArma(nome)
+    if arma then
+        pcall(function()
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:EquipTool(arma)
+            end
+        end)
+        return true
+    end
+    return false
+end
+
+local function alternarArma()
+    local proxima = ARMAS[INDICE_ARMA]
+    local equipou = equiparArma(proxima)
+    if equipou then
+        INDICE_ARMA = INDICE_ARMA + 1
+        if INDICE_ARMA > #ARMAS then INDICE_ARMA = 1 end
+    end
+end
+
+local function criarHUD()
+    if gui then gui:Destroy() end
+    gui = Instance.new("ScreenGui")
+    gui.Name = "FuturisticAimGUI"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 10000
+    gui.Parent = PlayerGui
+
+    bolinha = Instance.new("Frame")
+    bolinha.Name = "Bolinha"
+    bolinha.Size = UDim2.new(0, 10, 0, 10)
+    bolinha.Position = UDim2.new(0.5, -5, 0.5, -5)
+    bolinha.BackgroundColor3 = COR_ALERTA
+    bolinha.BorderSizePixel = 0
+    bolinha.Visible = false
+    bolinha.ZIndex = 5
+    bolinha.Parent = gui
+    local cb = Instance.new("UICorner") cb.CornerRadius = UDim.new(1, 0) cb.Parent = bolinha
+    local sb = Instance.new("UIStroke") sb.Color = Color3.fromRGB(255, 255, 255) sb.Thickness = 1.5 sb.Parent = bolinha
+    local brilhoBolinha = Instance.new("ImageLabel")
+    brilhoBolinha.Size = UDim2.new(3, 0, 3, 0)
+    brilhoBolinha.Position = UDim2.new(-1, 0, -1, 0)
+    brilhoBolinha.BackgroundTransparency = 1
+    brilhoBolinha.Image = "rbxassetid://5028857084"
+    brilhoBolinha.ImageColor3 = COR_ALERTA
+    brilhoBolinha.ImageTransparency = 0.5
+    brilhoBolinha.Parent = bolinha
+
+    task.spawn(function()
+        while gui and gui.Parent and bolinha do
+            TweenService:Create(brilhoBolinha, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+                ImageTransparency = 0.85
+            }):Play()
+            task.wait(1)
+        end
+    end)
+
+    local crossContainer = Instance.new("Frame")
+    crossContainer.Size = UDim2.new(0, 40, 0, 40)
+    crossContainer.Position = UDim2.new(0.5, -20, 0.5, -20)
+    crossContainer.BackgroundTransparency = 1
+    crossContainer.Parent = gui
+
+    local tracos = {
+        {UDim2.new(0.5, -1, 0, 0), UDim2.new(0, 2, 0, 8)},
+        {UDim2.new(0.5, -1, 0, 32), UDim2.new(0, 2, 0, 8)},
+        {UDim2.new(0, 0, 0.5, -1), UDim2.new(0, 8, 0, 2)},
+        {UDim2.new(0, 32, 0.5, -1), UDim2.new(0, 8, 0, 2)},
+    }
+    for _, dados in ipairs(tracos) do
+        local t = Instance.new("Frame")
+        t.Size = dados[2]
+        t.Position = dados[1]
+        t.BackgroundColor3 = COR_PRIMARIA
+        t.BorderSizePixel = 0
+        t.Parent = crossContainer
+        local ct = Instance.new("UICorner") ct.CornerRadius = UDim.new(0, 2) ct.Parent = t
+    end
+
+    local centroDot = Instance.new("Frame")
+    centroDot.Size = UDim2.new(0, 4, 0, 4)
+    centroDot.Position = UDim2.new(0.5, -2, 0.5, -2)
+    centroDot.BackgroundColor3 = COR_PRIMARIA
+    centroDot.BorderSizePixel = 0
+    centroDot.Parent = crossContainer
+    local cd = Instance.new("UICorner") cd.CornerRadius = UDim.new(1, 0) cd.Parent = centroDot
+
+    local botaoAbrir = Instance.new("TextButton")
+    botaoAbrir.Size = UDim2.new(0, 65, 0, 65)
+    botaoAbrir.Position = UDim2.new(0, 20, 0.5, -32)
+    botaoAbrir.BackgroundColor3 = COR_FUNDO
+    botaoAbrir.Text = ""
+    botaoAbrir.BorderSizePixel = 0
+    botaoAbrir.Active = true
+    botaoAbrir.Draggable = true
+    botaoAbrir.Parent = gui
+
+    local cBA = Instance.new("UICorner") cBA.CornerRadius = UDim.new(1, 0) cBA.Parent = botaoAbrir
+    local sBA = Instance.new("UIStroke") sBA.Color = COR_PRIMARIA sBA.Thickness = 2 sBA.Parent = botaoAbrir
+    local gradBA = Instance.new("UIGradient")
+    gradBA.Rotation = 45
+    gradBA.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, COR_PRIMARIA),
+        ColorSequenceKeypoint.new(1, COR_SECUNDARIA)
+    })
+    gradBA.Parent = sBA
+
+    local icone = Instance.new("ImageLabel")
+    icone.Size = UDim2.new(0, 40, 0, 40)
+    icone.Position = UDim2.new(0.5, -20, 0.5, -20)
+    icone.BackgroundTransparency = 1
+    icone.Image = "rbxassetid://3926305904"
+    icone.ImageRectOffset = Vector2.new(724, 44)
+    icone.ImageRectSize = Vector2.new(36, 36)
+    icone.ImageColor3 = COR_PRIMARIA
+    icone.Parent = botaoAbrir
+
+    task.spawn(function()
+        while gui and gui.Parent and botaoAbrir do
+            TweenService:Create(sBA, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+                Thickness = 4,
+                Transparency = 0.3
+            }):Play()
+            task.wait(1.5)
+        end
+    end)
+
+    local menu = Instance.new("Frame")
+    menu.Size = UDim2.new(0, 320, 0, 580)
+    menu.Position = UDim2.new(0.5, -160, 0.5, -290)
+    menu.BackgroundColor3 = COR_FUNDO
+    menu.BorderSizePixel = 0
+    menu.Visible = false
+    menu.Active = true
+    menu.Draggable = true
+    menu.ClipsDescendants = true
+    menu.Parent = gui
+
+    local cMenu = Instance.new("UICorner") cMenu.CornerRadius = UDim.new(0, 16) cMenu.Parent = menu
+    local gradFundo = Instance.new("UIGradient")
+    gradFundo.Rotation = 135
+    gradFundo.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, COR_FUNDO),
+        ColorSequenceKeypoint.new(1, COR_FUNDO2)
+    })
+    gradFundo.Parent = menu
+
+    local sMenu = Instance.new("UIStroke") sMenu.Color = COR_PRIMARIA sMenu.Thickness = 2 sMenu.Parent = menu
+    local gradBorda = Instance.new("UIGradient")
+    gradBorda.Rotation = 0
+    gradBorda.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, COR_PRIMARIA),
+        ColorSequenceKeypoint.new(0.5, COR_SECUNDARIA),
+        ColorSequenceKeypoint.new(1, COR_PRIMARIA)
+    })
+    gradBorda.Parent = sMenu
+
+    task.spawn(function()
+        local rotacao = 0
+        while gui and gui.Parent and gradBorda do
+            rotacao = (rotacao + 3) % 360
+            gradBorda.Rotation = rotacao
+            task.wait(0.05)
+        end
+    end)
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 60)
+    header.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+    header.BorderSizePixel = 0
+    header.Parent = menu
+
+    local gradHeader = Instance.new("UIGradient")
+    gradHeader.Rotation = 90
+    gradHeader.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 10, 60))
+    })
+    gradHeader.Parent = header
+
+    local linhaHeader = Instance.new("Frame")
+    linhaHeader.Size = UDim2.new(1, 0, 0, 2)
+    linhaHeader.Position = UDim2.new(0, 0, 1, -2)
+    linhaHeader.BackgroundColor3 = COR_PRIMARIA
+    linhaHeader.BorderSizePixel = 0
+    linhaHeader.Parent = header
+
+    local iconeHeader = Instance.new("ImageLabel")
+    iconeHeader.Size = UDim2.new(0, 32, 0, 32)
+    iconeHeader.Position = UDim2.new(0, 18, 0.5, -16)
+    iconeHeader.BackgroundTransparency = 1
+    iconeHeader.Image = "rbxassetid://3926305904"
+    iconeHeader.ImageRectOffset = Vector2.new(724, 44)
+    iconeHeader.ImageRectSize = Vector2.new(36, 36)
+    iconeHeader.ImageColor3 = COR_PRIMARIA
+    iconeHeader.Parent = header
+
+    local titulo = Instance.new("TextLabel")
+    titulo.Size = UDim2.new(1, -60, 0, 25)
+    titulo.Position = UDim2.new(0, 55, 0, 12)
+    titulo.BackgroundTransparency = 1
+    titulo.Text = "by: @willnzx.mt"
+    titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titulo.Font = Enum.Font.GothamBold
+    titulo.TextSize = 18
+    titulo.TextXAlignment = Enum.TextXAlignment.Left
+    titulo.Parent = header
+
+    local subtitulo = Instance.new("TextLabel")
+    subtitulo.Size = UDim2.new(1, -60, 0, 15)
+    subtitulo.Position = UDim2.new(0, 55, 0, 34)
+    subtitulo.BackgroundTransparency = 1
+    subtitulo.Text = "v2.1 // by @willnzx.mt"
+    subtitulo.TextColor3 = Color3.fromRGB(120, 120, 150)
+    subtitulo.Font = Enum.Font.Gotham
+    subtitulo.TextSize = 10
+    subtitulo.TextXAlignment = Enum.TextXAlignment.Left
+    subtitulo.Parent = header
+
+    local btnX = Instance.new("TextButton")
+    btnX.Size = UDim2.new(0, 28, 0, 28)
+    btnX.Position = UDim2.new(1, -38, 0, 16)
+    btnX.BackgroundColor3 = Color3.fromRGB(40, 10, 25)
+    btnX.Text = "✕"
+    btnX.TextColor3 = COR_ALERTA
+    btnX.Font = Enum.Font.GothamBold
+    btnX.TextSize = 14
+    btnX.BorderSizePixel = 0
+    btnX.Parent = header
+    local cX = Instance.new("UICorner") cX.CornerRadius = UDim.new(0, 8) cX.Parent = btnX
+
+    local statusBar = Instance.new("Frame")
+    statusBar.Size = UDim2.new(0.9, 0, 0, 32)
+    statusBar.Position = UDim2.new(0.05, 0, 0, 72)
+    statusBar.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+    statusBar.BorderSizePixel = 0
+    statusBar.Parent = menu
+    local cSB = Instance.new("UICorner") cSB.CornerRadius = UDim.new(0, 8) cSB.Parent = statusBar
+    local sSB = Instance.new("UIStroke") sSB.Color = COR_PRIMARIA sSB.Thickness = 1 sSB.Transparency = 0.5 sSB.Parent = statusBar
+
+    local statusDot = Instance.new("Frame")
+    statusDot.Size = UDim2.new(0, 8, 0, 8)
+    statusDot.Position = UDim2.new(0, 12, 0.5, -4)
+    statusDot.BackgroundColor3 = COR_VERDE
+    statusDot.BorderSizePixel = 0
+    statusDot.Parent = statusBar
+    local cDot = Instance.new("UICorner") cDot.CornerRadius = UDim.new(1, 0) cDot.Parent = statusDot
+
+    statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -30, 1, 0)
+    statusLabel.Position = UDim2.new(0, 26, 0, 0)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "ONLINE // Modo: CENTER"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextSize = 11
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = statusBar
+
+    local secModos = Instance.new("TextLabel")
+    secModos.Size = UDim2.new(0.9, 0, 0, 20)
+    secModos.Position = UDim2.new(0.05, 0, 0, 112)
+    secModos.BackgroundTransparency = 1
+    secModos.Text = "▸ AIM MODE"
+    secModos.TextColor3 = COR_PRIMARIA
+    secModos.Font = Enum.Font.GothamBold
+    secModos.TextSize = 11
+    secModos.TextXAlignment = Enum.TextXAlignment.Left
+    secModos.Parent = menu
+
+    local function criarBtnModo(texto, yPos, modo)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.9, 0, 0, 42)
+        btn.Position = UDim2.new(0.05, 0, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+        btn.BorderSizePixel = 0
+        btn.Text = ""
+        btn.Parent = menu
+        local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, 10) c.Parent = btn
+        local s = Instance.new("UIStroke") s.Color = Color3.fromRGB(60, 60, 90) s.Thickness = 1 s.Parent = btn
+
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.new(0, 6, 0, 6)
+        dot.Position = UDim2.new(0, 14, 0.5, -3)
+        dot.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
+        dot.BorderSizePixel = 0
+        dot.Parent = btn
+        local cd = Instance.new("UICorner") cd.CornerRadius = UDim.new(1, 0) cd.Parent = dot
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -40, 1, 0)
+        label.Position = UDim2.new(0, 30, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = texto
+        label.TextColor3 = Color3.fromRGB(180, 180, 200)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = btn
+
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 45)}):Play()
+            TweenService:Create(s, TweenInfo.new(0.2), {Color = COR_PRIMARIA, Transparency = 0.3}):Play()
+        end)
+
+        btn.MouseLeave:Connect(function()
+            if MODO ~= modo then
+                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(15, 15, 30)}):Play()
+                TweenService:Create(s, TweenInfo.new(0.2), {Color = Color3.fromRGB(60, 60, 90), Transparency = 0}):Play()
+            end
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            MODO = modo
+            atualizarVisual()
+        end)
+
+        return {btn = btn, dot = dot, label = label, stroke = s, modo = modo}
+    end
+
+    local btnsModo = {}
+    table.insert(btnsModo, criarBtnModo("🎯  CENTER AIM", 136, "center"))
+    table.insert(btnsModo, criarBtnModo("👤  JOGADOR FIXO", 184, "fixo"))
+    table.insert(btnsModo, criarBtnModo("👥  SEGUIR TODOS", 232, "todos"))
+
+    function atualizarVisual()
+        for _, b in ipairs(btnsModo) do
+            if b.modo == MODO then
+                TweenService:Create(b.btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 60, 90)}):Play()
+                TweenService:Create(b.stroke, TweenInfo.new(0.3), {Color = COR_PRIMARIA, Transparency = 0}):Play()
+                TweenService:Create(b.dot, TweenInfo.new(0.3), {BackgroundColor3 = COR_PRIMARIA}):Play()
+                TweenService:Create(b.label, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            else
+                TweenService:Create(b.btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(15, 15, 30)}):Play()
+                TweenService:Create(b.stroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(60, 60, 90), Transparency = 0}):Play()
+                TweenService:Create(b.dot, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 80, 120)}):Play()
+                TweenService:Create(b.label, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(180, 180, 200)}):Play()
+            end
+        end
+        local textos = {center = "CENTER", fixo = "FIXO", todos = "TODOS"}
+        if statusLabel then
+            statusLabel.Text = "ONLINE // Modo: " .. (textos[MODO] or "?")
+        end
+    end
+    atualizarVisual()
+
+    local secFixo = Instance.new("TextLabel")
+    secFixo.Size = UDim2.new(0.9, 0, 0, 20)
+    secFixo.Position = UDim2.new(0.05, 0, 0, 284)
+    secFixo.BackgroundTransparency = 1
+    secFixo.Text = "▸ SELECIONAR JOGADOR"
+    secFixo.TextColor3 = COR_SECUNDARIA
+    secFixo.Font = Enum.Font.GothamBold
+    secFixo.TextSize = 11
+    secFixo.TextXAlignment = Enum.TextXAlignment.Left
+    secFixo.Parent = menu
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(0.9, 0, 0, 80)
+    scroll.Position = UDim2.new(0.05, 0, 0, 308)
+    scroll.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 4
+    scroll.ScrollBarImageColor3 = COR_PRIMARIA
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Parent = menu
+    local cSc = Instance.new("UICorner") cSc.CornerRadius = UDim.new(0, 8) cSc.Parent = scroll
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 6)
+    pad.PaddingLeft = UDim.new(0, 6)
+    pad.PaddingRight = UDim.new(0, 6)
+    pad.Parent = scroll
+
+    local function atualizarLista()
+        for _, obj in ipairs(scroll:GetChildren()) do
+            if obj:IsA("TextButton") then obj:Destroy() end
+        end
+        local ordem = 0
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                ordem = ordem + 1
+                local btn = Instance.new("TextButton")
+                btn.Size = UDim2.new(1, -12, 0, 26)
+                btn.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+                btn.BorderSizePixel = 0
+                btn.Text = plr.Name
+                btn.TextColor3 = Color3.fromRGB(200, 200, 220)
+                btn.Font = Enum.Font.GothamBold
+                btn.TextSize = 11
+                btn.LayoutOrder = ordem
+                btn.Parent = scroll
+                local cB = Instance.new("UICorner") cB.CornerRadius = UDim.new(0, 6) cB.Parent = btn
+
+                btn.MouseButton1Click:Connect(function()
+                    JOGADOR_FIXO = plr
+                    for _, outro in ipairs(scroll:GetChildren()) do
+                        if outro:IsA("TextButton") then
+                            TweenService:Create(outro, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 40)}):Play()
+                        end
+                    end
+                    TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 80, 60)}):Play()
+                end)
+            end
+        end
+        task.wait(0.05)
+        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+    end
+
+    local secArmas = Instance.new("TextLabel")
+    secArmas.Size = UDim2.new(0.9, 0, 0, 20)
+    secArmas.Position = UDim2.new(0.05, 0, 0, 396)
+    secArmas.BackgroundTransparency = 1
+    secArmas.Text = "▸ ALTERNAR ARMAS"
+    secArmas.TextColor3 = COR_VERDE
+    secArmas.Font = Enum.Font.GothamBold
+    secArmas.TextSize = 11
+    secArmas.TextXAlignment = Enum.TextXAlignment.Left
+    secArmas.Parent = menu
+
+    btnToggleArmas = Instance.new("TextButton")
+    btnToggleArmas.Size = UDim2.new(0.9, 0, 0, 42)
+    btnToggleArmas.Position = UDim2.new(0.05, 0, 0, 420)
+    btnToggleArmas.BackgroundColor3 = Color3.fromRGB(40, 20, 20)
+    btnToggleArmas.BorderSizePixel = 0
+    btnToggleArmas.Text = "🔄  ALTERNAR ARMAS\n❌ OFF"
+    btnToggleArmas.TextColor3 = Color3.fromRGB(255, 150, 150)
+    btnToggleArmas.Font = Enum.Font.GothamBold
+    btnToggleArmas.TextSize = 12
+    btnToggleArmas.Parent = menu
+    local cTA = Instance.new("UICorner") cTA.CornerRadius = UDim.new(0, 10) cTA.Parent = btnToggleArmas
+    local sTA = Instance.new("UIStroke") sTA.Color = COR_ALERTA sTA.Thickness = 1 sTA.Parent = btnToggleArmas
+
+    btnToggleArmas.MouseButton1Click:Connect(function()
+        ALTERNAR_ATIVO = not ALTERNAR_ATIVO
+        if ALTERNAR_ATIVO then
+            btnToggleArmas.Text = "🔄  ALTERNAR ARMAS\n✅ ON"
+            btnToggleArmas.TextColor3 = COR_VERDE
+            btnToggleArmas.BackgroundColor3 = Color3.fromRGB(15, 50, 30)
+            TweenService:Create(sTA, TweenInfo.new(0.3), {Color = COR_VERDE}):Play()
+        else
+            btnToggleArmas.Text = "🔄  ALTERNAR ARMAS\n❌ OFF"
+            btnToggleArmas.TextColor3 = Color3.fromRGB(255, 150, 150)
+            btnToggleArmas.BackgroundColor3 = Color3.fromRGB(40, 20, 20)
+            TweenService:Create(sTA, TweenInfo.new(0.3), {Color = COR_ALERTA}):Play()
+        end
+    end)
+
+    local labelArmas = Instance.new("TextLabel")
+    labelArmas.Size = UDim2.new(0.9, 0, 0, 22)
+    labelArmas.Position = UDim2.new(0.05, 0, 0, 468)
+    labelArmas.BackgroundTransparency = 1
+    labelArmas.Text = "RockeLauncher ↔ WindRocketLauncher"
+    labelArmas.TextColor3 = Color3.fromRGB(150, 150, 180)
+    labelArmas.Font = Enum.Font.Gotham
+    labelArmas.TextSize = 10
+    labelArmas.Parent = menu
+
+    local secAjustes = Instance.new("TextLabel")
+    secAjustes.Size = UDim2.new(0.9, 0, 0, 20)
+    secAjustes.Position = UDim2.new(0.05, 0, 0, 496)
+    secAjustes.BackgroundTransparency = 1
+    secAjustes.Text = "▸ AJUSTES"
+    secAjustes.TextColor3 = COR_PRIMARIA
+    secAjustes.Font = Enum.Font.GothamBold
+    secAjustes.TextSize = 11
+    secAjustes.TextXAlignment = Enum.TextXAlignment.Left
+    secAjustes.Parent = menu
+
+    local labelLead = Instance.new("TextLabel")
+    labelLead.Size = UDim2.new(0.4, 0, 0, 26)
+    labelLead.Position = UDim2.new(0.05, 0, 0, 520)
+    labelLead.BackgroundTransparency = 1
+    labelLead.Text = "LEAD: 0.35"
+    labelLead.TextColor3 = Color3.fromRGB(180, 180, 200)
+    labelLead.Font = Enum.Font.GothamBold
+    labelLead.TextSize = 10
+    labelLead.TextXAlignment = Enum.TextXAlignment.Left
+    labelLead.Parent = menu
+
+    local btnLeadM = Instance.new("TextButton")
+    btnLeadM.Size = UDim2.new(0.11, 0, 0, 26)
+    btnLeadM.Position = UDim2.new(0.5, 0, 0, 520)
+    btnLeadM.BackgroundColor3 = Color3.fromRGB(30, 15, 40)
+    btnLeadM.Text = "−"
+    btnLeadM.TextColor3 = COR_ALERTA
+    btnLeadM.Font = Enum.Font.GothamBold
+    btnLeadM.TextSize = 14
+    btnLeadM.BorderSizePixel = 0
+    btnLeadM.Parent = menu
+    local cLM = Instance.new("UICorner") cLM.CornerRadius = UDim.new(0, 6) cLM.Parent = btnLeadM
+
+    local btnLeadP = Instance.new("TextButton")
+    btnLeadP.Size = UDim2.new(0.11, 0, 0, 26)
+    btnLeadP.Position = UDim2.new(0.62, 0, 0, 520)
+    btnLeadP.BackgroundColor3 = Color3.fromRGB(15, 30, 40)
+    btnLeadP.Text = "+"
+    btnLeadP.TextColor3 = COR_PRIMARIA
+    btnLeadP.Font = Enum.Font.GothamBold
+    btnLeadP.TextSize = 14
+    btnLeadP.BorderSizePixel = 0
+    btnLeadP.Parent = menu
+    local cLP = Instance.new("UICorner") cLP.CornerRadius = UDim.new(0, 6) cLP.Parent = btnLeadP
+
+    local labelOff = Instance.new("TextLabel")
+    labelOff.Size = UDim2.new(0.4, 0, 0, 26)
+    labelOff.Position = UDim2.new(0.05, 0, 0, 550)
+    labelOff.BackgroundTransparency = 1
+    labelOff.Text = "OFFSET: 4"
+    labelOff.TextColor3 = Color3.fromRGB(180, 180, 200)
+    labelOff.Font = Enum.Font.GothamBold
+    labelOff.TextSize = 10
+    labelOff.TextXAlignment = Enum.TextXAlignment.Left
+    labelOff.Parent = menu
+
+    local btnOffM = Instance.new("TextButton")
+    btnOffM.Size = UDim2.new(0.11, 0, 0, 26)
+    btnOffM.Position = UDim2.new(0.5, 0, 0, 550)
+    btnOffM.BackgroundColor3 = Color3.fromRGB(30, 15, 40)
+    btnOffM.Text = "−"
+    btnOffM.TextColor3 = COR_ALERTA
+    btnOffM.Font = Enum.Font.GothamBold
+    btnOffM.TextSize = 14
+    btnOffM.BorderSizePixel = 0
+    btnOffM.Parent = menu
+    local cOM = Instance.new("UICorner") cOM.CornerRadius = UDim.new(0, 6) cOM.Parent = btnOffM
+
+    local btnOffP = Instance.new("TextButton")
+    btnOffP.Size = UDim2.new(0.11, 0, 0, 26)
+    btnOffP.Position = UDim2.new(0.62, 0, 0, 550)
+    btnOffP.BackgroundColor3 = Color3.fromRGB(15, 30, 40)
+    btnOffP.Text = "+"
+    btnOffP.TextColor3 = COR_PRIMARIA
+    btnOffP.Font = Enum.Font.GothamBold
+    btnOffP.TextSize = 14
+    btnOffP.BorderSizePixel = 0
+    btnOffP.Parent = menu
+    local cOP = Instance.new("UICorner") cOP.CornerRadius = UDim.new(0, 6) cOP.Parent = btnOffP
+
+    btnLeadM.MouseButton1Click:Connect(function()
+        TEMPO_PREVISAO = math.max(TEMPO_PREVISAO - 0.05, 0)
+        labelLead.Text = string.format("LEAD: %.2f", TEMPO_PREVISAO)
+    end)
+    btnLeadP.MouseButton1Click:Connect(function()
+        TEMPO_PREVISAO = math.min(TEMPO_PREVISAO + 0.05, 1)
+        labelLead.Text = string.format("LEAD: %.2f", TEMPO_PREVISAO)
+    end)
+    btnOffM.MouseButton1Click:Connect(function()
+        OFFSET_FRENTE = math.max(OFFSET_FRENTE - 1, 0)
+        labelOff.Text = "OFFSET: " .. OFFSET_FRENTE
+    end)
+    btnOffP.MouseButton1Click:Connect(function()
+        OFFSET_FRENTE = math.min(OFFSET_FRENTE + 1, 15)
+        labelOff.Text = "OFFSET: " .. OFFSET_FRENTE
+    end)
+
+    local btnToggle = Instance.new("TextButton")
+    btnToggle.Size = UDim2.new(0.9, 0, 0, 34)
+    btnToggle.Position = UDim2.new(0.05, 0, 1, -46)
+    btnToggle.BackgroundColor3 = Color3.fromRGB(15, 50, 30)
+    btnToggle.BorderSizePixel = 0
+    btnToggle.Text = "⏻  SCRIPT ATIVO"
+    btnToggle.TextColor3 = COR_VERDE
+    btnToggle.Font = Enum.Font.GothamBold
+    btnToggle.TextSize = 12
+    btnToggle.Parent = menu
+    local cTg = Instance.new("UICorner") cTg.CornerRadius = UDim.new(0, 10) cTg.Parent = btnToggle
+    local sTg = Instance.new("UIStroke") sTg.Color = COR_VERDE sTg.Thickness = 1 sTg.Transparency = 0.4 sTg.Parent = btnToggle
+
+    btnToggle.MouseButton1Click:Connect(function()
+        ATIVO = not ATIVO
+        if ATIVO then
+            btnToggle.Text = "⏻  SCRIPT ATIVO"
+            btnToggle.TextColor3 = COR_VERDE
+            btnToggle.BackgroundColor3 = Color3.fromRGB(15, 50, 30)
+            sTg.Color = COR_VERDE
+        else
+            btnToggle.Text = "⏻  SCRIPT DESATIVADO"
+            btnToggle.TextColor3 = Color3.fromRGB(255, 100, 100)
+            btnToggle.BackgroundColor3 = Color3.fromRGB(50, 15, 15)
+            sTg.Color = Color3.fromRGB(255, 100, 100)
+            if bolinha then bolinha.Visible = false end
+        end
+    end)
+
+    botaoAbrir.MouseButton1Click:Connect(function()
+        menu.Visible = not menu.Visible
+        if menu.Visible then atualizarLista() end
+    end)
+    btnX.MouseButton1Click:Connect(function()
+        menu.Visible = false
+    end)
+end
+
+local function acharMaisProximo()
+    local meuChar = LocalPlayer.Character
+    if not meuChar then return nil end
+    local meuHrp = meuChar:FindFirstChild("HumanoidRootPart")
+    if not meuHrp then return nil end
+
+    local maisPerto, menorDist = nil, math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local head = plr.Character:FindFirstChild("Head")
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            if head and hum and hum.Health > 0 then
+                local dist = (head.Position - meuHrp.Position).Magnitude
+                if dist < menorDist then
+                    menorDist = dist
+                    maisPerto = head
+                end
+            end
+        end
+    end
+    return maisPerto
+end
+
+local function acharFixo()
+    if not JOGADOR_FIXO or not JOGADOR_FIXO.Character then return nil end
+    local head = JOGADOR_FIXO.Character:FindFirstChild("Head")
+    local hum = JOGADOR_FIXO.Character:FindFirstChildOfClass("Humanoid")
+    if head and hum and hum.Health > 0 then
+        return head
+    end
+    return nil
+end
+
+local function alvoValido(alvo)
+    if not alvo or not alvo.Parent then return false end
+    local hum = alvo.Parent:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function pegarAlvo()
+    if MODO == "center" then return nil end
+    if MODO == "fixo" then return acharFixo() end
+    if MODO == "todos" then return acharMaisProximo() end
+    return nil
+end
+
+local function posicaoPrevista(alvo)
+    if not alvo then return nil end
+    local hrp = alvo.Parent:FindFirstChild("HumanoidRootPart")
+    local posBase = alvo.Position
+
+    local direcaoMovimento = Vector3.new(0, 0, 0)
+    if hrp then
+        local velocidade = hrp.Velocity
+        local velHorizontal = Vector3.new(velocidade.X, 0, velocidade.Z)
+        if velHorizontal.Magnitude > 1 then
+            direcaoMovimento = velHorizontal.Unit
+            posBase = posBase + (velHorizontal * TEMPO_PREVISAO)
+        end
+    end
+
+    local direcaoFrente = direcaoMovimento
+    if direcaoFrente.Magnitude < 0.1 then
+        local char = LocalPlayer.Character
+        if char then
+            local meuHrp = char:FindFirstChild("HumanoidRootPart")
+            if meuHrp then
+                direcaoFrente = (alvo.Position - meuHrp.Position).Unit
+            end
+        end
+    end
+
+    if direcaoFrente.Magnitude > 0.1 then
+        posBase = posBase + (direcaoFrente * OFFSET_FRENTE)
+    end
+
+    return posBase
+end
+
+local function posicaoFinal()
+    if ATIVO and alvoAtual and alvoValido(alvoAtual) then
+        return posicaoPrevista(alvoAtual)
+    end
+    local camCF = Camera.CFrame
+    local origin = camCF.Position
+    local dir = camCF.LookVector * 1000
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    local result = workspace:Raycast(origin, dir, params)
+    if result then return result.Position end
+    return origin + dir
+end
+
+local function aplicarOverride()
+    if not fetchMouseAtual or not fetchMouseAtual.Parent then return end
+    pcall(function()
+        fetchMouseAtual.OnClientInvoke = function(...)
+            return posicaoFinal()
+        end
+        overrideAtivo = true
+    end)
+end
+
+local function setupLauncher(tool)
+    if not tool:IsA("Tool") then return end
+    local nome = tool.Name:lower()
+    if not (nome:find("rocket") or nome:find("launcher") or nome:find("gun")) then return end
+
+    tool.Equipped:Connect(function()
+        fetchMouseAtual = tool:FindFirstChild("FetchMousePos")
+        if fetchMouseAtual then aplicarOverride() end
+    end)
+
+    tool.Unequipped:Connect(function()
+        overrideAtivo = false
+    end)
+end
+
+local function monitorarChar(char)
+    for _, obj in ipairs(char:GetChildren()) do
+        setupLauncher(obj)
+    end
+    char.ChildAdded:Connect(setupLauncher)
+end
+
+if LocalPlayer.Character then monitorarChar(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(monitorarChar)
+
+RunService.Heartbeat:Connect(function()
+    if fetchMouseAtual and fetchMouseAtual.Parent and not overrideAtivo then
+        aplicarOverride()
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not ALTERNAR_ATIVO then return end
+    if tick() - ULTIMO_ALTERNAR < INTERVALO_ALTERNAR then return end
+    ULTIMO_ALTERNAR = tick()
+    alternarArma()
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not ATIVO then
+        if bolinha then bolinha.Visible = false end
+        return
+    end
+
+    alvoAtual = pegarAlvo()
+
+    if not bolinha then return end
+
+    if alvoAtual and alvoValido(alvoAtual) then
+        local posMostrar = posicaoPrevista(alvoAtual)
+        local screenPos, onScreen = Camera:WorldToViewportPoint(posMostrar)
+        if onScreen then
+            bolinha.Visible = true
+            bolinha.Position = UDim2.new(0, screenPos.X - 5, 0, screenPos.Y - 5)
+        else
+            bolinha.Visible = false
+        end
+    else
+        if MODO == "center" then
+            bolinha.Visible = true
+            bolinha.Position = UDim2.new(0.5, -5, 0.5, -5)
+        else
+            bolinha.Visible = false
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        ATIVO = not ATIVO
+    end
+end)
+
+criarHUD()
+print("✅ AURORA AIM v2.1 carregado!")
+print("   Toca no ⚡ pra abrir o menu")
