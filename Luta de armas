@@ -1,0 +1,304 @@
+-- ========================================================
+-- CHAOS HUB (FUTURISTA) - Luta de Armas
+-- by: @willnzx.mt + miguelestrellaaa
+-- ========================================================
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- Remove GUI antiga
+local oldGui = game:GetService("CoreGui"):FindFirstChild("ChaosHubGUI")
+if oldGui then oldGui:Destroy() end
+
+-- ================= CRIAÇÃO DA GUI =================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ChaosHubGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 280, 0, 260)
+mainFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 15)
+uiCorner.Parent = mainFrame
+
+-- Borda neon animada
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Color = Color3.fromRGB(0, 255, 255)
+uiStroke.Thickness = 2
+uiStroke.Transparency = 0.2
+uiStroke.Parent = mainFrame
+
+local strokeTween = TweenService:Create(uiStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Color = Color3.fromRGB(255, 0, 255)})
+strokeTween:Play()
+
+-- Gradiente de fundo
+local uiGradient = Instance.new("UIGradient")
+uiGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 15))
+}
+uiGradient.Rotation = 45
+uiGradient.Parent = mainFrame
+
+-- Título
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.Position = UDim2.new(0, 0, 0, 5)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "⚡ troll script ⚡"
+titleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+titleLabel.Font = Enum.Font.GothamBlack
+titleLabel.TextSize = 20
+titleLabel.Parent = mainFrame
+
+-- Créditos
+local creditLabel = Instance.new("TextLabel")
+creditLabel.Size = UDim2.new(1, 0, 0, 15)
+creditLabel.Position = UDim2.new(0, 0, 0, 42)
+creditLabel.BackgroundTransparency = 1
+creditLabel.Text = "by: @willnzx.mt + miguelestrellaaa"
+creditLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+creditLabel.Font = Enum.Font.GothamMedium
+creditLabel.TextSize = 9
+creditLabel.Parent = mainFrame
+
+-- Status
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "Status"
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.Position = UDim2.new(0, 0, 1, -25)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "STATUS: PRONTO"
+statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.TextSize = 10
+statusLabel.Parent = mainFrame
+
+-- ================= FUNÇÕES =================
+
+-- Função auxiliar para atualizar o status
+local function setStatus(texto, cor)
+    statusLabel.Text = "STATUS: " .. texto
+    statusLabel.TextColor3 = cor or Color3.fromRGB(0, 255, 100)
+end
+
+-- Função para animar clique
+local function animarClique(botao)
+    local tween = TweenService:Create(botao, TweenInfo.new(0.1), {Size = UDim2.new(0, 240, 0, 45)})
+    tween:Play()
+    tween.Completed:Connect(function()
+        TweenService:Create(botao, TweenInfo.new(0.1), {Size = UDim2.new(0, 240, 0, 40)}):Play()
+    end)
+end
+
+-- ================= BOTÃO 1: SPAM TOOLS =================
+local btnSpam = Instance.new("TextButton")
+btnSpam.Name = "SpamBtn"
+btnSpam.Size = UDim2.new(0, 240, 0, 40)
+btnSpam.Position = UDim2.new(0.5, -120, 0, 70)
+btnSpam.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+btnSpam.BorderSizePixel = 0
+btnSpam.Text = "💥 SPAM TOOLS"
+btnSpam.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnSpam.Font = Enum.Font.GothamBold
+btnSpam.TextSize = 14
+btnSpam.Parent = mainFrame
+
+local btnCorner1 = Instance.new("UICorner")
+btnCorner1.CornerRadius = UDim.new(0, 10)
+btnCorner1.Parent = btnSpam
+
+local btnStroke1 = Instance.new("UIStroke")
+btnStroke1.Color = Color3.fromRGB(200, 0, 255)
+btnStroke1.Thickness = 1.5
+btnStroke1.Parent = btnSpam
+
+-- ================= BOTÃO 2: EQUIPAR TODOS =================
+local btnEquip = Instance.new("TextButton")
+btnEquip.Name = "EquipBtn"
+btnEquip.Size = UDim2.new(0, 240, 0, 40)
+btnEquip.Position = UDim2.new(0.5, -120, 0, 120)
+btnEquip.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+btnEquip.BorderSizePixel = 0
+btnEquip.Text = "⚔️ EQUIPAR TODOS"
+btnEquip.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnEquip.Font = Enum.Font.GothamBold
+btnEquip.TextSize = 14
+btnEquip.Parent = mainFrame
+
+local btnCorner2 = Instance.new("UICorner")
+btnCorner2.CornerRadius = UDim.new(0, 10)
+btnCorner2.Parent = btnEquip
+
+local btnStroke2 = Instance.new("UIStroke")
+btnStroke2.Color = Color3.fromRGB(0, 200, 255)
+btnStroke2.Thickness = 1.5
+btnStroke2.Parent = btnEquip
+
+-- ================= BOTÃO 3: TROLL =================
+local btnTroll = Instance.new("TextButton")
+btnTroll.Name = "TrollBtn"
+btnTroll.Size = UDim2.new(0, 240, 0, 40)
+btnTroll.Position = UDim2.new(0.5, -120, 0, 170)
+btnTroll.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnTroll.BorderSizePixel = 0
+btnTroll.Text = "😈 TROLL [OFF]"
+btnTroll.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnTroll.Font = Enum.Font.GothamBold
+btnTroll.TextSize = 14
+btnTroll.Parent = mainFrame
+
+local btnCorner3 = Instance.new("UICorner")
+btnCorner3.CornerRadius = UDim.new(0, 10)
+btnCorner3.Parent = btnTroll
+
+local btnStroke3 = Instance.new("UIStroke")
+btnStroke3.Color = Color3.fromRGB(255, 50, 50)
+btnStroke3.Thickness = 1.5
+btnStroke3.Parent = btnTroll
+
+-- ================= LÓGICA DOS BOTÕES =================
+
+-- 1. SPAM TOOLS
+btnSpam.MouseButton1Click:Connect(function()
+    animarClique(btnSpam)
+    setStatus("SPAMANDO TOOLS...", Color3.fromRGB(255, 200, 0))
+    
+    -- Acha a Gear Machine
+    local gearMachine = Workspace:FindFirstChild("Gear Machine")
+    if not gearMachine then
+        setStatus("GEAR MACHINE NÃO ENCONTRADA", Color3.fromRGB(255, 50, 50))
+        return
+    end
+    
+    -- Pega todos os ClickDetectors
+    local clickDetectors = {}
+    for _, obj in ipairs(gearMachine:GetDescendants()) do
+        if obj:IsA("ClickDetector") then
+            table.insert(clickDetectors, obj)
+        end
+    end
+    
+    setStatus("CLICANDO EM " .. #clickDetectors .. " BOTÕES...", Color3.fromRGB(255, 200, 0))
+    
+    -- Dispara todos
+    local sucessos = 0
+    for _, detector in ipairs(clickDetectors) do
+        pcall(function()
+            fireclickdetector(detector)
+            sucessos = sucessos + 1
+        end)
+        task.wait(0.01)
+    end
+    
+    setStatus("✅ " .. sucessos .. " TOOLS SPAWNADAS!", Color3.fromRGB(0, 255, 100))
+    print("💥 Spam Tools: " .. sucessos .. " cliques enviados!")
+end)
+
+-- 2. EQUIPAR TODOS
+btnEquip.MouseButton1Click:Connect(function()
+    animarClique(btnEquip)
+    setStatus("EQUIPANDO TODOS OS ITENS...", Color3.fromRGB(0, 200, 255))
+    
+    local char = player.Character
+    if not char then
+        setStatus("PERSONAGEM NÃO ENCONTRADO", Color3.fromRGB(255, 50, 50))
+        return
+    end
+    
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then
+        setStatus("BACKPACK NÃO ENCONTRADO", Color3.fromRGB(255, 50, 50))
+        return
+    end
+    
+    -- Equipa cada Tool do Backpack
+    local equipados = 0
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            pcall(function()
+                tool.Parent = char
+                equipados = equipados + 1
+            end)
+            task.wait(0.01)
+        end
+    end
+    
+    setStatus("✅ " .. equipados .. " ITENS EQUIPADOS!", Color3.fromRGB(0, 255, 100))
+    print("⚔️ Equipar Todos: " .. equipados .. " itens equipados!")
+end)
+
+-- 3. TROLL
+local trollAtivo = false
+local trollLoop = nil
+
+btnTroll.MouseButton1Click:Connect(function()
+    animarClique(btnTroll)
+    trollAtivo = not trollAtivo
+    
+    if trollAtivo then
+        btnTroll.Text = "😈 TROLL [ON]"
+        btnTroll.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+        btnStroke3.Color = Color3.fromRGB(255, 0, 150)
+        setStatus("😈 ROUBANDO ITENS...", Color3.fromRGB(255, 0, 100))
+        
+        -- Ativa o loop de troll
+        trollLoop = task.spawn(function()
+            while trollAtivo do
+                task.wait(0.03)
+                
+                local char = player.Character
+                if not char then continue end
+                
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then continue end
+                
+                local backpack = player:FindFirstChild("Backpack")
+                if not backpack then continue end
+                
+                -- Procura itens no chão
+                for _, obj in ipairs(Workspace:GetChildren()) do
+                    if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
+                        -- Teleporta para o item
+                        pcall(function()
+                            hrp.CFrame = obj.Handle.CFrame + Vector3.new(0, 1, 0)
+                        end)
+                        -- Força a coleta
+                        task.wait(0.01)
+                        pcall(function()
+                            obj.Parent = backpack
+                        end)
+                    end
+                end
+            end
+        end)
+    else
+        btnTroll.Text = "😈 TROLL [OFF]"
+        btnTroll.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        btnStroke3.Color = Color3.fromRGB(255, 50, 50)
+        setStatus("TROLL DESATIVADO", Color3.fromRGB(255, 200, 0))
+    end
+end)
+
+-- ================= FINALIZAÇÃO =================
+
+print("==========================================")
+print("⚡ CHAOS HUB CARREGADO!")
+print("by: @willnzx.mt + miguelestrellaaa")
+print("==========================================")
+print("💥 SPAM TOOLS: Spawna todos os itens da parede")
+print("⚔️ EQUIPAR TODOS: Equipa tudo do inventário")
+print("😈 TROLL: Rouba itens do chão automaticamente")
+print("==========================================")
