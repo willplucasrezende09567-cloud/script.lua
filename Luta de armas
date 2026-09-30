@@ -1,53 +1,57 @@
 -- ========================================================
--- CHAOS HUB (FUTURISTA) - Luta de Armas
+-- TROLL HUB (VISUAL SCANNER + ANIMAÇÕES) - Luta de Armas
 -- by: @willnzx.mt + miguelestrellaaa
 -- ========================================================
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
 -- Remove GUI antiga
-local oldGui = game:GetService("CoreGui"):FindFirstChild("ChaosHubGUI")
+local oldGui = game:GetService("CoreGui"):FindFirstChild("TrollHubGUI")
 if oldGui then oldGui:Destroy() end
 
 -- ================= CRIAÇÃO DA GUI =================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ChaosHubGUI"
+screenGui.Name = "TrollHubGUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = game:GetService("CoreGui")
 
+-- ================= MAIN FRAME (HUB COMPLETO) =================
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 280, 0, 260)
+mainFrame.Size = UDim2.new(0, 280, 0, 280)
 mainFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
+mainFrame.ClipsDescendants = true
 mainFrame.Parent = screenGui
 
 local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 15)
+uiCorner.CornerRadius = UDim.new(0, 12)
 uiCorner.Parent = mainFrame
 
 -- Borda neon animada
 local uiStroke = Instance.new("UIStroke")
 uiStroke.Color = Color3.fromRGB(0, 255, 255)
-uiStroke.Thickness = 2
-uiStroke.Transparency = 0.2
+uiStroke.Thickness = 1.5
+uiStroke.Transparency = 0.1
 uiStroke.Parent = mainFrame
 
-local strokeTween = TweenService:Create(uiStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Color = Color3.fromRGB(255, 0, 255)})
+local strokeTween = TweenService:Create(uiStroke, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Color = Color3.fromRGB(255, 0, 255)})
 strokeTween:Play()
 
--- Gradiente de fundo
+-- Degradê no fundo
 local uiGradient = Instance.new("UIGradient")
 uiGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 15))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 30)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 30))
 }
 uiGradient.Rotation = 45
 uiGradient.Parent = mainFrame
@@ -57,16 +61,16 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
 titleLabel.Position = UDim2.new(0, 0, 0, 5)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "⚡ troll script ⚡"
+titleLabel.Text = "⚡ TROLL ⚡"
 titleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
 titleLabel.Font = Enum.Font.GothamBlack
-titleLabel.TextSize = 20
+titleLabel.TextSize = 22
 titleLabel.Parent = mainFrame
 
 -- Créditos
 local creditLabel = Instance.new("TextLabel")
 creditLabel.Size = UDim2.new(1, 0, 0, 15)
-creditLabel.Position = UDim2.new(0, 0, 0, 42)
+creditLabel.Position = UDim2.new(0, 0, 0, 45)
 creditLabel.BackgroundTransparency = 1
 creditLabel.Text = "by: @willnzx.mt + miguelestrellaaa"
 creditLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -86,15 +90,34 @@ statusLabel.Font = Enum.Font.GothamMedium
 statusLabel.TextSize = 10
 statusLabel.Parent = mainFrame
 
--- ================= FUNÇÕES =================
+-- ================= BOTÃO DE MINIMIZAR (QUADRADO) =================
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeBtn"
+minimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+minimizeBtn.Position = UDim2.new(1, -30, 0, 5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Text = "—"
+minimizeBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 14
+minimizeBtn.Parent = mainFrame
 
--- Função auxiliar para atualizar o status
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 6)
+minCorner.Parent = minimizeBtn
+
+local minStroke = Instance.new("UIStroke")
+minStroke.Color = Color3.fromRGB(0, 255, 255)
+minStroke.Thickness = 1
+minStroke.Parent = minimizeBtn
+
+-- ================= FUNÇÕES AUXILIARES =================
 local function setStatus(texto, cor)
     statusLabel.Text = "STATUS: " .. texto
     statusLabel.TextColor3 = cor or Color3.fromRGB(0, 255, 100)
 end
 
--- Função para animar clique
 local function animarClique(botao)
     local tween = TweenService:Create(botao, TweenInfo.new(0.1), {Size = UDim2.new(0, 240, 0, 45)})
     tween:Play()
@@ -107,11 +130,11 @@ end
 local btnSpam = Instance.new("TextButton")
 btnSpam.Name = "SpamBtn"
 btnSpam.Size = UDim2.new(0, 240, 0, 40)
-btnSpam.Position = UDim2.new(0.5, -120, 0, 70)
-btnSpam.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+btnSpam.Position = UDim2.new(0.5, -120, 0, 75)
+btnSpam.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
 btnSpam.BorderSizePixel = 0
 btnSpam.Text = "💥 SPAM TOOLS"
-btnSpam.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnSpam.TextColor3 = Color3.fromRGB(200, 150, 255)
 btnSpam.Font = Enum.Font.GothamBold
 btnSpam.TextSize = 14
 btnSpam.Parent = mainFrame
@@ -121,7 +144,7 @@ btnCorner1.CornerRadius = UDim.new(0, 10)
 btnCorner1.Parent = btnSpam
 
 local btnStroke1 = Instance.new("UIStroke")
-btnStroke1.Color = Color3.fromRGB(200, 0, 255)
+btnStroke1.Color = Color3.fromRGB(150, 50, 255)
 btnStroke1.Thickness = 1.5
 btnStroke1.Parent = btnSpam
 
@@ -129,11 +152,11 @@ btnStroke1.Parent = btnSpam
 local btnEquip = Instance.new("TextButton")
 btnEquip.Name = "EquipBtn"
 btnEquip.Size = UDim2.new(0, 240, 0, 40)
-btnEquip.Position = UDim2.new(0.5, -120, 0, 120)
-btnEquip.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+btnEquip.Position = UDim2.new(0.5, -120, 0, 125)
+btnEquip.BackgroundColor3 = Color3.fromRGB(20, 40, 70)
 btnEquip.BorderSizePixel = 0
 btnEquip.Text = "⚔️ EQUIPAR TODOS"
-btnEquip.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnEquip.TextColor3 = Color3.fromRGB(100, 200, 255)
 btnEquip.Font = Enum.Font.GothamBold
 btnEquip.TextSize = 14
 btnEquip.Parent = mainFrame
@@ -143,7 +166,7 @@ btnCorner2.CornerRadius = UDim.new(0, 10)
 btnCorner2.Parent = btnEquip
 
 local btnStroke2 = Instance.new("UIStroke")
-btnStroke2.Color = Color3.fromRGB(0, 200, 255)
+btnStroke2.Color = Color3.fromRGB(0, 150, 255)
 btnStroke2.Thickness = 1.5
 btnStroke2.Parent = btnEquip
 
@@ -151,11 +174,11 @@ btnStroke2.Parent = btnEquip
 local btnTroll = Instance.new("TextButton")
 btnTroll.Name = "TrollBtn"
 btnTroll.Size = UDim2.new(0, 240, 0, 40)
-btnTroll.Position = UDim2.new(0.5, -120, 0, 170)
-btnTroll.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnTroll.Position = UDim2.new(0.5, -120, 0, 175)
+btnTroll.BackgroundColor3 = Color3.fromRGB(70, 20, 30)
 btnTroll.BorderSizePixel = 0
 btnTroll.Text = "😈 TROLL [OFF]"
-btnTroll.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnTroll.TextColor3 = Color3.fromRGB(255, 100, 120)
 btnTroll.Font = Enum.Font.GothamBold
 btnTroll.TextSize = 14
 btnTroll.Parent = mainFrame
@@ -165,7 +188,7 @@ btnCorner3.CornerRadius = UDim.new(0, 10)
 btnCorner3.Parent = btnTroll
 
 local btnStroke3 = Instance.new("UIStroke")
-btnStroke3.Color = Color3.fromRGB(255, 50, 50)
+btnStroke3.Color = Color3.fromRGB(255, 50, 80)
 btnStroke3.Thickness = 1.5
 btnStroke3.Parent = btnTroll
 
@@ -176,14 +199,12 @@ btnSpam.MouseButton1Click:Connect(function()
     animarClique(btnSpam)
     setStatus("SPAMANDO TOOLS...", Color3.fromRGB(255, 200, 0))
     
-    -- Acha a Gear Machine
     local gearMachine = Workspace:FindFirstChild("Gear Machine")
     if not gearMachine then
         setStatus("GEAR MACHINE NÃO ENCONTRADA", Color3.fromRGB(255, 50, 50))
         return
     end
     
-    -- Pega todos os ClickDetectors
     local clickDetectors = {}
     for _, obj in ipairs(gearMachine:GetDescendants()) do
         if obj:IsA("ClickDetector") then
@@ -193,7 +214,6 @@ btnSpam.MouseButton1Click:Connect(function()
     
     setStatus("CLICANDO EM " .. #clickDetectors .. " BOTÕES...", Color3.fromRGB(255, 200, 0))
     
-    -- Dispara todos
     local sucessos = 0
     for _, detector in ipairs(clickDetectors) do
         pcall(function()
@@ -224,7 +244,6 @@ btnEquip.MouseButton1Click:Connect(function()
         return
     end
     
-    -- Equipa cada Tool do Backpack
     local equipados = 0
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
@@ -250,11 +269,10 @@ btnTroll.MouseButton1Click:Connect(function()
     
     if trollAtivo then
         btnTroll.Text = "😈 TROLL [ON]"
-        btnTroll.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
-        btnStroke3.Color = Color3.fromRGB(255, 0, 150)
+        btnTroll.BackgroundColor3 = Color3.fromRGB(150, 0, 50)
+        btnStroke3.Color = Color3.fromRGB(255, 0, 100)
         setStatus("😈 ROUBANDO ITENS...", Color3.fromRGB(255, 0, 100))
         
-        -- Ativa o loop de troll
         trollLoop = task.spawn(function()
             while trollAtivo do
                 task.wait(0.03)
@@ -268,14 +286,11 @@ btnTroll.MouseButton1Click:Connect(function()
                 local backpack = player:FindFirstChild("Backpack")
                 if not backpack then continue end
                 
-                -- Procura itens no chão
                 for _, obj in ipairs(Workspace:GetChildren()) do
                     if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
-                        -- Teleporta para o item
                         pcall(function()
                             hrp.CFrame = obj.Handle.CFrame + Vector3.new(0, 1, 0)
                         end)
-                        -- Força a coleta
                         task.wait(0.01)
                         pcall(function()
                             obj.Parent = backpack
@@ -286,19 +301,103 @@ btnTroll.MouseButton1Click:Connect(function()
         end)
     else
         btnTroll.Text = "😈 TROLL [OFF]"
-        btnTroll.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        btnStroke3.Color = Color3.fromRGB(255, 50, 50)
+        btnTroll.BackgroundColor3 = Color3.fromRGB(70, 20, 30)
+        btnStroke3.Color = Color3.fromRGB(255, 50, 80)
         setStatus("TROLL DESATIVADO", Color3.fromRGB(255, 200, 0))
     end
 end)
 
--- ================= FINALIZAÇÃO =================
+-- ================= MINIMIZAR (BOLHINHA) =================
 
+-- Cria a bolhinha (invisível no começo)
+local bolha = Instance.new("TextButton")
+bolha.Name = "Bolha"
+bolha.Size = UDim2.new(0, 60, 0, 60)
+bolha.Position = UDim2.new(0.5, -30, 0.5, -30)
+bolha.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+bolha.BorderSizePixel = 0
+bolha.Text = "🎭"
+bolha.TextColor3 = Color3.fromRGB(0, 255, 255)
+bolha.Font = Enum.Font.GothamBold
+bolha.TextSize = 25
+bolha.Visible = false
+bolha.Active = true
+bolha.Draggable = true
+bolha.Parent = screenGui
+
+local bolhaCorner = Instance.new("UICorner")
+bolhaCorner.CornerRadius = UDim.new(1, 0)
+bolhaCorner.Parent = bolha
+
+local bolhaStroke = Instance.new("UIStroke")
+bolhaStroke.Color = Color3.fromRGB(0, 255, 255)
+bolhaStroke.Thickness = 2
+bolhaStroke.Parent = bolha
+
+local bolhaTween = TweenService:Create(bolhaStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Color = Color3.fromRGB(255, 0, 255)})
+bolhaTween:Play()
+
+-- Animação de minimizar
+local function minimizar()
+    -- Animação do Hub encolhendo e desaparecendo
+    local tween1 = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(bolha.Position.X.Scale, bolha.Position.X.Offset, bolha.Position.Y.Scale, bolha.Position.Y.Offset),
+        BackgroundTransparency = 1
+    })
+    
+    -- Animação da bolha aparecendo
+    local tween2 = TweenService:Create(bolha, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 60, 0, 60),
+        Visible = true
+    })
+    
+    tween1:Play()
+    tween2:Play()
+    
+    tween1.Completed:Connect(function()
+        mainFrame.Visible = false
+    end)
+end
+
+-- Animação de restaurar
+local function restaurar()
+    mainFrame.Visible = true
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    mainFrame.BackgroundTransparency = 1
+    
+    -- Animação do Hub aparecendo
+    local tween1 = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 280, 0, 280),
+        Position = UDim2.new(0.5, -140, 0.3, 0),
+        BackgroundTransparency = 0
+    })
+    
+    -- Animação da bolha encolhendo
+    local tween2 = TweenService:Create(bolha, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+    
+    tween1:Play()
+    tween2:Play()
+    
+    tween2.Completed:Connect(function()
+        bolha.Visible = false
+    end)
+end
+
+-- Botão de minimizar
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimizar()
+end)
+
+-- Clicar na bolha restaura
+bolha.MouseButton1Click:Connect(function()
+    restaurar()
+end)
+
+-- ================= FINALIZAÇÃO =================
 print("==========================================")
-print("⚡ CHAOS HUB CARREGADO!")
+print("🎭 TROLL HUB CARREGADO!")
 print("by: @willnzx.mt + miguelestrellaaa")
-print("==========================================")
-print("💥 SPAM TOOLS: Spawna todos os itens da parede")
-print("⚔️ EQUIPAR TODOS: Equipa tudo do inventário")
-print("😈 TROLL: Rouba itens do chão automaticamente")
 print("==========================================")
