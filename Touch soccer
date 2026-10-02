@@ -1,25 +1,25 @@
 -- =======================================================
 -- DELTA HUB - FUTEBOL (UI MOBILE v16) - CUSTOMIZADO
--- Funções: Seguir Bola (Auto Fly, Studs 7, Inclinado, ShiftLock)
+-- Funções: Seguir Bola (Auto Fly, Studs 7, Inclinado, ShiftLock) + Speed Loop
 -- =======================================================
-
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
 
 -- ⚙️ CONFIGURAÇÃO ⚙️
-local alturaFixa = 7        -- TRAVADO NO STUDS 7 (Não muda!)
-local inclinacaoX = 35      -- Inclinação (Positivo = Deitado pra frente / Negativo = Deitado pra trás)
+local alturaFixa = 7 -- TRAVADO NO STUDS 7 (Não muda!)
+local inclinacaoX = 35 -- Inclinação (Positivo = Deitado pra frente / Negativo = Deitado pra trás)
+local WALK_SPEED = 64 -- Velocidade do Speed Loop
 -- ⚙️ ⚙️ ⚙️ ⚙️ ⚙️ ⚙️
 
 -- Variáveis de Estado
 local seguirBolaAtivado = false
 local bolaAlvo = nil
+local speedLoopAtivo = false
 
 -- =======================================================
 -- CRIAÇÃO DA UI
 -- =======================================================
-
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DeltaMobileHub"
 ScreenGui.Parent = game.CoreGui
@@ -62,11 +62,10 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = TitleBar
 
--- 🔽 TÍTULO ALTERADO AQUI 🔽
 local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, 0, 1, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "by: @willnzx.mt" -- Alterado
+TitleText.Text = "by: @willnzx.mt"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 14
@@ -81,8 +80,8 @@ CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
 CloseBtn.Parent = TitleBar
-
 CloseBtn.MouseButton1Click:Connect(function()
+    speedLoopAtivo = false
     ScreenGui:Destroy()
 end)
 
@@ -98,7 +97,9 @@ TitleBar.InputBegan:Connect(function(input)
         dragStart = input.Position
         startPos = MainFrame.Position
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
         end)
     end
 end)
@@ -108,16 +109,18 @@ TitleBar.InputChanged:Connect(function(input)
     end
 end)
 userInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then update(input) end
+    if input == dragInput and dragging then
+        update(input)
+    end
 end)
 
--- 🔽 BOTÃO ALTERADO AQUI 🔽
+-- 🔽 BOTÃO 🔽
 local btnMain = Instance.new("TextButton")
 btnMain.Size = UDim2.new(0, 240, 0, 50)
 btnMain.Position = UDim2.new(0.5, -120, 0, 55)
 btnMain.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 btnMain.BorderSizePixel = 0
-btnMain.Text = "skill [OFF]" -- Alterado
+btnMain.Text = "skill [OFF]"
 btnMain.TextColor3 = Color3.fromRGB(150, 150, 150)
 btnMain.Font = Enum.Font.GothamBold
 btnMain.TextSize = 13
@@ -132,26 +135,58 @@ btnStroke.Color = Color3.fromRGB(80, 80, 80)
 btnStroke.Thickness = 1
 btnStroke.Parent = btnMain
 
+-- =======================================================
+-- 🏃 SPEED LOOP AUTOMÁTICO
+-- =======================================================
+local function aplicarSpeed()
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health > 0 then
+            humanoid.WalkSpeed = WALK_SPEED
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if speedLoopAtivo then
+            aplicarSpeed()
+        end
+        task.wait(0.2)
+    end
+end)
+
+-- Reaplica o speed após respawn se estiver ativo
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if speedLoopAtivo then
+        aplicarSpeed()
+    end
+end)
+
 -- Ativação do Botão
 btnMain.MouseButton1Click:Connect(function()
     seguirBolaAtivado = not seguirBolaAtivado
-    
+    speedLoopAtivo = seguirBolaAtivado
+
     if seguirBolaAtivado then
-        btnMain.Text = "skill [ON]" -- Alterado
+        btnMain.Text = "skill [ON]"
         btnMain.TextColor3 = Color3.fromRGB(0, 255, 255)
         btnStroke.Color = Color3.fromRGB(0, 255, 255)
         btnMain.BackgroundColor3 = Color3.fromRGB(0, 100, 100)
+        aplicarSpeed()
     else
-        btnMain.Text = "skill [OFF]" -- Alterado
+        btnMain.Text = "skill [OFF]"
         btnMain.TextColor3 = Color3.fromRGB(150, 150, 150)
         btnStroke.Color = Color3.fromRGB(80, 80, 80)
         btnMain.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        
-        -- Reseta o personagem ao desligar
+        -- Restaura velocidade padrão
         local char = player.Character
         if char then
             local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if humanoid then 
+            if humanoid then
+                humanoid.WalkSpeed = 16
                 humanoid.PlatformStand = false
                 humanoid.AutoRotate = true
             end
@@ -162,7 +197,6 @@ end)
 -- =======================================================
 -- LÓGICA DA FUNÇÃO (SÓ ATIVA SE A BOLA EXISTIR)
 -- =======================================================
-
 local function encontrarBola()
     local campo = workspace:FindFirstChild("FootballField")
     if campo then
@@ -180,45 +214,35 @@ end
 runService.RenderStepped:Connect(function()
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
     local hrp = char.HumanoidRootPart
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    
     if not humanoid or humanoid.Health <= 0 then return end
 
     if seguirBolaAtivado then
-        -- Tenta achar a bola caso ela não exista ou tenha morrido
         if not bolaAlvo or not bolaAlvo.Parent then
             bolaAlvo = encontrarBola()
         end
-        
-        -- SÓ ATIVA O MODO DEITADO SE A BOLA EXISTIR
+
         if bolaAlvo then
             humanoid.PlatformStand = true
             humanoid.AutoRotate = false
-            
-            -- 1. POSIÇÃO: Embaixo da bola, travado no Studs 7
+
             local targetPos = Vector3.new(
-                bolaAlvo.Position.X, 
-                alturaFixa, 
+                bolaAlvo.Position.X,
+                alturaFixa,
                 bolaAlvo.Position.Z
             )
-            
-            -- 2. PEGA A DIREÇÃO DA CÂMERA (Para funcionar o Shift Lock)
+
             local camera = workspace.CurrentCamera
             local camLook = camera.CFrame.LookVector
             local flatLook = Vector3.new(camLook.X, 0, camLook.Z).Unit
-            
-            -- 3. APLICA ROTAÇÃO DA CÂMERA + INCLINAÇÃO SÓ DE FRENTE/TRÁS
+
             local baseCFrame = CFrame.new(targetPos, targetPos + flatLook)
             hrp.CFrame = baseCFrame * CFrame.Angles(math.rad(inclinacaoX), 0, 0)
-            
-            -- 4. ANTI-BUG
+
             hrp.Velocity = Vector3.new(0, 0, 0)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
-            
         else
-            -- SE A BOLA NÃO EXISTIR (Gol, fim de partida), VOLTA AO NORMAL
             humanoid.PlatformStand = false
             humanoid.AutoRotate = true
         end
