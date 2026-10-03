@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v45) - CUSTOMIZADO
--- Head Fling modo PADRÃO (giro clássico + walkfling)
+-- DELTA HUB - FUTEBOL (UI MOBILE v50) - CUSTOMIZADO
+-- Head Fling: walkfling REAL (velocidade + bodyvel, sem teleporte)
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
@@ -20,21 +20,18 @@ local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 15
+local WALL_PHASE_ALTURA = 13
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
--- 🔥 Head Fling (PADRÃO - giro clássico)
-local HEAD_FLING_OFFSET = 1.5       -- studs acima da cabeça
-local HEAD_FLING_VELOCIDADE = 400   -- rad/s (velocidade do giro)
-local HEAD_FLING_FORCA = 900        -- força aplicada por frame
-local HEAD_FLING_ANGULAR = 600      -- spin do corpo
-local HEAD_FLING_WALK_VEL = 300     -- velocidade pra alcançar o alvo
-local HEAD_FLING_DURACAO = 0.7
-local HEAD_FLING_VEL_LIMITE = 70
-local HEAD_FLING_VOOU_LIMITE = 25
-
--- 👁️ Spectate
-local SPECTATE_ATIVADO = true
+-- 🔥 Head Fling (walkfling REAL, sem teleporte)
+local HEAD_FLING_PROFUNDIDADE = -1      -- offset Y na cabeça do alvo
+local HEAD_FLING_FRENTE = 2             -- studs na frente (andando)
+local HEAD_FLING_INCLINACAO = 90        -- pitch: 90 = virado pro chão
+local HEAD_FLING_BODY_VEL = 300         -- ⬅️ velocidade do BodyVelocity (colar no alvo)
+local HEAD_FLING_ANGULAR = 2000         -- ⬅️ spin GIGANTE (isso arremessa)
+local HEAD_FLING_WALK_VEL = 350         -- velocidade pra alcançar o alvo (longe)
+local HEAD_FLING_DURACAO = 1.5          -- ⬅️ aumentado (walkfling precisa de tempo)
+local HEAD_FLING_RECUPERAR_DIST = 8     -- se ficar >8 studs de distância, teleporta de volta
 
 -- 🛡️ Anti-dumping / Team
 local TEAM_CHECK_INTERVAL = 0.5
@@ -70,10 +67,14 @@ local headFlingRodandoAgora = false
 local headFlingAlvo = nil
 local headFlingConnection = nil
 local headFlingStartTime = 0
-local headFlingAngle = 0
 local headFlingAlvoMorreuConn = nil
 
+-- 🌀 Constraints pra walkfling (BodyVelocity + BodyAngularVelocity)
+local headFlingBodyVel = nil
+local headFlingBodyAngVel = nil
+
 -- 👁️ Spectate
+local SPECTATE_ATIVADO = true
 local spectateOriginalSubject = nil
 local spectateOriginalType = nil
 
@@ -778,15 +779,23 @@ local function ativarWallPhase()
 end
 
 -- =======================================================
--- 🔥 HEAD FLING (PADRÃO — GIRO CLÁSSICO)
+-- 🔥 HEAD FLING (WALKFLING REAL — sem teleporte)
 -- =======================================================
+local function removerConstraintsHeadFling()
+    if headFlingBodyVel then
+        headFlingBodyVel:Destroy()
+        headFlingBodyVel = nil
+    end
+    if headFlingBodyAngVel then
+        headFlingBodyAngVel:Destroy()
+        headFlingBodyAngVel = nil
+    end
+end
+
 local function pausarHeadFlingAgora()
     if not headFlingRodandoAgora then return end
     headFlingRodandoAgora = false
-    for part, value in pairs(originalCanCollide) do
-        if part and part.Parent then part.CanCollide = value end
-    end
-    originalCanCollide = {}
+    removerConstraintsHeadFling()
     local char = player.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -802,21 +811,31 @@ local function ativarHeadFlingAgora()
     if headFlingRodandoAgora then return end
     local char = player.Character
     if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-    -- noclip: precisa atravessar pra colidir internamente
-    originalCanCollide = {}
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            originalCanCollide[part] = part.CanCollide
-            part.CanCollide = false
-        end
-    end
+    if not hrp or not humanoid then return end
+
     humanoid.PlatformStand = true
     humanoid.AutoRotate = false
     headFlingRodandoAgora = true
     headFlingStartTime = tick()
-    headFlingAngle = 0
+
+    -- 🌀 Cria BodyVelocity (colar no alvo) + BodyAngularVelocity (spin)
+    removerConstraintsHeadFling()
+
+    headFlingBodyVel = Instance.new("BodyVelocity")
+    headFlingBodyVel.Name = "HeadFlingBodyVel"
+    headFlingBodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    headFlingBodyVel.P = 1e6
+    headFlingBodyVel.Velocity = Vector3.zero
+    headFlingBodyVel.Parent = hrp
+
+    headFlingBodyAngVel = Instance.new("BodyAngularVelocity")
+    headFlingBodyAngVel.Name = "HeadFlingBodyAngVel"
+    headFlingBodyAngVel.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    headFlingBodyAngVel.P = 1e6
+    headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
+    headFlingBodyAngVel.Parent = hrp
 end
 
 function desativarHeadFling()
@@ -883,6 +902,11 @@ local function ativarHeadFling()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
+        if not headFlingBodyVel or not headFlingBodyVel.Parent then
+            headFlingBodyVel = nil
+            headFlingBodyAngVel = nil
+            return
+        end
 
         -- ⏱️ Timer
         if headFlingRodandoAgora and (tick() - headFlingStartTime) >= HEAD_FLING_DURACAO then
@@ -890,7 +914,6 @@ local function ativarHeadFling()
             return
         end
 
-        -- Sem alvo
         if not headFlingAlvo or not headFlingAlvo.Parent or not headFlingAlvo.Character then
             pausarHeadFlingAgora()
             return
@@ -915,9 +938,9 @@ local function ativarHeadFling()
         end
 
         local velTorso = alvoTorso.AssemblyLinearVelocity
-        local velY = math.abs(velTorso.Y)
+        local velFlat = Vector3.new(velTorso.X, 0, velTorso.Z)
 
-        if velY > HEAD_FLING_VOOU_LIMITE or velTorso.Magnitude > HEAD_FLING_VEL_LIMITE then
+        if math.abs(velTorso.Y) > 25 or velTorso.Magnitude > 70 then
             pausarHeadFlingAgora()
             return
         end
@@ -926,52 +949,63 @@ local function ativarHeadFling()
             ativarHeadFlingAgora()
         end
 
-        -- 🎯 Ponto central: cabeça do alvo
-        local pontoCentral = cabecaPos + Vector3.new(0, HEAD_FLING_OFFSET, 0)
+        local alvoAndando = velFlat.Magnitude > 3
 
-        -- 📏 Distância até o centro
-        local minhaPos = h.Position
-        if not posicaoValida(minhaPos) then
-            h.CFrame = CFrame.new(pontoCentral)
-            pararMeuMovimento()
+        -- 🎯 POSIÇÃO alvo
+        local destinoPos
+        if alvoAndando then
+            destinoPos = cabecaPos + velFlat.Unit * HEAD_FLING_FRENTE + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
+        else
+            destinoPos = cabecaPos + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
+        end
+
+        if not posicaoValida(destinoPos) then
+            pausarHeadFlingAgora()
             return
         end
 
-        local dist = (minhaPos - pontoCentral).Magnitude
+        local minhaPos = h.Position
+        local dist = (destinoPos - minhaPos).Magnitude
 
-        if dist > 4 then
-            -- 🏃 LONGE: corre na direção do alvo
-            local dir = (pontoCentral - minhaPos).Unit
-            h.AssemblyLinearVelocity = dir * HEAD_FLING_WALK_VEL
-            h.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            h.CFrame = CFrame.lookAt(minhaPos, Vector3.new(pontoCentral.X, minhaPos.Y, pontoCentral.Z))
+        -- 🛟 Recuperação: se ficou muito longe, teleporta UMA vez
+        if dist > HEAD_FLING_RECUPERAR_DIST then
+            h.CFrame = CFrame.new(destinoPos)
+            h.AssemblyLinearVelocity = Vector3.zero
+            h.AssemblyAngularVelocity = Vector3.zero
+            return
+        end
+
+        -- 🏃 LONGE: aplica velocidade alta na direção do alvo (sem teleporte!)
+        if dist > 3 then
+            local dir = (destinoPos - minhaPos).Unit
+            if headFlingBodyVel then
+                headFlingBodyVel.Velocity = dir * HEAD_FLING_WALK_VEL
+            end
+            if headFlingBodyAngVel then
+                headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
+            end
         else
-            -- 🌀 GIRO CLÁSSICO: orbita em volta da cabeça + spin no corpo
-            headFlingAngle = headFlingAngle + dt * HEAD_FLING_VELOCIDADE
+            -- 🎯 PERTO: trava na posição via BodyVelocity (empurra pro destino)
+            -- Aplica velocidade corretiva que "cola" o HRP no destino
+            local diff = destinoPos - minhaPos
+            local correcaoVel = diff * HEAD_FLING_BODY_VEL
+            if headFlingBodyVel then
+                headFlingBodyVel.Velocity = correcaoVel
+            end
 
-            -- Offset orbital em XZ ao redor do ponto central
-            local raioOrbita = 1.5
-            local offset = Vector3.new(
-                math.cos(headFlingAngle) * raioOrbita,
-                0,
-                math.sin(headFlingAngle) * raioOrbita
-            )
-
-            -- Teleporta pro ponto da órbita
-            local targetPos = pontoCentral + offset
-            h.CFrame = CFrame.new(targetPos)
-
-            -- 💥 Aplica velocidade orbital (o que arremessa)
-            h.AssemblyLinearVelocity = offset.Unit * HEAD_FLING_FORCA
-
-            -- 🔄 Spin no corpo (giro do próprio personagem)
-            h.AssemblyAngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
-
-            -- Anti-travamento: se parar, reaplica
-            if h.Velocity.Magnitude < 5 then
-                h.AssemblyLinearVelocity = offset.Unit * HEAD_FLING_FORCA
+            -- 🌀 Spin gigante (arremessa o alvo)
+            if headFlingBodyAngVel then
+                headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
             end
         end
+
+        -- 👀 Orientação: virado pro alvo + inclinado pro chão (SEM teleporte — só CFrame local)
+        -- Aplica só a orientação (não a posição), sem ser teleporte
+        local lookTarget = Vector3.new(cabecaPos.X, h.Position.Y, cabecaPos.Z)
+        local baseCFrame = CFrame.lookAt(h.Position, lookTarget)
+        -- Mantém só a rotação (posição continua sendo controlada pela física)
+        h.CFrame = CFrame.new(h.Position) * (baseCFrame - baseCFrame.Position)
+            * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
     end)
 end
 
@@ -1149,9 +1183,6 @@ task.spawn(function()
     end
 end)
 
--- =======================================================
--- RESPAWN
--- =======================================================
 player.CharacterAdded:Connect(function()
     task.wait(1)
     if tenhoTeam() then
