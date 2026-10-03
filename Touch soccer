@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v50) - CUSTOMIZADO
--- Head Fling: walkfling REAL (velocidade + bodyvel, sem teleporte)
+-- DELTA HUB - FUTEBOL (UI MOBILE v51) - CUSTOMIZADO
+-- Head Fling: AlignPosition + AlignOrientation (trava sem kick)
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
@@ -23,15 +23,16 @@ local WALL_PHASE_INCLINACAO = -90
 local WALL_PHASE_ALTURA = 13
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
--- 🔥 Head Fling (walkfling REAL, sem teleporte)
-local HEAD_FLING_PROFUNDIDADE = -1      -- offset Y na cabeça do alvo
-local HEAD_FLING_FRENTE = 2             -- studs na frente (andando)
-local HEAD_FLING_INCLINACAO = 90        -- pitch: 90 = virado pro chão
-local HEAD_FLING_BODY_VEL = 300         -- ⬅️ velocidade do BodyVelocity (colar no alvo)
-local HEAD_FLING_ANGULAR = 2000         -- ⬅️ spin GIGANTE (isso arremessa)
-local HEAD_FLING_WALK_VEL = 350         -- velocidade pra alcançar o alvo (longe)
-local HEAD_FLING_DURACAO = 1.5          -- ⬅️ aumentado (walkfling precisa de tempo)
-local HEAD_FLING_RECUPERAR_DIST = 8     -- se ficar >8 studs de distância, teleporta de volta
+-- 🔥 Head Fling
+local HEAD_FLING_PROFUNDIDADE = -1
+local HEAD_FLING_FRENTE = 2
+local HEAD_FLING_INCLINACAO = 90          -- 90 = pro chão
+local HEAD_FLING_ANGULAR = 1500
+local HEAD_FLING_ALIGN_FORCE = 1e5        -- força do AlignPosition (trava)
+local HEAD_FLING_ALIGN_TORQUE = 1e5       -- torque do AlignOrientation (trava)
+local HEAD_FLING_WALK_VEL = 350
+local HEAD_FLING_DURACAO = 1.5
+local HEAD_FLING_RECUPERAR_DIST = 10
 
 -- 🛡️ Anti-dumping / Team
 local TEAM_CHECK_INTERVAL = 0.5
@@ -69,9 +70,11 @@ local headFlingConnection = nil
 local headFlingStartTime = 0
 local headFlingAlvoMorreuConn = nil
 
--- 🌀 Constraints pra walkfling (BodyVelocity + BodyAngularVelocity)
-local headFlingBodyVel = nil
-local headFlingBodyAngVel = nil
+-- 🌀 Constraints (AlignPosition + AlignOrientation + AngularVelocity)
+local headFlingAlignPos = nil
+local headFlingAlignOri = nil
+local headFlingAngVel = nil
+local headFlingAttachment = nil
 
 -- 👁️ Spectate
 local SPECTATE_ATIVADO = true
@@ -779,17 +782,13 @@ local function ativarWallPhase()
 end
 
 -- =======================================================
--- 🔥 HEAD FLING (WALKFLING REAL — sem teleporte)
+-- 🔥 HEAD FLING (AlignPosition + AlignOrientation — TRAVA DE VERDADE)
 -- =======================================================
 local function removerConstraintsHeadFling()
-    if headFlingBodyVel then
-        headFlingBodyVel:Destroy()
-        headFlingBodyVel = nil
-    end
-    if headFlingBodyAngVel then
-        headFlingBodyAngVel:Destroy()
-        headFlingBodyAngVel = nil
-    end
+    if headFlingAlignPos then headFlingAlignPos:Destroy(); headFlingAlignPos = nil end
+    if headFlingAlignOri then headFlingAlignOri:Destroy(); headFlingAlignOri = nil end
+    if headFlingAngVel then headFlingAngVel:Destroy(); headFlingAngVel = nil end
+    if headFlingAttachment then headFlingAttachment:Destroy(); headFlingAttachment = nil end
 end
 
 local function pausarHeadFlingAgora()
@@ -820,22 +819,41 @@ local function ativarHeadFlingAgora()
     headFlingRodandoAgora = true
     headFlingStartTime = tick()
 
-    -- 🌀 Cria BodyVelocity (colar no alvo) + BodyAngularVelocity (spin)
     removerConstraintsHeadFling()
 
-    headFlingBodyVel = Instance.new("BodyVelocity")
-    headFlingBodyVel.Name = "HeadFlingBodyVel"
-    headFlingBodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    headFlingBodyVel.P = 1e6
-    headFlingBodyVel.Velocity = Vector3.zero
-    headFlingBodyVel.Parent = hrp
+    -- 📍 Attachment no HRP (referência pra AlignPosition/Orientation)
+    headFlingAttachment = Instance.new("Attachment")
+    headFlingAttachment.Name = "HeadFlingAttach"
+    headFlingAttachment.Parent = hrp
 
-    headFlingBodyAngVel = Instance.new("BodyAngularVelocity")
-    headFlingBodyAngVel.Name = "HeadFlingBodyAngVel"
-    headFlingBodyAngVel.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-    headFlingBodyAngVel.P = 1e6
-    headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
-    headFlingBodyAngVel.Parent = hrp
+    -- 🚀 AlignPosition: TRAVA a posição do HRP no ponto alvo
+    headFlingAlignPos = Instance.new("AlignPosition")
+    headFlingAlignPos.Name = "HeadFlingAlignPos"
+    headFlingAlignPos.Attachment0 = headFlingAttachment
+    headFlingAlignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
+    headFlingAlignPos.Position = hrp.Position
+    headFlingAlignPos.MaxForce = HEAD_FLING_ALIGN_FORCE
+    headFlingAlignPos.Responsiveness = 200 -- ⬅️ quanto maior, mais rápido cola
+    headFlingAlignPos.Parent = hrp
+
+    -- 🎯 AlignOrientation: TRAVA a rotação do HRP
+    headFlingAlignOri = Instance.new("AlignOrientation")
+    headFlingAlignOri.Name = "HeadFlingAlignOri"
+    headFlingAlignOri.Attachment0 = headFlingAttachment
+    headFlingAlignOri.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    headFlingAlignOri.CFrame = hrp.CFrame
+    headFlingAlignOri.MaxTorque = HEAD_FLING_ALIGN_TORQUE
+    headFlingAlignOri.Responsiveness = 200
+    headFlingAlignOri.PrimaryAxisOnly = false -- ⬅️ trava os 3 eixos
+    headFlingAlignOri.Parent = hrp
+
+    -- 🌀 AngularVelocity: spin adicional (arremessa)
+    headFlingAngVel = Instance.new("AngularVelocity")
+    headFlingAngVel.Name = "HeadFlingAngVel"
+    headFlingAngVel.Attachment0 = headFlingAttachment
+    headFlingAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
+    headFlingAngVel.MaxTorque = 1e6
+    headFlingAngVel.Parent = hrp
 end
 
 function desativarHeadFling()
@@ -902,9 +920,8 @@ local function ativarHeadFling()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
-        if not headFlingBodyVel or not headFlingBodyVel.Parent then
-            headFlingBodyVel = nil
-            headFlingBodyAngVel = nil
+        if not headFlingAlignPos or not headFlingAlignPos.Parent then
+            headFlingAlignPos = nil; headFlingAlignOri = nil; headFlingAngVel = nil; headFlingAttachment = nil
             return
         end
 
@@ -951,7 +968,7 @@ local function ativarHeadFling()
 
         local alvoAndando = velFlat.Magnitude > 3
 
-        -- 🎯 POSIÇÃO alvo
+        -- 🎯 DESTINO: dentro da cabeça (com offset se andando)
         local destinoPos
         if alvoAndando then
             destinoPos = cabecaPos + velFlat.Unit * HEAD_FLING_FRENTE + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
@@ -967,45 +984,38 @@ local function ativarHeadFling()
         local minhaPos = h.Position
         local dist = (destinoPos - minhaPos).Magnitude
 
-        -- 🛟 Recuperação: se ficou muito longe, teleporta UMA vez
+        -- 🛟 Recuperação (só se ficar MUITO longe)
         if dist > HEAD_FLING_RECUPERAR_DIST then
             h.CFrame = CFrame.new(destinoPos)
             h.AssemblyLinearVelocity = Vector3.zero
             h.AssemblyAngularVelocity = Vector3.zero
+            if headFlingAlignPos then
+                headFlingAlignPos.Position = destinoPos
+            end
             return
         end
 
-        -- 🏃 LONGE: aplica velocidade alta na direção do alvo (sem teleporte!)
-        if dist > 3 then
-            local dir = (destinoPos - minhaPos).Unit
-            if headFlingBodyVel then
-                headFlingBodyVel.Velocity = dir * HEAD_FLING_WALK_VEL
-            end
-            if headFlingBodyAngVel then
-                headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
-            end
-        else
-            -- 🎯 PERTO: trava na posição via BodyVelocity (empurra pro destino)
-            -- Aplica velocidade corretiva que "cola" o HRP no destino
-            local diff = destinoPos - minhaPos
-            local correcaoVel = diff * HEAD_FLING_BODY_VEL
-            if headFlingBodyVel then
-                headFlingBodyVel.Velocity = correcaoVel
-            end
+        -- 🎯 Orientação: virado pro alvo + inclinado pro chão
+        local lookTarget = Vector3.new(cabecaPos.X, destinoPos.Y, cabecaPos.Z)
+        local baseCFrame = CFrame.lookAt(destinoPos, lookTarget)
+        local orientacaoFinal = baseCFrame * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
 
-            -- 🌀 Spin gigante (arremessa o alvo)
-            if headFlingBodyAngVel then
-                headFlingBodyAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
-            end
+        -- 🚀 Atualiza o AlignPosition (trava na posição exata)
+        if headFlingAlignPos then
+            headFlingAlignPos.Position = destinoPos
+            -- Responsiveness alta quando perto, mais baixa quando longe
+            headFlingAlignPos.Responsiveness = dist > 3 and 60 or 200
         end
 
-        -- 👀 Orientação: virado pro alvo + inclinado pro chão (SEM teleporte — só CFrame local)
-        -- Aplica só a orientação (não a posição), sem ser teleporte
-        local lookTarget = Vector3.new(cabecaPos.X, h.Position.Y, cabecaPos.Z)
-        local baseCFrame = CFrame.lookAt(h.Position, lookTarget)
-        -- Mantém só a rotação (posição continua sendo controlada pela física)
-        h.CFrame = CFrame.new(h.Position) * (baseCFrame - baseCFrame.Position)
-            * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
+        -- 🎯 Atualiza o AlignOrientation (trava na rotação exata)
+        if headFlingAlignOri then
+            headFlingAlignOri.CFrame = orientacaoFinal
+        end
+
+        -- 🌀 Reforça o spin
+        if headFlingAngVel then
+            headFlingAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
+        end
     end)
 end
 
