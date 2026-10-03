@@ -1,5 +1,5 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v22) - CUSTOMIZADO
+-- DELTA HUB - FUTEBOL (UI MOBILE v23) - CUSTOMIZADO
 -- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball
 -- =======================================================
 local player = game.Players.LocalPlayer
@@ -12,10 +12,10 @@ local inclinacaoX = 35
 local WALK_SPEED = 64
 
 -- 🌀 Fling Ball
-local FLING_RAIO = 2.0 -- 2.0 studs
-local FLING_VELOCIDADE = 120 -- rad/s
-local FLING_FORCA = 400
-local FLING_ALTURA = 2 -- altura acima da bola (studs)
+local FLING_RAIO = 2.0
+local FLING_VELOCIDADE = 200
+local FLING_FORCA = 800
+local FLING_ALTURA = 2
 
 -- 🥅 Posições dos Gols
 local GOALS = {
@@ -29,7 +29,8 @@ local seguirBolaAtivado = false
 local bolaAlvo = nil
 local speedLoopAtivo = false
 local golSelecionado = 0
-local flingBallAtivado = false
+local flingBallAtivado = false        -- intenção do usuário (botão ON/OFF)
+local flingRodandoAgora = false       -- se a órbita está ativa nesse instante
 local flingConnection = nil
 local flingAngle = 0
 local originalCanCollide = {}
@@ -264,16 +265,13 @@ local function encontrarBola()
 end
 
 -- =======================================================
--- 🌀 FLING BALL (baseado em fly + walkfling)
+-- 🌀 FLING BALL
 -- =======================================================
-function desativarFlingBall()
-    flingBallAtivado = false
-    if flingConnection then
-        flingConnection:Disconnect()
-        flingConnection = nil
-    end
+-- Restaura colisões e estado do personagem (usado quando pausa por bola sumida)
+local function pausarFlingAgora()
+    if not flingRodandoAgora then return end
+    flingRodandoAgora = false
 
-    -- Restaura colisões
     for part, value in pairs(originalCanCollide) do
         if part and part.Parent then
             part.CanCollide = value
@@ -289,6 +287,39 @@ function desativarFlingBall()
             humanoid.AutoRotate = true
         end
     end
+end
+
+-- Ativa a órbita (noclip + platform stand)
+local function ativarFlingAgora()
+    if flingRodandoAgora then return end
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    originalCanCollide = {}
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalCanCollide[part] = part.CanCollide
+            part.CanCollide = false
+        end
+    end
+
+    humanoid.PlatformStand = true
+    humanoid.AutoRotate = false
+    flingRodandoAgora = true
+    flingAngle = 0
+end
+
+-- Desativa TUDO (usado pelo botão e ao fechar GUI)
+function desativarFlingBall()
+    flingBallAtivado = false
+    pausarFlingAgora()
+
+    if flingConnection then
+        flingConnection:Disconnect()
+        flingConnection = nil
+    end
 
     atualizarVisualFling(false)
 end
@@ -300,20 +331,7 @@ local function ativarFlingBall()
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
 
-    -- Salva CanCollide original e desativa (noclip com a bola)
-    originalCanCollide = {}
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            originalCanCollide[part] = part.CanCollide
-            part.CanCollide = false
-        end
-    end
-
-    humanoid.PlatformStand = true
-    humanoid.AutoRotate = false
-
-    flingBallAtivado = true
-    flingAngle = 0
+    ativarFlingAgora()
 
     if flingConnection then flingConnection:Disconnect() end
     flingConnection = runService.Heartbeat:Connect(function(dt)
@@ -327,13 +345,18 @@ local function ativarFlingBall()
             bolaAlvo = encontrarBola()
         end
 
-        -- 🟥 BOLA SUMIU: desativa automaticamente
+        -- 🟥 BOLA SUMIU: pausa a órbita mas mantém o botão ON
         if not bolaAlvo then
-            desativarFlingBall()
+            pausarFlingAgora()
             return
         end
 
-        -- Órbita rápida ao redor da bola (2 studs)
+        -- 🟢 BOLA VOLTOU: reativa automaticamente
+        if not flingRodandoAgora then
+            ativarFlingAgora()
+        end
+
+        -- Órbita rápida ao redor da bola
         flingAngle = flingAngle + dt * FLING_VELOCIDADE
         local offset = Vector3.new(
             math.cos(flingAngle) * FLING_RAIO,
@@ -342,12 +365,10 @@ local function ativarFlingBall()
         )
         local targetPos = bolaAlvo.Position + Vector3.new(0, FLING_ALTURA, 0) + offset
 
-        -- Teleporta + aplica velocidade/rotação altíssimas (fling)
         h.CFrame = CFrame.new(targetPos)
         h.AssemblyLinearVelocity = offset.Unit * FLING_FORCA
         h.AssemblyAngularVelocity = Vector3.new(0, FLING_FORCA * 2, 0)
 
-        -- Anti-travamento
         if h.Velocity.Magnitude < 1 then
             h.AssemblyLinearVelocity = offset.Unit * FLING_FORCA
         end
@@ -424,7 +445,7 @@ btnGoalB.MouseButton1Click:Connect(function()
 end)
 
 -- =======================================================
--- 🎬 LOOP PRINCIPAL (SKILL + CAMERA LOCK)
+-- 🎬 LOOP PRINCIPAL (SKILL)
 -- =======================================================
 runService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
