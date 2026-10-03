@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v20) - CUSTOMIZADO
--- Funções: Seguir Bola + Speed Loop + Personagem Virado pro Gol
+-- DELTA HUB - FUTEBOL (UI MOBILE v22) - CUSTOMIZADO
+-- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball
 -- =======================================================
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
@@ -10,6 +10,12 @@ local userInputService = game:GetService("UserInputService")
 local alturaFixa = 7
 local inclinacaoX = 35
 local WALK_SPEED = 64
+
+-- 🌀 Fling Ball
+local FLING_RAIO = 2.0 -- 2.0 studs
+local FLING_VELOCIDADE = 120 -- rad/s
+local FLING_FORCA = 400
+local FLING_ALTURA = 2 -- altura acima da bola (studs)
 
 -- 🥅 Posições dos Gols
 local GOALS = {
@@ -22,7 +28,11 @@ local GOALS = {
 local seguirBolaAtivado = false
 local bolaAlvo = nil
 local speedLoopAtivo = false
-local golSelecionado = 0 -- 0 = nenhum, 1 = Goal A, 2 = Goal B
+local golSelecionado = 0
+local flingBallAtivado = false
+local flingConnection = nil
+local flingAngle = 0
+local originalCanCollide = {}
 
 -- =======================================================
 -- CRIAÇÃO DA UI
@@ -33,8 +43,8 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 170)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -85)
+MainFrame.Size = UDim2.new(0, 280, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -100)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 0
@@ -88,6 +98,7 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
 CloseBtn.Parent = TitleBar
 CloseBtn.MouseButton1Click:Connect(function()
+    if flingBallAtivado then desativarFlingBall() end
     speedLoopAtivo = false
     golSelecionado = 0
     ScreenGui:Destroy()
@@ -105,9 +116,7 @@ TitleBar.InputBegan:Connect(function(input)
         dragStart = input.Position
         startPos = MainFrame.Position
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
         end)
     end
 end)
@@ -117,73 +126,58 @@ TitleBar.InputChanged:Connect(function(input)
     end
 end)
 userInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        update(input)
-    end
+    if input == dragInput and dragging then update(input) end
 end)
 
--- 🔽 BOTÃO SKILL 🔽
-local btnMain = Instance.new("TextButton")
-btnMain.Size = UDim2.new(0, 260, 0, 45)
-btnMain.Position = UDim2.new(0.5, -130, 0, 42)
-btnMain.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-btnMain.BorderSizePixel = 0
-btnMain.Text = "skill [OFF]"
-btnMain.TextColor3 = Color3.fromRGB(150, 150, 150)
-btnMain.Font = Enum.Font.GothamBold
-btnMain.TextSize = 13
-btnMain.Parent = MainFrame
+-- Função genérica de estilo de botão
+local function criarBotao(pos, size, texto)
+    local btn = Instance.new("TextButton")
+    btn.Size = size
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.BorderSizePixel = 0
+    btn.Text = texto
+    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = MainFrame
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = btnMain
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
 
-local btnStroke = Instance.new("UIStroke")
-btnStroke.Color = Color3.fromRGB(80, 80, 80)
-btnStroke.Thickness = 1
-btnStroke.Parent = btnMain
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(80, 80, 80)
+    stroke.Thickness = 1
+    stroke.Parent = btn
 
--- 🎯 BOTÃO GOAL A
-local btnGoalA = Instance.new("TextButton")
-btnGoalA.Size = UDim2.new(0, 125, 0, 42)
-btnGoalA.Position = UDim2.new(0, 10, 0, 100)
-btnGoalA.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-btnGoalA.BorderSizePixel = 0
-btnGoalA.Text = "Goal A"
-btnGoalA.TextColor3 = Color3.fromRGB(150, 150, 150)
-btnGoalA.Font = Enum.Font.GothamBold
-btnGoalA.TextSize = 13
-btnGoalA.Parent = MainFrame
+    return btn, corner, stroke
+end
 
-local goalACorner = Instance.new("UICorner")
-goalACorner.CornerRadius = UDim.new(0, 8)
-goalACorner.Parent = btnGoalA
+-- 🔽 BOTÕES 🔽
+local btnMain, _, btnStroke = criarBotao(
+    UDim2.new(0.5, -130, 0, 42),
+    UDim2.new(0, 260, 0, 42),
+    "skill [OFF]"
+)
 
-local goalAStroke = Instance.new("UIStroke")
-goalAStroke.Color = Color3.fromRGB(80, 80, 80)
-goalAStroke.Thickness = 1
-goalAStroke.Parent = btnGoalA
+local btnGoalA, _, goalAStroke = criarBotao(
+    UDim2.new(0, 10, 0, 90),
+    UDim2.new(0, 125, 0, 36),
+    "Goal A"
+)
 
--- 🎯 BOTÃO GOAL B
-local btnGoalB = Instance.new("TextButton")
-btnGoalB.Size = UDim2.new(0, 125, 0, 42)
-btnGoalB.Position = UDim2.new(0, 145, 0, 100)
-btnGoalB.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-btnGoalB.BorderSizePixel = 0
-btnGoalB.Text = "Goal B"
-btnGoalB.TextColor3 = Color3.fromRGB(150, 150, 150)
-btnGoalB.Font = Enum.Font.GothamBold
-btnGoalB.TextSize = 13
-btnGoalB.Parent = MainFrame
+local btnGoalB, _, goalBStroke = criarBotao(
+    UDim2.new(0, 145, 0, 90),
+    UDim2.new(0, 125, 0, 36),
+    "Goal B"
+)
 
-local goalBCorner = Instance.new("UICorner")
-goalBCorner.CornerRadius = UDim.new(0, 8)
-goalBCorner.Parent = btnGoalB
-
-local goalBStroke = Instance.new("UIStroke")
-goalBStroke.Color = Color3.fromRGB(80, 80, 80)
-goalBStroke.Thickness = 1
-goalBStroke.Parent = btnGoalB
+local btnFling, _, flingStroke = criarBotao(
+    UDim2.new(0.5, -130, 0, 134),
+    UDim2.new(0, 260, 0, 42),
+    "fling ball [OFF]"
+)
 
 -- Atualiza visual dos botões de gol
 local function atualizarBotoesGoal()
@@ -212,6 +206,21 @@ local function atualizarBotoesGoal()
     end
 end
 
+-- Atualiza visual do botão fling
+local function atualizarVisualFling(ativo)
+    if ativo then
+        btnFling.Text = "fling ball [ON]"
+        btnFling.TextColor3 = Color3.fromRGB(255, 80, 80)
+        flingStroke.Color = Color3.fromRGB(255, 80, 80)
+        btnFling.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+    else
+        btnFling.Text = "fling ball [OFF]"
+        btnFling.TextColor3 = Color3.fromRGB(150, 150, 150)
+        flingStroke.Color = Color3.fromRGB(80, 80, 80)
+        btnFling.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    end
+end
+
 -- =======================================================
 -- 🏃 SPEED LOOP AUTOMÁTICO
 -- =======================================================
@@ -227,22 +236,134 @@ end
 
 task.spawn(function()
     while true do
-        if speedLoopAtivo then
-            aplicarSpeed()
-        end
+        if speedLoopAtivo then aplicarSpeed() end
         task.wait(0.2)
     end
 end)
 
 player.CharacterAdded:Connect(function()
     task.wait(1)
-    if speedLoopAtivo then
-        aplicarSpeed()
-    end
+    if speedLoopAtivo then aplicarSpeed() end
 end)
 
--- Ativação do Botão Skill
+-- =======================================================
+-- 🔍 ENCONTRAR BOLA
+-- =======================================================
+local function encontrarBola()
+    local campo = workspace:FindFirstChild("FootballField")
+    if campo then
+        local bola = campo:FindFirstChild("SoccerBall") or campo:FindFirstChild("ServerSoccerBall")
+        if bola then return bola end
+    end
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if (obj.Name == "SoccerBall" or obj.Name == "ServerSoccerBall") and obj:IsA("BasePart") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- =======================================================
+-- 🌀 FLING BALL (baseado em fly + walkfling)
+-- =======================================================
+function desativarFlingBall()
+    flingBallAtivado = false
+    if flingConnection then
+        flingConnection:Disconnect()
+        flingConnection = nil
+    end
+
+    -- Restaura colisões
+    for part, value in pairs(originalCanCollide) do
+        if part and part.Parent then
+            part.CanCollide = value
+        end
+    end
+    originalCanCollide = {}
+
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.AutoRotate = true
+        end
+    end
+
+    atualizarVisualFling(false)
+end
+
+local function ativarFlingBall()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    -- Salva CanCollide original e desativa (noclip com a bola)
+    originalCanCollide = {}
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalCanCollide[part] = part.CanCollide
+            part.CanCollide = false
+        end
+    end
+
+    humanoid.PlatformStand = true
+    humanoid.AutoRotate = false
+
+    flingBallAtivado = true
+    flingAngle = 0
+
+    if flingConnection then flingConnection:Disconnect() end
+    flingConnection = runService.Heartbeat:Connect(function(dt)
+        if not flingBallAtivado then return end
+        local c = player.Character
+        if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        if not h then return end
+
+        if not bolaAlvo or not bolaAlvo.Parent then
+            bolaAlvo = encontrarBola()
+        end
+
+        -- 🟥 BOLA SUMIU: desativa automaticamente
+        if not bolaAlvo then
+            desativarFlingBall()
+            return
+        end
+
+        -- Órbita rápida ao redor da bola (2 studs)
+        flingAngle = flingAngle + dt * FLING_VELOCIDADE
+        local offset = Vector3.new(
+            math.cos(flingAngle) * FLING_RAIO,
+            0,
+            math.sin(flingAngle) * FLING_RAIO
+        )
+        local targetPos = bolaAlvo.Position + Vector3.new(0, FLING_ALTURA, 0) + offset
+
+        -- Teleporta + aplica velocidade/rotação altíssimas (fling)
+        h.CFrame = CFrame.new(targetPos)
+        h.AssemblyLinearVelocity = offset.Unit * FLING_FORCA
+        h.AssemblyAngularVelocity = Vector3.new(0, FLING_FORCA * 2, 0)
+
+        -- Anti-travamento
+        if h.Velocity.Magnitude < 1 then
+            h.AssemblyLinearVelocity = offset.Unit * FLING_FORCA
+        end
+    end)
+end
+
+-- =======================================================
+-- 🎮 ATIVAÇÃO DOS BOTÕES
+-- =======================================================
+
+-- BOTÃO SKILL
 btnMain.MouseButton1Click:Connect(function()
+    if flingBallAtivado then
+        desativarFlingBall()
+    end
+
     seguirBolaAtivado = not seguirBolaAtivado
     speedLoopAtivo = seguirBolaAtivado
 
@@ -269,43 +390,42 @@ btnMain.MouseButton1Click:Connect(function()
     end
 end)
 
--- Toggle Goal A
+-- BOTÃO FLING BALL
+btnFling.MouseButton1Click:Connect(function()
+    if seguirBolaAtivado then
+        seguirBolaAtivado = false
+        speedLoopAtivo = false
+        btnMain.Text = "skill [OFF]"
+        btnMain.TextColor3 = Color3.fromRGB(150, 150, 150)
+        btnStroke.Color = Color3.fromRGB(80, 80, 80)
+        btnMain.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    end
+
+    flingBallAtivado = not flingBallAtivado
+
+    if flingBallAtivado then
+        atualizarVisualFling(true)
+        ativarFlingBall()
+    else
+        desativarFlingBall()
+    end
+end)
+
+-- TOGGLE GOAL A
 btnGoalA.MouseButton1Click:Connect(function()
-    if golSelecionado == 1 then
-        golSelecionado = 0
-    else
-        golSelecionado = 1
-    end
+    golSelecionado = (golSelecionado == 1) and 0 or 1
     atualizarBotoesGoal()
 end)
 
--- Toggle Goal B
+-- TOGGLE GOAL B
 btnGoalB.MouseButton1Click:Connect(function()
-    if golSelecionado == 2 then
-        golSelecionado = 0
-    else
-        golSelecionado = 2
-    end
+    golSelecionado = (golSelecionado == 2) and 0 or 2
     atualizarBotoesGoal()
 end)
 
 -- =======================================================
--- LÓGICA DA FUNÇÃO (SÓ ATIVA SE A BOLA EXISTIR)
+-- 🎬 LOOP PRINCIPAL (SKILL + CAMERA LOCK)
 -- =======================================================
-local function encontrarBola()
-    local campo = workspace:FindFirstChild("FootballField")
-    if campo then
-        local bola = campo:FindFirstChild("SoccerBall") or campo:FindFirstChild("ServerSoccerBall")
-        if bola then return bola end
-    end
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if (obj.Name == "SoccerBall" or obj.Name == "ServerSoccerBall") and obj:IsA("BasePart") then
-            return obj
-        end
-    end
-    return nil
-end
-
 runService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
     if not camera then return end
@@ -315,6 +435,8 @@ runService.RenderStepped:Connect(function()
     local hrp = char.HumanoidRootPart
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return end
+
+    if flingBallAtivado then return end
 
     if seguirBolaAtivado then
         if not bolaAlvo or not bolaAlvo.Parent then
@@ -331,7 +453,6 @@ runService.RenderStepped:Connect(function()
                 bolaAlvo.Position.Z
             )
 
-            -- 🎯 DIREÇÃO: se tem gol selecionado, vira pro gol. Senão, segue a câmera.
             local lookDir
             if golSelecionado > 0 then
                 local goal = GOALS[golSelecionado]
@@ -345,16 +466,24 @@ runService.RenderStepped:Connect(function()
                 lookDir = Vector3.new(camLook.X, 0, camLook.Z).Unit
             end
 
-            -- 🎥 CÂMERA NÃO É MAIS MOVIDA — só rotaciona o personagem
             local baseCFrame = CFrame.new(targetPos, targetPos + lookDir)
             hrp.CFrame = baseCFrame * CFrame.Angles(math.rad(inclinacaoX), 0, 0)
 
             hrp.Velocity = Vector3.new(0, 0, 0)
             hrp.RotVelocity = Vector3.new(0, 0, 0)
         else
-            -- 🟥 BOLA SUMIU: só reseta o humanoid, MANTÉM golSelecionado ativado
             humanoid.PlatformStand = false
             humanoid.AutoRotate = true
         end
+    end
+end)
+
+-- =======================================================
+-- 💀 RESPAWN
+-- =======================================================
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if flingBallAtivado then
+        ativarFlingBall()
     end
 end)
