@@ -13,7 +13,7 @@ local WALK_SPEED = 64
 
 -- 🌀 Fling Ball
 local FLING_RAIO = 2.0
-local FLING_VELOCIDADE = 200
+local FLING_VELOCIDADE = 300
 local FLING_FORCA = 800
 local FLING_ALTURA = 2
 
