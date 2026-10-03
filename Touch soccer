@@ -15,7 +15,7 @@ local WALK_SPEED = 64
 local FLING_RAIO = 2.0
 local FLING_VELOCIDADE = 200
 local FLING_FORCA = 800
-local FLING_ALTURA = 1
+local FLING_ALTURA = 2
 
 -- 🎭 Animação do Fling (Accurate House Box Glitch Emote)
 local FLING_ANIMATION_ASSET_ID = 93552301087938
