@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v23) - CUSTOMIZADO
--- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball
+-- DELTA HUB - FUTEBOL (UI MOBILE v24) - CUSTOMIZADO
+-- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball + Animação
 -- =======================================================
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
@@ -17,6 +17,9 @@ local FLING_VELOCIDADE = 200
 local FLING_FORCA = 800
 local FLING_ALTURA = 2
 
+-- 🎭 Animação do Fling (Accurate House Box Glitch Emote)
+local FLING_ANIMATION_ASSET_ID = 93552301087938
+
 -- 🥅 Posições dos Gols
 local GOALS = {
     [1] = { nome = "Goal A", pos = Vector3.new(-316.8, 12.7, 92.8) },
@@ -29,11 +32,37 @@ local seguirBolaAtivado = false
 local bolaAlvo = nil
 local speedLoopAtivo = false
 local golSelecionado = 0
-local flingBallAtivado = false        -- intenção do usuário (botão ON/OFF)
-local flingRodandoAgora = false       -- se a órbita está ativa nesse instante
+local flingBallAtivado = false
+local flingRodandoAgora = false
 local flingConnection = nil
 local flingAngle = 0
 local originalCanCollide = {}
+
+-- 🎭 Variáveis da animação
+local flingAnimationId = nil
+local flingAnimationTrack = nil
+
+-- =======================================================
+-- 🎭 EXTRAIR ANIMATION ID
+-- =======================================================
+local function extrairAnimationId(assetId)
+    local sucesso, resultado = pcall(function()
+        local objetos = game:GetObjects("rbxassetid://" .. tostring(assetId))
+        for _, obj in pairs(objetos) do
+            if obj:IsA("Animation") then return obj.AnimationId end
+            local child = obj:FindFirstChildWhichIsA("Animation", true)
+            if child then return child.AnimationId end
+        end
+        return nil
+    end)
+    if sucesso and resultado then
+        print("✅ AnimationId extraído:", resultado)
+        return resultado
+    else
+        warn("❌ Falha ao extrair AnimationId:", assetId)
+        return nil
+    end
+end
 
 -- =======================================================
 -- CRIAÇÃO DA UI
@@ -267,7 +296,6 @@ end
 -- =======================================================
 -- 🌀 FLING BALL
 -- =======================================================
--- Restaura colisões e estado do personagem (usado quando pausa por bola sumida)
 local function pausarFlingAgora()
     if not flingRodandoAgora then return end
     flingRodandoAgora = false
@@ -287,9 +315,14 @@ local function pausarFlingAgora()
             humanoid.AutoRotate = true
         end
     end
+
+    -- 🎭 Para a animação ao pausar
+    if flingAnimationTrack then
+        flingAnimationTrack:Stop()
+        flingAnimationTrack = nil
+    end
 end
 
--- Ativa a órbita (noclip + platform stand)
 local function ativarFlingAgora()
     if flingRodandoAgora then return end
     local char = player.Character
@@ -309,9 +342,20 @@ local function ativarFlingAgora()
     humanoid.AutoRotate = false
     flingRodandoAgora = true
     flingAngle = 0
+
+    -- 🎭 Toca a animação
+    if not flingAnimationId then
+        flingAnimationId = extrairAnimationId(FLING_ANIMATION_ASSET_ID)
+    end
+    if flingAnimationId then
+        local anim = Instance.new("Animation")
+        anim.AnimationId = flingAnimationId
+        flingAnimationTrack = humanoid:LoadAnimation(anim)
+        flingAnimationTrack.Looped = true
+        flingAnimationTrack:Play()
+    end
 end
 
--- Desativa TUDO (usado pelo botão e ao fechar GUI)
 function desativarFlingBall()
     flingBallAtivado = false
     pausarFlingAgora()
@@ -319,6 +363,12 @@ function desativarFlingBall()
     if flingConnection then
         flingConnection:Disconnect()
         flingConnection = nil
+    end
+
+    -- 🎭 Garante que a animação parou
+    if flingAnimationTrack then
+        flingAnimationTrack:Stop()
+        flingAnimationTrack = nil
     end
 
     atualizarVisualFling(false)
