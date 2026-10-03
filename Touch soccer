@@ -1,8 +1,9 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v30) - CUSTOMIZADO
--- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball + Wall Phase
+-- DELTA HUB - FUTEBOL (UI MOBILE v31) - CUSTOMIZADO
+-- Seguir Bola + Speed + Camera Lock + Fling Ball + Wall Phase + Head Fling
 -- =======================================================
 local player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
 
@@ -19,8 +20,14 @@ local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 15 -- ⬅️ antes era 18, agora -3 studs
+local WALL_PHASE_ALTURA = 15
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
+
+-- 🔥 Head Fling
+local HEAD_FLING_ALTURA = 4          -- studs acima da cabeça do alvo
+local HEAD_FLING_FRENTE = 3          -- studs na frente quando o alvo anda
+local HEAD_FLING_FORCA = 700         -- força aplicada pra baixo
+local HEAD_FLING_VEL_LIMITE = 70     -- se alvo passar dessa velocidade, considera arremessado e para
 
 -- 🥅 Posições dos Gols
 local GOALS = {
@@ -47,6 +54,11 @@ local wallPhaseAnimationTrack = nil
 local wallPhaseAnimationId = nil
 local wallPhaseAnimConnection = nil
 
+local headFlingAtivado = false
+local headFlingRodandoAgora = false
+local headFlingAlvo = nil -- Player
+local headFlingConnection = nil
+
 -- =======================================================
 -- 🎭 EXTRAIR ANIMATION ID
 -- =======================================================
@@ -69,9 +81,6 @@ local function extrairAnimationId(assetId)
     end
 end
 
--- =======================================================
--- 🎭 ANIMAÇÃO EM LOOP (só usada no wall phase agora)
--- =======================================================
 local function criarLoopAnimacao(humanoid, animationId, setTrackCallback, isStillActiveFn)
     local anim = Instance.new("Animation")
     anim.AnimationId = animationId
@@ -109,8 +118,8 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -125)
+MainFrame.Size = UDim2.new(0, 280, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 0
@@ -166,6 +175,7 @@ CloseBtn.Parent = TitleBar
 CloseBtn.MouseButton1Click:Connect(function()
     if flingBallAtivado then desativarFlingBall() end
     if wallPhaseAtivado then desativarWallPhase() end
+    if headFlingAtivado then desativarHeadFling() end
     speedLoopAtivo = false
     golSelecionado = 0
     ScreenGui:Destroy()
@@ -220,12 +230,102 @@ local function criarBotao(pos, size, texto)
     return btn, corner, stroke
 end
 
-local btnMain, _, btnStroke = criarBotao(UDim2.new(0.5, -130, 0, 42), UDim2.new(0, 260, 0, 42), "skill [OFF]")
-local btnGoalA, _, goalAStroke = criarBotao(UDim2.new(0, 10, 0, 90), UDim2.new(0, 125, 0, 36), "Goal A")
-local btnGoalB, _, goalBStroke = criarBotao(UDim2.new(0, 145, 0, 90), UDim2.new(0, 125, 0, 36), "Goal B")
-local btnFling, _, flingStroke = criarBotao(UDim2.new(0.5, -130, 0, 134), UDim2.new(0, 260, 0, 42), "fling ball [OFF]")
-local btnWallPhase, _, wallPhaseStroke = criarBotao(UDim2.new(0.5, -130, 0, 178), UDim2.new(0, 260, 0, 42), "wall phase [OFF]")
+local btnMain, _, btnStroke = criarBotao(UDim2.new(0.5, -130, 0, 42), UDim2.new(0, 260, 0, 40), "skill [OFF]")
+local btnGoalA, _, goalAStroke = criarBotao(UDim2.new(0, 10, 0, 88), UDim2.new(0, 125, 0, 34), "Goal A")
+local btnGoalB, _, goalBStroke = criarBotao(UDim2.new(0, 145, 0, 88), UDim2.new(0, 125, 0, 34), "Goal B")
+local btnFling, _, flingStroke = criarBotao(UDim2.new(0.5, -130, 0, 130), UDim2.new(0, 260, 0, 40), "fling ball [OFF]")
+local btnWallPhase, _, wallPhaseStroke = criarBotao(UDim2.new(0.5, -130, 0, 174), UDim2.new(0, 260, 0, 40), "wall phase [OFF]")
+local btnHeadFling, _, headFlingStroke = criarBotao(UDim2.new(0.5, -130, 0, 218), UDim2.new(0, 260, 0, 40), "head fling [OFF]")
 
+-- 🔍 TEXTBOX de alvo
+local txtAlvo = Instance.new("TextBox")
+txtAlvo.Size = UDim2.new(0.5, -130, 0, 34)
+txtAlvo.Position = UDim2.new(0.5, -130, 0, 264)
+txtAlvo.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+txtAlvo.BorderSizePixel = 0
+txtAlvo.Text = ""
+txtAlvo.PlaceholderText = "Nome do alvo (1 letra basta)"
+txtAlvo.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+txtAlvo.TextColor3 = Color3.fromRGB(200, 200, 200)
+txtAlvo.Font = Enum.Font.GothamBold
+txtAlvo.TextSize = 12
+txtAlvo.ClearTextOnFocus = false
+txtAlvo.Parent = MainFrame
+
+local txtCorner = Instance.new("UICorner")
+txtCorner.CornerRadius = UDim.new(0, 8)
+txtCorner.Parent = txtAlvo
+
+local txtStroke = Instance.new("UIStroke")
+txtStroke.Color = Color3.fromRGB(80, 80, 80)
+txtStroke.Thickness = 1
+txtStroke.Parent = txtAlvo
+
+local txtPadding = Instance.new("UIPadding")
+txtPadding.PaddingLeft = UDim.new(0, 10)
+txtPadding.PaddingRight = UDim.new(0, 10)
+txtPadding.Parent = txtAlvo
+
+-- =======================================================
+-- 🧠 DETECÇÃO INTELIGENTE DE ALVO (1 letra)
+-- =======================================================
+local function buscarAlvoPorTexto(search)
+    search = search:lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if #search == 0 then return nil end
+
+    -- 1) Prefixo (mais preciso)
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local nome = plr.Name:lower()
+            if nome:sub(1, #search) == search then
+                return plr
+            end
+        end
+    end
+
+    -- 2) Substring (fallback)
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            if plr.Name:lower():find(search, 1, true) then
+                return plr
+            end
+        end
+    end
+
+    return nil
+end
+
+txtAlvo:GetPropertyChangedSignal("Text"):Connect(function()
+    local texto = txtAlvo.Text
+    if #texto == 0 then
+        headFlingAlvo = nil
+        txtAlvo.TextColor3 = Color3.fromRGB(200, 200, 200)
+        txtStroke.Color = Color3.fromRGB(80, 80, 80)
+        return
+    end
+
+    local match = buscarAlvoPorTexto(texto)
+    if match then
+        headFlingAlvo = match
+        txtAlvo.TextColor3 = Color3.fromRGB(0, 255, 120)
+        txtStroke.Color = Color3.fromRGB(0, 255, 120)
+    else
+        headFlingAlvo = nil
+        txtAlvo.TextColor3 = Color3.fromRGB(255, 80, 80)
+        txtStroke.Color = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+-- Auto-completa o nome quando sai do foco
+txtAlvo.FocusLost:Connect(function()
+    if headFlingAlvo then
+        txtAlvo.Text = headFlingAlvo.Name
+    end
+end)
+
+-- =======================================================
+-- FUNÇÕES DE ATUALIZAÇÃO VISUAL
+-- =======================================================
 local function atualizarBotoesGoal()
     if golSelecionado == 1 then
         btnGoalA.Text = "Goal A [ON]"
@@ -280,6 +380,20 @@ local function atualizarVisualWallPhase(ativo)
     end
 end
 
+local function atualizarVisualHeadFling(ativo)
+    if ativo then
+        btnHeadFling.Text = "head fling [ON]"
+        btnHeadFling.TextColor3 = Color3.fromRGB(255, 150, 0)
+        headFlingStroke.Color = Color3.fromRGB(255, 150, 0)
+        btnHeadFling.BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+    else
+        btnHeadFling.Text = "head fling [OFF]"
+        btnHeadFling.TextColor3 = Color3.fromRGB(150, 150, 150)
+        headFlingStroke.Color = Color3.fromRGB(80, 80, 80)
+        btnHeadFling.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    end
+end
+
 -- =======================================================
 -- 🏃 SPEED LOOP
 -- =======================================================
@@ -331,7 +445,7 @@ local function bolaValida()
 end
 
 -- =======================================================
--- 🌀 FLING BALL (SEM ANIMAÇÃO)
+-- 🌀 FLING BALL
 -- =======================================================
 local function pausarFlingAgora()
     if not flingRodandoAgora then return end
@@ -573,6 +687,127 @@ local function ativarWallPhase()
 end
 
 -- =======================================================
+-- 🔥 HEAD FLING
+-- =======================================================
+local function pausarHeadFlingAgora()
+    if not headFlingRodandoAgora then return end
+    headFlingRodandoAgora = false
+
+    for part, value in pairs(originalCanCollide) do
+        if part and part.Parent then part.CanCollide = value end
+    end
+    originalCanCollide = {}
+
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.AutoRotate = true
+        end
+    end
+end
+
+local function ativarHeadFlingAgora()
+    if headFlingRodandoAgora then return end
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    originalCanCollide = {}
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalCanCollide[part] = part.CanCollide
+            part.CanCollide = false
+        end
+    end
+
+    humanoid.PlatformStand = true
+    humanoid.AutoRotate = false
+    headFlingRodandoAgora = true
+end
+
+function desativarHeadFling()
+    headFlingAtivado = false
+    pausarHeadFlingAgora()
+
+    if headFlingConnection then
+        headFlingConnection:Disconnect()
+        headFlingConnection = nil
+    end
+
+    atualizarVisualHeadFling(false)
+end
+
+local function ativarHeadFling()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    ativarHeadFlingAgora()
+
+    if headFlingConnection then headFlingConnection:Disconnect() end
+    headFlingConnection = runService.Heartbeat:Connect(function(dt)
+        if not headFlingAtivado then return end
+        local c = player.Character
+        if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        if not h then return end
+
+        -- Sem alvo válido: pausa (mantém botão ON)
+        if not headFlingAlvo or not headFlingAlvo.Parent or not headFlingAlvo.Character then
+            pausarHeadFlingAgora()
+            return
+        end
+
+        local alvoChar = headFlingAlvo.Character
+        local alvoHRP = alvoChar:FindFirstChild("HumanoidRootPart")
+        local alvoHum = alvoChar:FindFirstChildOfClass("Humanoid")
+
+        if not alvoHRP or not alvoHum or alvoHum.Health <= 0 then
+            pausarHeadFlingAgora()
+            return
+        end
+
+        -- 🔍 Verifica se o alvo foi arremessado (velocidade subiu muito)
+        local velAlvo = alvoHRP.AssemblyLinearVelocity
+        local velMag = velAlvo.Magnitude
+        if velMag > HEAD_FLING_VEL_LIMITE then
+            -- 🎯 Alvo arremessado! Para automaticamente (mantém botão ON)
+            pausarHeadFlingAgora()
+            return
+        end
+
+        -- Retoma se pausado e alvo voltou
+        if not headFlingRodandoAgora then
+            ativarHeadFlingAgora()
+        end
+
+        -- 🚶 Detecta se o alvo está andando
+        local velFlat = Vector3.new(velAlvo.X, 0, velAlvo.Z)
+        local alvoAndando = velFlat.Magnitude > 3
+
+        local targetPos
+        if alvoAndando then
+            -- 3 studs na frente da direção que ele tá indo
+            local dir = velFlat.Unit
+            targetPos = alvoHRP.Position + dir * HEAD_FLING_FRENTE + Vector3.new(0, HEAD_FLING_ALTURA, 0)
+        else
+            -- Em cima da cabeça
+            targetPos = alvoHRP.Position + Vector3.new(0, HEAD_FLING_ALTURA + 2, 0)
+        end
+
+        -- 💥 Teleporta + empurra PRA BAIXO
+        h.CFrame = CFrame.new(targetPos)
+        h.AssemblyLinearVelocity = Vector3.new(0, -HEAD_FLING_FORCA, 0)
+        h.AssemblyAngularVelocity = Vector3.new(0, HEAD_FLING_FORCA, 0)
+    end)
+end
+
+-- =======================================================
 -- 🎮 BOTÕES
 -- =======================================================
 local function resetarBotaoSkill()
@@ -596,10 +831,8 @@ end
 
 btnMain.MouseButton1Click:Connect(function()
     if flingBallAtivado then desativarFlingBall() end
-    if wallPhaseAtivado then
-        wallPhaseAtivado = false
-        desativarWallPhase()
-    end
+    if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
+    if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
 
     seguirBolaAtivado = not seguirBolaAtivado
     speedLoopAtivo = seguirBolaAtivado
@@ -623,10 +856,8 @@ btnFling.MouseButton1Click:Connect(function()
         resetarBotaoSkill()
         resetarSpeed()
     end
-    if wallPhaseAtivado then
-        wallPhaseAtivado = false
-        desativarWallPhase()
-    end
+    if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
+    if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
 
     flingBallAtivado = not flingBallAtivado
 
@@ -644,6 +875,7 @@ btnWallPhase.MouseButton1Click:Connect(function()
         resetarBotaoSkill()
     end
     if flingBallAtivado then desativarFlingBall() end
+    if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
 
     wallPhaseAtivado = not wallPhaseAtivado
     speedLoopAtivo = wallPhaseAtivado
@@ -655,6 +887,33 @@ btnWallPhase.MouseButton1Click:Connect(function()
     else
         desativarWallPhase()
         resetarSpeed()
+    end
+end)
+
+btnHeadFling.MouseButton1Click:Connect(function()
+    if seguirBolaAtivado then
+        seguirBolaAtivado = false
+        speedLoopAtivo = false
+        resetarBotaoSkill()
+        resetarSpeed()
+    end
+    if flingBallAtivado then desativarFlingBall() end
+    if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
+
+    -- Verifica se tem alvo selecionado
+    if not headFlingAlvo then
+        txtAlvo.TextColor3 = Color3.fromRGB(255, 80, 80)
+        txtStroke.Color = Color3.fromRGB(255, 80, 80)
+        return
+    end
+
+    headFlingAtivado = not headFlingAtivado
+
+    if headFlingAtivado then
+        atualizarVisualHeadFling(true)
+        ativarHeadFling()
+    else
+        desativarHeadFling()
     end
 end)
 
@@ -681,7 +940,7 @@ runService.RenderStepped:Connect(function()
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return end
 
-    if flingBallAtivado or wallPhaseAtivado then return end
+    if flingBallAtivado or wallPhaseAtivado or headFlingAtivado then return end
 
     if seguirBolaAtivado then
         if not bolaValida() then
@@ -730,5 +989,6 @@ player.CharacterAdded:Connect(function()
     task.wait(1)
     if flingBallAtivado then ativarFlingBall() end
     if wallPhaseAtivado then ativarWallPhase() end
+    if headFlingAtivado then ativarHeadFling() end
     if speedLoopAtivo then aplicarSpeed() end
 end)
