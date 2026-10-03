@@ -1,5 +1,5 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v29) - CUSTOMIZADO
+-- DELTA HUB - FUTEBOL (UI MOBILE v30) - CUSTOMIZADO
 -- Funções: Seguir Bola + Speed Loop + Camera Lock + Fling Ball + Wall Phase
 -- =======================================================
 local player = game.Players.LocalPlayer
@@ -13,17 +13,14 @@ local WALK_SPEED = 64
 
 -- 🌀 Fling Ball
 local FLING_RAIO = 2.0
-local FLING_VELOCIDADE = 200
+local FLING_VELOCIDADE = 300
 local FLING_FORCA = 800
 local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 18 -- aumentado pra compensar o range da animação
+local WALL_PHASE_ALTURA = 18
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
-
--- 🎭 Animação do Fling (Accurate House Box Glitch Emote)
-local FLING_ANIMATION_ASSET_ID = 93552301087938
 
 -- 🥅 Posições dos Gols
 local GOALS = {
@@ -42,10 +39,6 @@ local flingRodandoAgora = false
 local flingConnection = nil
 local flingAngle = 0
 local originalCanCollide = {}
-
-local flingAnimationId = nil
-local flingAnimationTrack = nil
-local flingAnimConnection = nil
 
 local wallPhaseAtivado = false
 local wallPhaseRodandoAgora = false
@@ -77,7 +70,7 @@ local function extrairAnimationId(assetId)
 end
 
 -- =======================================================
--- 🎭 ANIMAÇÃO EM LOOP
+-- 🎭 ANIMAÇÃO EM LOOP (só usada no wall phase agora)
 -- =======================================================
 local function criarLoopAnimacao(humanoid, animationId, setTrackCallback, isStillActiveFn)
     local anim = Instance.new("Animation")
@@ -338,20 +331,11 @@ local function bolaValida()
 end
 
 -- =======================================================
--- 🌀 FLING BALL
+-- 🌀 FLING BALL (SEM ANIMAÇÃO)
 -- =======================================================
 local function pausarFlingAgora()
     if not flingRodandoAgora then return end
     flingRodandoAgora = false
-
-    if flingAnimConnection then
-        flingAnimConnection:Disconnect()
-        flingAnimConnection = nil
-    end
-    if flingAnimationTrack then
-        flingAnimationTrack:Stop()
-        flingAnimationTrack = nil
-    end
 
     for part, value in pairs(originalCanCollide) do
         if part and part.Parent then part.CanCollide = value end
@@ -387,17 +371,6 @@ local function ativarFlingAgora()
     humanoid.AutoRotate = false
     flingRodandoAgora = true
     flingAngle = 0
-
-    if not flingAnimationId then
-        flingAnimationId = extrairAnimationId(FLING_ANIMATION_ASSET_ID)
-    end
-    if flingAnimationId then
-        if flingAnimConnection then flingAnimConnection:Disconnect() end
-        flingAnimConnection = criarLoopAnimacao(humanoid, flingAnimationId,
-            function(t) flingAnimationTrack = t end,
-            function() return flingRodandoAgora end
-        )
-    end
 end
 
 function desativarFlingBall()
