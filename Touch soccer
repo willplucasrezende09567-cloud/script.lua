@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v59) - CUSTOMIZADO
--- Head Fling: fix de rotação pós-desativação (para de girar no ar)
+-- DELTA HUB - FUTEBOL (UI MOBILE v60) - CUSTOMIZADO
+-- Head Fling: colado no alvo (frente quando anda, dentro quando parado)
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
@@ -24,10 +24,10 @@ local WALL_PHASE_ALTURA = 10
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
 -- 🔥 Head Fling
-local HEAD_FLING_PROFUNDIDADE = -1
-local HEAD_FLING_FRENTE = 2
+local HEAD_FLING_PROFUNDIDADE = -2
+local HEAD_FLING_FRENTE = 1.5
 local HEAD_FLING_INCLINACAO = 90
-local HEAD_FLING_ANGULAR = 1500
+local HEAD_FLING_ANGULAR = 500
 local HEAD_FLING_ALIGN_FORCE = 1e5
 local HEAD_FLING_ALIGN_TORQUE = 1e5
 local HEAD_FLING_RECUPERAR_DIST = 10
@@ -41,7 +41,7 @@ local HEAD_FLING_Y_MINIMO = 5
 local HEAD_FLING_Y_DIF_MAX = 3
 
 -- 🛑 Anti-giro pós-desativação
-local HEAD_FLING_ZERAR_DURACAO = 0.5 -- segundos que continua zerando rotação
+local HEAD_FLING_ZERAR_DURACAO = 0.5
 
 -- 🛡️ Anti-dumping / Team
 local TEAM_CHECK_INTERVAL = 0.5
@@ -80,7 +80,7 @@ local headFlingAlvoMorreuConn = nil
 
 local headFlingFramesVoo = 0
 local headFlingFramesSubida = 0
-local headFlingZerarAte = 0 -- 🛑 timestamp até quando zerar rotação
+local headFlingZerarAte = 0
 
 -- 🌀 Constraints
 local headFlingAlignPos = nil
@@ -585,12 +585,11 @@ player.CharacterAdded:Connect(function()
 end)
 
 -- =======================================================
--- 🛑 LOOP ANTI-GIRO (zera rotação até o timer passar)
+-- 🛑 LOOP ANTI-GIRO
 -- =======================================================
 task.spawn(function()
     while true do
-        task.wait(0.03) -- ~33fps
-
+        task.wait(0.03)
         if headFlingZerarAte > 0 and tick() < headFlingZerarAte then
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -837,7 +836,6 @@ local function pausarHeadFlingAgora()
         end
     end
 
-    -- 🛑 ZERA ROTAÇÃO E MARCA TIMER
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
         hrp.AssemblyAngularVelocity = Vector3.zero
@@ -907,9 +905,7 @@ function desativarHeadFling()
         headFlingConnection:Disconnect()
         headFlingConnection = nil
     end
-
     headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
-
     pararMeuMovimento()
     atualizarVisualHeadFling(false)
 end
@@ -1089,7 +1085,6 @@ local function ativarHeadFling()
             headFlingAlignPos.Responsiveness = 200
         end
 
-        -- 🎯 Orientação (fix gimbal lock quando parado)
         local flatDir
         if velFlat.Magnitude > 1 then
             flatDir = velFlat.Unit
