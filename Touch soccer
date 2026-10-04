@@ -10,7 +10,7 @@ local SCRIPT_URL = "https://pastefy.app/DLqzNTI2/raw"
 local LOAD_CMD = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
 
 -- 1) Carrega o script original
-loadstring(game:HttpGet(SCRIPT_URL))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20script"))()
 
 -- 2) Se o executor suportar, agenda o script para re-executar no próximo servidor
 if type(queue_on_teleport) == "function" then
