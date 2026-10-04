@@ -1,14 +1,15 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v62) - CUSTOMIZADO
--- + Auto-Rejoin (autorj) quando kick ou sair
+-- DELTA HUB - FUTEBOL (UI MOBILE v68) - DESIGN FUTURISTA
+-- + Fix: bolha suave + canto da tela + restaura posição original
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
 
--- ⚙️ CONFIGURAÇÃO ⚙️
+-- ⚙️ CONFIGURAÇÃO ⚙️ (mutável via painel de config)
 local alturaFixa = 7
 local inclinacaoX = 35
 local WALK_SPEED = 64
@@ -21,7 +22,7 @@ local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 11
+local WALL_PHASE_ALTURA = 10,5
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
 -- 🔥 Head Fling
@@ -34,165 +35,79 @@ local HEAD_FLING_ALIGN_TORQUE = 1e5
 local HEAD_FLING_RECUPERAR_DIST = 10
 local HEAD_FLING_SEGUIR_VEL = 15
 
--- 🛡️ Anti-kick / Anti-voo
+-- 🛡️ Anti-kick
 local HEAD_FLING_VEL_LIMITE = 60
 local HEAD_FLING_VOOU_LIMITE = 30
 local HEAD_FLING_SUBIDA_LIMITE = 30
 local HEAD_FLING_Y_MINIMO = 5
 local HEAD_FLING_Y_DIF_MAX = 3
-
--- 🛑 Anti-giro pós-desativação
 local HEAD_FLING_ZERAR_DURACAO = 0.5
 
--- 🛡️ Anti-dumping / Team
+-- 🛡️ Anti-dumping
 local TEAM_CHECK_INTERVAL = 0.5
 local TEAM_WAIT_TIMEOUT = 3
 
--- 🔄 Auto-Rejoin (autorj)
-local AUTO_REJOIN_ATIVADO = true
-local AUTO_REJOIN_DELAY = 1        -- segundos de espera antes de rejoin
-local AUTO_REJOIN_TENTATIVAS = 5   -- tentativas máximas
-
--- 🥅 Posições dos Gols
+-- 🥅 Gols
 local GOALS = {
     [1] = { nome = "Goal A", pos = Vector3.new(-316.8, 12.7, 92.8) },
     [2] = { nome = "Goal B", pos = Vector3.new(-112.2, 12.7, 92.6) },
 }
--- ⚙️ ⚙️ ⚙️ ⚙️ ⚙️ ⚙️
 
 -- =======================================================
--- 🔄 AUTO-REJOIN (autorj estilo Infinity Yield)
+-- 🎨 PALETA DE CORES
 -- =======================================================
-local REJOIN_PLACE_ID = game.PlaceId
-local REJOIN_JOB_ID = game.JobId
-local rejoinJaDisparou = false
+local C = {
+    bg = Color3.fromRGB(12, 12, 22),
+    bgAlt = Color3.fromRGB(18, 18, 32),
+    card = Color3.fromRGB(24, 24, 42),
+    cardHover = Color3.fromRGB(32, 32, 55),
+    accent = Color3.fromRGB(0, 220, 255),
+    accentAlt = Color3.fromRGB(160, 60, 255),
+    success = Color3.fromRGB(0, 220, 120),
+    danger = Color3.fromRGB(255, 70, 100),
+    warning = Color3.fromRGB(255, 180, 40),
+    text = Color3.fromRGB(240, 240, 250),
+    textDim = Color3.fromRGB(140, 140, 165),
+    border = Color3.fromRGB(60, 60, 90),
+}
 
-local function tentarRejoin(motivo)
-    if not AUTO_REJOIN_ATIVADO then return end
-    if rejoinJaDisparou then return end
-    rejoinJaDisparou = true
-
-    print("🔄 [autorj] Detectado:", motivo, "— tentando reconectar...")
-
-    task.spawn(function()
-        for tentativa = 1, AUTO_REJOIN_TENTATIVAS do
-            task.wait(AUTO_REJOIN_DELAY)
-            local sucesso = pcall(function()
-                TeleportService:TeleportToPlaceInstance(REJOIN_PLACE_ID, REJOIN_JOB_ID, player)
-            end)
-            if sucesso then
-                print("✅ [autorj] Rejoin enviado! Tentativa", tentativa)
-                break
-            else
-                warn("⚠️ [autorj] Tentativa", tentativa, "falhou, tentando de novo...")
-            end
-        end
-    end)
+-- =======================================================
+-- 🔧 HELPERS DE UI
+-- =======================================================
+local function tween(obj, time, props, style, dir)
+    local info = TweenInfo.new(time, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
 end
 
-if AUTO_REJOIN_ATIVADO then
-    -- 🎯 Detecta kick via mudança de parent do LocalPlayer
-    task.spawn(function()
-        while true do
-            task.wait(0.1)
-            if not player or not player.Parent then
-                tentarRejoin("player saiu / kick (AncestryChanged)")
-                break
-            end
-        end
-    end)
+local function addCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 10)
+    c.Parent = parent
+    return c
+end
 
-    -- 🎯 Detecta kick via PlayerRemoving (quando o servidor te remove)
-    Players.PlayerRemoving:Connect(function(plr)
-        if plr == player then
-            tentarRejoin("PlayerRemoving (kick do servidor)")
-        end
-    end)
+local function addStroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or C.border
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent
+    return s
+end
 
-    -- 🎯 Detecta fechamento do jogo (game.OnClose)
-    game.OnClose = function()
-        tentarRejoin("game.OnClose (servidor fechando)")
-    end
+local function addGradient(parent, colors, rotation)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new(colors)
+    g.Rotation = rotation or 90
+    g.Parent = parent
+    return g
 end
 
 -- =======================================================
--- Variáveis de Estado
--- =======================================================
-local seguirBolaAtivado = false
-local bolaAlvo = nil
-local speedLoopAtivo = false
-local golSelecionado = 0
-local flingBallAtivado = false
-local flingRodandoAgora = false
-local flingConnection = nil
-local flingAngle = 0
-local originalCanCollide = {}
-
-local wallPhaseAtivado = false
-local wallPhaseRodandoAgora = false
-local wallPhaseConnection = nil
-local wallPhaseAnimationTrack = nil
-local wallPhaseAnimationId = nil
-local wallPhaseAnimConnection = nil
-
-local headFlingAtivado = false
-local headFlingRodandoAgora = false
-local headFlingAlvo = nil
-local headFlingConnection = nil
-local headFlingAlvoMorreuConn = nil
-
-local headFlingFramesVoo = 0
-local headFlingFramesSubida = 0
-local headFlingZerarAte = 0
-
--- 🌀 Constraints
-local headFlingAlignPos = nil
-local headFlingAlignOri = nil
-local headFlingAngVel = nil
-local headFlingAttachment = nil
-
--- 👁️ Spectate
-local SPECTATE_ATIVADO = true
-local spectateOriginalSubject = nil
-local spectateOriginalType = nil
-
--- =======================================================
--- 👁️ SPECTATE
--- =======================================================
-local function iniciarSpectate(alvoPlayer)
-    if not SPECTATE_ATIVADO then return end
-    if not alvoPlayer or not alvoPlayer.Character then return end
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local humanoid = alvoPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-    if not spectateOriginalSubject then
-        spectateOriginalSubject = camera.CameraSubject
-        spectateOriginalType = camera.CameraType
-    end
-    camera.CameraSubject = humanoid
-    camera.CameraType = Enum.CameraType.Custom
-end
-
-local function pararSpectate()
-    if not SPECTATE_ATIVADO then return end
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local meuHumanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    if meuHumanoid then
-        camera.CameraSubject = meuHumanoid
-    elseif spectateOriginalSubject then
-        camera.CameraSubject = spectateOriginalSubject
-    end
-    if spectateOriginalType then
-        camera.CameraType = spectateOriginalType
-    end
-    spectateOriginalSubject = nil
-    spectateOriginalType = nil
-end
-
--- =======================================================
--- 🛑 ZERA VELOCIDADE
+-- 🛑 FUNÇÕES UTILITÁRIAS
 -- =======================================================
 local function pararMeuMovimento()
     local char = player.Character
@@ -242,12 +157,10 @@ local function extrairAnimationId(assetId)
         return nil
     end)
     if sucesso and resultado then
-        print("✅ AnimationId extraído:", resultado)
+        print("✅ AnimationId:", resultado)
         return resultado
-    else
-        warn("❌ Falha ao extrair AnimationId:", assetId)
-        return nil
     end
+    return nil
 end
 
 local function criarLoopAnimacao(humanoid, animationId, setTrackCallback, isStillActiveFn)
@@ -258,7 +171,6 @@ local function criarLoopAnimacao(humanoid, animationId, setTrackCallback, isStil
     track.Priority = Enum.AnimationPriority.Action4
     track:Play()
     setTrackCallback(track)
-
     local conn = track.Stopped:Connect(function()
         if not isStillActiveFn or not isStillActiveFn() then return end
         task.wait(0.05)
@@ -279,7 +191,7 @@ local function criarLoopAnimacao(humanoid, animationId, setTrackCallback, isStil
 end
 
 -- =======================================================
--- 🛡️ ANTI-DUMPING / TEAM
+-- 🛡️ TEAM / ANTI-DUMPING
 -- =======================================================
 local transparentFrameCache = nil
 
@@ -301,21 +213,15 @@ local function encontrarTransparentFrame()
     if transparentFrameCache and transparentFrameCache.Parent and transparentFrameCache:IsDescendantOf(workspace) then
         return transparentFrameCache
     end
-    local joinPortal = workspace:FindFirstChild("JoinPortal")
-    if joinPortal then
-        local frame = joinPortal:FindFirstChild("TransparentFrame")
-        if frame and frame:IsA("BasePart") then
-            transparentFrameCache = frame
-            return frame
-        end
+    local jp = workspace:FindFirstChild("JoinPortal")
+    if jp then
+        local f = jp:FindFirstChild("TransparentFrame")
+        if f and f:IsA("BasePart") then transparentFrameCache = f; return f end
     end
-    local newTouch = workspace:FindFirstChild("PortalNewTouchFootball")
-    if newTouch then
-        local frame = newTouch:FindFirstChild("TransparentFrame")
-        if frame and frame:IsA("BasePart") then
-            transparentFrameCache = frame
-            return frame
-        end
+    local nt = workspace:FindFirstChild("PortalNewTouchFootball")
+    if nt then
+        local f = nt:FindFirstChild("TransparentFrame")
+        if f and f:IsA("BasePart") then transparentFrameCache = f; return f end
     end
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj.Name == "TransparentFrame" and obj:IsA("BasePart") then
@@ -333,9 +239,9 @@ local function teleportarProTransparentFrame()
     if not hrp then return end
     local frame = encontrarTransparentFrame()
     if not frame then return end
-    local targetPos = frame.Position + Vector3.new(0, 3, 0)
-    if not posicaoValida(targetPos) then return end
-    hrp.CFrame = CFrame.new(targetPos)
+    local tp = frame.Position + Vector3.new(0, 3, 0)
+    if not posicaoValida(tp) then return end
+    hrp.CFrame = CFrame.new(tp)
     pararMeuMovimento()
 end
 
@@ -353,68 +259,682 @@ local function garantirTeam(continuar)
 end
 
 -- =======================================================
--- CRIAÇÃO DA UI
+-- 🔄 AUTO-REJOIN
+-- =======================================================
+local REJOIN_PLACE_ID = game.PlaceId
+local REJOIN_JOB_ID = game.JobId
+local rejoinJaDisparou = false
+local SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer"
+local LOAD_CMD = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
+
+if type(queue_on_teleport) == "function" then
+    pcall(function() queue_on_teleport(LOAD_CMD) end)
+    print("✅ [autorj] Queue OK")
+end
+
+local function rejoin()
+    if rejoinJaDisparou then return end
+    rejoinJaDisparou = true
+    print("🔄 [autorj] REJOIN!")
+    if type(queue_on_teleport) == "function" then
+        pcall(function() queue_on_teleport(LOAD_CMD) end)
+    end
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(REJOIN_PLACE_ID, REJOIN_JOB_ID, player)
+    end)
+end
+
+if hookfunction and newcclosure then
+    local oldPrint = print
+    print = newcclosure(function(...)
+        local args = {...}
+        local msg = ""
+        for _, v in ipairs(args) do msg = msg .. tostring(v) .. " " end
+        if string.find(msg, "Server Kick Message") or string.find(msg, "kicked due to") then
+            rejoin()
+        end
+        return oldPrint(...)
+    end)
+    print("✅ [autorj] Hook print")
+end
+
+if hookmetamethod and getnamecallmethod then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local m = getnamecallmethod()
+        if m == "Kick" or m == "kick" then rejoin() end
+        return oldNamecall(self, ...)
+    end)
+    print("✅ [autorj] Hook namecall")
+end
+
+player.AncestryChanged:Connect(function()
+    if not player.Parent then rejoin() end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if p == player then rejoin() end
+end)
+
+-- =======================================================
+-- 📦 VARIÁVEIS DE ESTADO
+-- =======================================================
+local seguirBolaAtivado = false
+local bolaAlvo = nil
+local speedLoopAtivo = false
+local golSelecionado = 0
+local flingBallAtivado = false
+local flingRodandoAgora = false
+local flingConnection = nil
+local flingAngle = 0
+local originalCanCollide = {}
+
+local wallPhaseAtivado = false
+local wallPhaseRodandoAgora = false
+local wallPhaseConnection = nil
+local wallPhaseAnimationTrack = nil
+local wallPhaseAnimationId = nil
+local wallPhaseAnimConnection = nil
+
+local headFlingAtivado = false
+local headFlingRodandoAgora = false
+local headFlingAlvo = nil
+local headFlingConnection = nil
+local headFlingAlvoMorreuConn = nil
+local headFlingFramesVoo = 0
+local headFlingFramesSubida = 0
+local headFlingZerarAte = 0
+local headFlingAlignPos = nil
+local headFlingAlignOri = nil
+local headFlingAngVel = nil
+local headFlingAttachment = nil
+
+local SPECTATE_ATIVADO = true
+local spectateOriginalSubject = nil
+local spectateOriginalType = nil
+
+-- =======================================================
+-- 👁️ SPECTATE
+-- =======================================================
+local function iniciarSpectate(alvoPlayer)
+    if not SPECTATE_ATIVADO then return end
+    if not alvoPlayer or not alvoPlayer.Character then return end
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local humanoid = alvoPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    if not spectateOriginalSubject then
+        spectateOriginalSubject = camera.CameraSubject
+        spectateOriginalType = camera.CameraType
+    end
+    camera.CameraSubject = humanoid
+    camera.CameraType = Enum.CameraType.Custom
+end
+
+local function pararSpectate()
+    if not SPECTATE_ATIVADO then return end
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local meuHumanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if meuHumanoid then
+        camera.CameraSubject = meuHumanoid
+    elseif spectateOriginalSubject then
+        camera.CameraSubject = spectateOriginalSubject
+    end
+    if spectateOriginalType then
+        camera.CameraType = spectateOriginalType
+    end
+    spectateOriginalSubject = nil
+    spectateOriginalType = nil
+end
+
+-- =======================================================
+-- 🎨 UI - CRIAÇÃO
 -- =======================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DeltaMobileHub"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+-- ═══ FRAME PRINCIPAL ═══
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 340)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -170)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BackgroundTransparency = 0.1
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -200)
+MainFrame.BackgroundColor3 = C.bg
+MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
+addCorner(MainFrame, 16)
+addGradient(MainFrame, {
+    ColorSequenceKeypoint.new(0, C.bg),
+    ColorSequenceKeypoint.new(1, C.bgAlt)
+}, 135)
+local MainStroke = addStroke(MainFrame, C.accent, 1.5, 0.2)
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = MainFrame
+local GlowFrame = Instance.new("Frame")
+GlowFrame.Name = "Glow"
+GlowFrame.Size = UDim2.new(1, 8, 1, 8)
+GlowFrame.Position = UDim2.new(0, -4, 0, -4)
+GlowFrame.BackgroundColor3 = C.accent
+GlowFrame.BackgroundTransparency = 0.85
+GlowFrame.BorderSizePixel = 0
+GlowFrame.ZIndex = -1
+GlowFrame.Parent = MainFrame
+addCorner(GlowFrame, 20)
 
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(0, 255, 255)
-MainStroke.Thickness = 1.5
-MainStroke.Parent = MainFrame
-
-local MainGradient = Instance.new("UIGradient")
-MainGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 15)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 35))
-}
-MainGradient.Rotation = 45
-MainGradient.Parent = MainFrame
-
+-- ═══ TITLE BAR ═══
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 35)
-TitleBar.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-TitleBar.BackgroundTransparency = 0.8
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = C.accent
+TitleBar.BackgroundTransparency = 0.88
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
+addCorner(TitleBar, 16)
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = TitleBar
+local TitleCorner2 = Instance.new("Frame")
+TitleCorner2.Size = UDim2.new(1, 0, 0, 20)
+TitleCorner2.Position = UDim2.new(0, 0, 1, -20)
+TitleCorner2.BackgroundColor3 = C.accent
+TitleCorner2.BackgroundTransparency = 0.88
+TitleCorner2.BorderSizePixel = 0
+TitleCorner2.Parent = TitleBar
+
+addGradient(TitleBar, {
+    ColorSequenceKeypoint.new(0, C.accent),
+    ColorSequenceKeypoint.new(1, C.accentAlt)
+}, 90)
+
+local LogoIcon = Instance.new("TextLabel")
+LogoIcon.Size = UDim2.new(0, 30, 0, 30)
+LogoIcon.Position = UDim2.new(0, 8, 0, 5)
+LogoIcon.BackgroundTransparency = 1
+LogoIcon.Text = "◆"
+LogoIcon.TextColor3 = C.accent
+LogoIcon.TextSize = 22
+LogoIcon.Font = Enum.Font.GothamBold
+LogoIcon.Parent = TitleBar
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, 0, 1, 0)
+TitleText.Name = "TitleText"
+TitleText.Size = UDim2.new(1, -110, 1, 0)
+TitleText.Position = UDim2.new(0, 40, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "by: @willnzx.mt"
-TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Text = "DELTA HUB"
+TitleText.TextColor3 = C.text
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 14
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = TitleBar
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 2.5)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.Parent = TitleBar
+local function criarBtnTitulo(pos, texto, cor)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 28, 0, 28)
+    b.Position = pos
+    b.BackgroundColor3 = C.card
+    b.BackgroundTransparency = 0.5
+    b.BorderSizePixel = 0
+    b.Text = texto
+    b.TextColor3 = cor
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 16
+    b.AutoButtonColor = false
+    b.Parent = TitleBar
+    addCorner(b, 8)
+
+    b.MouseEnter:Connect(function()
+        tween(b, 0.15, { BackgroundTransparency = 0.1, BackgroundColor3 = cor, TextColor3 = C.bg })
+    end)
+    b.MouseLeave:Connect(function()
+        tween(b, 0.15, { BackgroundTransparency = 0.5, BackgroundColor3 = C.card, TextColor3 = cor })
+    end)
+    return b
+end
+
+local MinimizeBtn = criarBtnTitulo(UDim2.new(1, -105, 0, 6), "—", C.warning)
+local ConfigBtn = criarBtnTitulo(UDim2.new(1, -73, 0, 6), "⚙", C.accent)
+local CloseBtn = criarBtnTitulo(UDim2.new(1, -41, 0, 6), "×", C.danger)
+CloseBtn.TextSize = 20
+
+-- ═══════════════════════════════════════════════════════
+-- 📄 ABA 1: PRINCIPAL
+-- ═══════════════════════════════════════════════════════
+local Content = Instance.new("Frame")
+Content.Name = "ContentMain"
+Content.Size = UDim2.new(1, -20, 1, -50)
+Content.Position = UDim2.new(0, 10, 0, 45)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local function criarBtnMain(pos, size, texto)
+    local b = Instance.new("TextButton")
+    b.Size = size
+    b.Position = pos
+    b.BackgroundColor3 = C.card
+    b.BorderSizePixel = 0
+    b.Text = texto
+    b.TextColor3 = C.textDim
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    b.AutoButtonColor = false
+    b.Parent = Content
+    addCorner(b, 10)
+    local s = addStroke(b, C.border, 1, 0.3)
+
+    local sizeBase = size
+
+    b.MouseEnter:Connect(function()
+        tween(b, 0.15, { BackgroundColor3 = C.cardHover })
+        tween(s, 0.15, { Color = C.accent })
+    end)
+    b.MouseLeave:Connect(function()
+        if not b:GetAttribute("ativo") then
+            tween(b, 0.15, { BackgroundColor3 = C.card })
+            tween(s, 0.15, { Color = C.border })
+        end
+        tween(b, 0.1, { Size = sizeBase })
+    end)
+
+    b.MouseButton1Down:Connect(function()
+        tween(b, 0.08, {
+            Size = UDim2.new(sizeBase.X.Scale * 0.97, sizeBase.X.Offset, sizeBase.Y.Scale, sizeBase.Y.Offset)
+        })
+    end)
+    b.MouseButton1Up:Connect(function()
+        tween(b, 0.1, { Size = sizeBase })
+    end)
+
+    return b, s
+end
+
+local btnMain, btnMainStroke = criarBtnMain(UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 42), "SKILL")
+local btnGoalA, goalAStroke = criarBtnMain(UDim2.new(0, 0, 0, 52), UDim2.new(0.48, 0, 0, 34), "Goal A")
+local btnGoalB, goalBStroke = criarBtnMain(UDim2.new(0.52, 0, 0, 52), UDim2.new(0.48, 0, 0, 34), "Goal B")
+local btnFling, flingStroke = criarBtnMain(UDim2.new(0, 0, 0, 96), UDim2.new(1, 0, 0, 42), "FLING BALL")
+local btnWallPhase, wallStroke = criarBtnMain(UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 42), "WALL PHASE")
+local btnHeadFling, headFlingStroke = criarBtnMain(UDim2.new(0, 0, 0, 196), UDim2.new(1, 0, 0, 42), "HEAD FLING")
+
+local txtAlvo = Instance.new("TextBox")
+txtAlvo.Size = UDim2.new(1, 0, 0, 36)
+txtAlvo.Position = UDim2.new(0, 0, 0, 246)
+txtAlvo.BackgroundColor3 = C.bgAlt
+txtAlvo.BorderSizePixel = 0
+txtAlvo.Text = ""
+txtAlvo.PlaceholderText = "🎯 Nome do alvo (1 letra basta)"
+txtAlvo.PlaceholderColor3 = C.textDim
+txtAlvo.TextColor3 = C.text
+txtAlvo.Font = Enum.Font.GothamMedium
+txtAlvo.TextSize = 12
+txtAlvo.ClearTextOnFocus = false
+txtAlvo.Parent = Content
+addCorner(txtAlvo, 10)
+local txtStroke = addStroke(txtAlvo, C.border, 1, 0.3)
+
+local txtPad = Instance.new("UIPadding")
+txtPad.PaddingLeft = UDim.new(0, 12)
+txtPad.PaddingRight = UDim.new(0, 12)
+txtPad.Parent = txtAlvo
+
+local btnConfigRodape = Instance.new("TextButton")
+btnConfigRodape.Size = UDim2.new(1, 0, 0, 30)
+btnConfigRodape.Position = UDim2.new(0, 0, 0, 292)
+btnConfigRodape.BackgroundColor3 = C.bgAlt
+btnConfigRodape.BackgroundTransparency = 0.3
+btnConfigRodape.BorderSizePixel = 0
+btnConfigRodape.Text = "⚙  ABRIR CONFIGURAÇÕES"
+btnConfigRodape.TextColor3 = C.accent
+btnConfigRodape.Font = Enum.Font.GothamBold
+btnConfigRodape.TextSize = 11
+btnConfigRodape.AutoButtonColor = false
+btnConfigRodape.Parent = Content
+addCorner(btnConfigRodape, 8)
+local btnCfgStroke = addStroke(btnConfigRodape, C.accent, 1, 0.5)
+
+btnConfigRodape.MouseEnter:Connect(function()
+    tween(btnConfigRodape, 0.15, { BackgroundTransparency = 0.05 })
+    tween(btnCfgStroke, 0.15, { Transparency = 0 })
+end)
+btnConfigRodape.MouseLeave:Connect(function()
+    tween(btnConfigRodape, 0.15, { BackgroundTransparency = 0.3 })
+    tween(btnCfgStroke, 0.15, { Transparency = 0.5 })
+end)
+
+local VersionLabel = Instance.new("TextLabel")
+VersionLabel.Size = UDim2.new(1, 0, 0, 18)
+VersionLabel.Position = UDim2.new(0, 0, 1, -4)
+VersionLabel.BackgroundTransparency = 1
+VersionLabel.Text = "v68 • by @willnzx.mt"
+VersionLabel.TextColor3 = C.textDim
+VersionLabel.Font = Enum.Font.Gotham
+VersionLabel.TextSize = 10
+VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
+VersionLabel.Parent = Content
+
+-- ═══════════════════════════════════════════════════════
+-- ⚙️ ABA 2: CONFIGURAÇÕES
+-- ═══════════════════════════════════════════════════════
+local ConfigContent = Instance.new("Frame")
+ConfigContent.Name = "ContentConfig"
+ConfigContent.Size = UDim2.new(1, -20, 1, -50)
+ConfigContent.Position = UDim2.new(0, 10, 0, 45)
+ConfigContent.BackgroundTransparency = 1
+ConfigContent.Visible = false
+ConfigContent.Parent = MainFrame
+
+local CfgHeader = Instance.new("Frame")
+CfgHeader.Size = UDim2.new(1, 0, 0, 30)
+CfgHeader.BackgroundColor3 = C.accentAlt
+CfgHeader.BackgroundTransparency = 0.8
+CfgHeader.BorderSizePixel = 0
+CfgHeader.Parent = ConfigContent
+addCorner(CfgHeader, 8)
+
+local CfgHeaderLabel = Instance.new("TextLabel")
+CfgHeaderLabel.Size = UDim2.new(1, -60, 1, 0)
+CfgHeaderLabel.Position = UDim2.new(0, 12, 0, 0)
+CfgHeaderLabel.BackgroundTransparency = 1
+CfgHeaderLabel.Text = "CONFIGURAÇÕES"
+CfgHeaderLabel.TextColor3 = C.text
+CfgHeaderLabel.Font = Enum.Font.GothamBold
+CfgHeaderLabel.TextSize = 12
+CfgHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+CfgHeaderLabel.Parent = CfgHeader
+
+local btnVoltar = Instance.new("TextButton")
+btnVoltar.Size = UDim2.new(0, 24, 0, 24)
+btnVoltar.Position = UDim2.new(1, -30, 0, 3)
+btnVoltar.BackgroundColor3 = C.card
+btnVoltar.BackgroundTransparency = 0.4
+btnVoltar.BorderSizePixel = 0
+btnVoltar.Text = "←"
+btnVoltar.TextColor3 = C.accent
+btnVoltar.Font = Enum.Font.GothamBold
+btnVoltar.TextSize = 14
+btnVoltar.AutoButtonColor = false
+btnVoltar.Parent = CfgHeader
+addCorner(btnVoltar, 6)
+
+btnVoltar.MouseEnter:Connect(function()
+    tween(btnVoltar, 0.15, { BackgroundTransparency = 0.1, BackgroundColor3 = C.accent, TextColor3 = C.bg })
+end)
+btnVoltar.MouseLeave:Connect(function()
+    tween(btnVoltar, 0.15, { BackgroundTransparency = 0.4, BackgroundColor3 = C.card, TextColor3 = C.accent })
+end)
+
+local CfgScroll = Instance.new("ScrollingFrame")
+CfgScroll.Size = UDim2.new(1, 0, 1, -40)
+CfgScroll.Position = UDim2.new(0, 0, 0, 38)
+CfgScroll.BackgroundTransparency = 1
+CfgScroll.BorderSizePixel = 0
+CfgScroll.ScrollBarThickness = 4
+CfgScroll.ScrollBarImageColor3 = C.accent
+CfgScroll.CanvasSize = UDim2.new(0, 0, 0, 1000)
+CfgScroll.Parent = ConfigContent
+
+local CfgLayout = Instance.new("UIListLayout")
+CfgLayout.Padding = UDim.new(0, 6)
+CfgLayout.SortOrder = Enum.SortOrder.LayoutOrder
+CfgLayout.Parent = CfgScroll
+
+local CfgPad = Instance.new("UIPadding")
+CfgPad.PaddingLeft = UDim.new(0, 2)
+CfgPad.PaddingRight = UDim.new(0, 6)
+CfgPad.Parent = CfgScroll
+
+local function criarConfigInput(nome, valorInicial, callback, step, min, max)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1, 0, 0, 42)
+    holder.BackgroundColor3 = C.card
+    holder.BackgroundTransparency = 0.3
+    holder.BorderSizePixel = 0
+    holder.Parent = CfgScroll
+    addCorner(holder, 8)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 0, 18)
+    label.Position = UDim2.new(0, 10, 0, 4)
+    label.BackgroundTransparency = 1
+    label.Text = nome
+    label.TextColor3 = C.text
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0.35, 0, 0, 18)
+    valueLabel.Position = UDim2.new(0.6, 0, 0, 4)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(valorInicial)
+    valueLabel.TextColor3 = C.accent
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextSize = 11
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.Parent = holder
+
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -20, 0, 6)
+    sliderBg.Position = UDim2.new(0, 10, 0, 28)
+    sliderBg.BackgroundColor3 = C.bgAlt
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = holder
+    addCorner(sliderBg, 3)
+
+    local pct = math.clamp((valorInicial - min) / (max - min), 0, 1)
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(pct, 0, 1, 0)
+    sliderFill.BackgroundColor3 = C.accent
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    addCorner(sliderFill, 3)
+
+    local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+    sliderBtn.Position = UDim2.new(pct, -6, 0.5, -6)
+    sliderBtn.BackgroundColor3 = C.text
+    sliderBtn.BorderSizePixel = 0
+    sliderBtn.Text = ""
+    sliderBtn.Parent = sliderBg
+    addCorner(sliderBtn, 6)
+
+    local dragging = false
+    local function updateSlider(input)
+        local relX = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local novoValor = math.floor((min + (max - min) * relX) / step + 0.5) * step
+        sliderFill.Size = UDim2.new(relX, 0, 1, 0)
+        sliderBtn.Position = UDim2.new(relX, -6, 0.5, -6)
+        valueLabel.Text = tostring(novoValor)
+        callback(novoValor)
+    end
+
+    sliderBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    sliderBtn.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            updateSlider(input)
+        end
+    end)
+    sliderBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    return holder
+end
+
+local cfgItems = {
+    { "Altura Fixa (Skill)", function() return alturaFixa end, function(v) alturaFixa = v end, 1, 1, 30 },
+    { "Inclinação (Skill)", function() return inclinacaoX end, function(v) inclinacaoX = v end, 1, 0, 90 },
+    { "WalkSpeed", function() return WALK_SPEED end, function(v) WALK_SPEED = v end, 1, 16, 300 },
+    { "Fling Raio", function() return FLING_RAIO end, function(v) FLING_RAIO = v end, 0.1, 0.5, 10 },
+    { "Fling Velocidade", function() return FLING_VELOCIDADE end, function(v) FLING_VELOCIDADE = v end, 10, 50, 800 },
+    { "Fling Força", function() return FLING_FORCA end, function(v) FLING_FORCA = v end, 10, 100, 2000 },
+    { "Fling Altura", function() return FLING_ALTURA end, function(v) FLING_ALTURA = v end, 0.5, 0, 10 },
+    { "Wall Phase Altura", function() return WALL_PHASE_ALTURA end, function(v) WALL_PHASE_ALTURA = v end, 1, 5, 50 },
+    { "Head Fling Profundidade", function() return HEAD_FLING_PROFUNDIDADE end, function(v) HEAD_FLING_PROFUNDIDADE = v end, 0.5, -10, 5 },
+    { "Head Fling Frente", function() return HEAD_FLING_FRENTE end, function(v) HEAD_FLING_FRENTE = v end, 0.5, 0, 10 },
+    { "Head Fling Inclinação", function() return HEAD_FLING_INCLINACAO end, function(v) HEAD_FLING_INCLINACAO = v end, 5, -90, 90 },
+    { "Head Fling Spin", function() return HEAD_FLING_ANGULAR end, function(v) HEAD_FLING_ANGULAR = v end, 50, 100, 3000 },
+    { "Head Fling Seguir Vel", function() return HEAD_FLING_SEGUIR_VEL end, function(v) HEAD_FLING_SEGUIR_VEL = v end, 1, 5, 50 },
+    { "Head Fling Recup Dist", function() return HEAD_FLING_RECUPERAR_DIST end, function(v) HEAD_FLING_RECUPERAR_DIST = v end, 1, 5, 30 },
+}
+
+for _, item in ipairs(cfgItems) do
+    criarConfigInput(item[1], item[2](), item[3], item[4], item[5], item[6])
+end
+
+task.spawn(function()
+    task.wait(0.5)
+    CfgScroll.CanvasSize = UDim2.new(0, 0, 0, CfgLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- =======================================================
+-- 🫧 BOLHA MINIMIZADA (drag suave + corner fix)
+-- =======================================================
+local Bubble = Instance.new("TextButton")
+Bubble.Name = "Bubble"
+Bubble.Size = UDim2.new(0, 55, 0, 55)
+Bubble.Position = UDim2.new(0, 100, 0, 100)
+Bubble.BackgroundColor3 = C.bg
+Bubble.BorderSizePixel = 0
+Bubble.Text = "◆"
+Bubble.TextColor3 = C.accent
+Bubble.TextSize = 24
+Bubble.Font = Enum.Font.GothamBold
+Bubble.AutoButtonColor = false
+Bubble.Visible = false
+Bubble.Parent = ScreenGui
+addCorner(Bubble, 28)
+addStroke(Bubble, C.accent, 2, 0)
+addGradient(Bubble, {
+    ColorSequenceKeypoint.new(0, C.bg),
+    ColorSequenceKeypoint.new(1, C.bgAlt)
+}, 135)
+
+local BubbleGlow = Instance.new("Frame")
+BubbleGlow.Size = UDim2.new(1, 8, 1, 8)
+BubbleGlow.Position = UDim2.new(0, -4, 0, -4)
+BubbleGlow.BackgroundColor3 = C.accent
+BubbleGlow.BackgroundTransparency = 0.7
+BubbleGlow.BorderSizePixel = 0
+BubbleGlow.ZIndex = -1
+BubbleGlow.Parent = Bubble
+addCorner(BubbleGlow, 32)
+
+-- 🎯 DRAG SUAVE (UserInputService global - não solta)
+local bubbleDragging = false
+local bubbleDragStart = nil
+local bubbleStartPos = nil
+local bubbleMoved = false
+
+Bubble.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        bubbleDragging = true
+        bubbleMoved = false
+        bubbleDragStart = input.Position
+        bubbleStartPos = UDim2.new(0, Bubble.AbsolutePosition.X, 0, Bubble.AbsolutePosition.Y)
+    end
+end)
+
+-- 🎯 InputChanged GLOBAL - movimento em tempo real, sem drift
+userInputService.InputChanged:Connect(function(input)
+    if not bubbleDragging then return end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - bubbleDragStart
+        if math.abs(delta.X) > 3 or math.abs(delta.Y) > 3 then
+            bubbleMoved = true
+        end
+        -- Posição em Offset puro = segue o dedo exato
+        Bubble.Position = UDim2.new(0, bubbleStartPos.X.Offset + delta.X, 0, bubbleStartPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- 🎯 InputEnded GLOBAL - garante que sempre "solta"
+userInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if bubbleDragging then
+            bubbleDragging = false
+        end
+    end
+end)
+
+-- Animação pulse
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if Bubble.Visible then
+            tween(BubbleGlow, 0.75, { BackgroundTransparency = 0.95 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.75)
+            tween(BubbleGlow, 0.75, { BackgroundTransparency = 0.7 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        end
+    end
+end)
+
+-- =======================================================
+-- 🔄 SISTEMA DE ABAS (troca Main <-> Config)
+-- =======================================================
+local abaAtual = "main"
+
+local function trocarAba(novaAba)
+    if abaAtual == novaAba then return end
+    abaAtual = novaAba
+
+    if novaAba == "config" then
+        Content.Visible = false
+        ConfigContent.Visible = true
+        ConfigContent.Position = UDim2.new(0, 30, 0, 45)
+        tween(ConfigContent, 0.3, { Position = UDim2.new(0, 10, 0, 45) }, Enum.EasingStyle.Quart)
+
+        TitleText.Text = "⚙  CONFIG"
+        tween(TitleText, 0.2, { TextColor3 = C.accentAlt })
+        tween(ConfigBtn, 0.2, { BackgroundColor3 = C.accentAlt, TextColor3 = C.bg, BackgroundTransparency = 0.1 })
+    else
+        ConfigContent.Visible = false
+        Content.Visible = true
+        Content.Position = UDim2.new(0, 30, 0, 45)
+        tween(Content, 0.3, { Position = UDim2.new(0, 10, 0, 45) }, Enum.EasingStyle.Quart)
+
+        TitleText.Text = "DELTA HUB"
+        tween(TitleText, 0.2, { TextColor3 = C.text })
+        tween(ConfigBtn, 0.2, { BackgroundColor3 = C.card, TextColor3 = C.accent, BackgroundTransparency = 0.5 })
+    end
+end
+
+-- =======================================================
+-- 🎯 AÇÕES DA UI
+-- =======================================================
+-- 💾 Salva a posição antes de minimizar
+local posicaoGuardadaGUI = UDim2.new(0.5, -140, 0.5, -200)
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    -- Salva posição atual
+    posicaoGuardadaGUI = MainFrame.Position
+
+    -- Tween shrink
+    local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    local t = TweenService:Create(MainFrame, tweenInfo, { Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 })
+    t:Play()
+    t.Completed:Connect(function()
+        MainFrame.Visible = false
+
+        -- 🎯 Coloca bolha no CANTO SUPERIOR DIREITO da tela
+        local viewportSize = workspace.CurrentCamera.ViewportSize
+        Bubble.Position = UDim2.new(0, viewportSize.X - 75, 0, 100)
+
+        Bubble.Size = UDim2.new(0, 0, 0, 0)
+        Bubble.Visible = true
+        tween(Bubble, 0.3, { Size = UDim2.new(0, 55, 0, 55) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    end)
+end)
+
 CloseBtn.MouseButton1Click:Connect(function()
     if flingBallAtivado then desativarFlingBall() end
     if wallPhaseAtivado then desativarWallPhase() end
@@ -426,91 +946,107 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
-local dragging, dragInput, dragStart, startPos
-local function update(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
+ConfigBtn.MouseButton1Click:Connect(function()
+    if abaAtual == "main" then
+        trocarAba("config")
+    else
+        trocarAba("main")
+    end
+end)
+
+btnConfigRodape.MouseButton1Click:Connect(function()
+    trocarAba("config")
+end)
+
+btnVoltar.MouseButton1Click:Connect(function()
+    trocarAba("main")
+end)
+
+-- 🎯 Bubble click → restaura GUI na posição ORIGINAL
+Bubble.MouseButton1Click:Connect(function()
+    if not bubbleMoved then
+        Bubble.Visible = false
+        MainFrame.Visible = true
+        MainFrame.Size = UDim2.new(0, 280, 0, 400)
+        -- Restaura na posição salva
+        MainFrame.Position = posicaoGuardadaGUI
+        tween(MainFrame, 0.3, { BackgroundTransparency = 0.05 })
+    end
+end)
+
+-- Arrastar MainFrame
+local mfDrag = false
+local mfStart, mfStartPos
 TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
+        mfDrag = true
+        mfStart = input.Position
+        mfStartPos = MainFrame.Position
     end
 end)
 TitleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
+    if mfDrag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - mfStart
+        MainFrame.Position = UDim2.new(mfStartPos.X.Scale, mfStartPos.X.Offset + delta.X, mfStartPos.Y.Scale, mfStartPos.Y.Offset + delta.Y)
     end
 end)
-userInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then update(input) end
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mfDrag = false
+    end
 end)
 
-local function criarBotao(pos, size, texto)
-    local btn = Instance.new("TextButton")
-    btn.Size = size
-    btn.Position = pos
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    btn.BorderSizePixel = 0
-    btn.Text = texto
-    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
-    btn.Parent = MainFrame
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(80, 80, 80)
-    stroke.Thickness = 1
-    stroke.Parent = btn
-
-    return btn, corner, stroke
+-- =======================================================
+-- 🎨 VISUAL DOS BOTÕES
+-- =======================================================
+local function setBtnAtivo(btn, stroke, ativo, corAtiva)
+    if ativo then
+        btn:SetAttribute("ativo", true)
+        tween(btn, 0.2, { BackgroundColor3 = corAtiva, TextColor3 = C.bg })
+        tween(stroke, 0.2, { Color = corAtiva })
+    else
+        btn:SetAttribute("ativo", false)
+        tween(btn, 0.2, { BackgroundColor3 = C.card, TextColor3 = C.textDim })
+        tween(stroke, 0.2, { Color = C.border })
+    end
 end
 
-local btnMain, _, btnStroke = criarBotao(UDim2.new(0.5, -130, 0, 42), UDim2.new(0, 260, 0, 40), "skill [OFF]")
-local btnGoalA, _, goalAStroke = criarBotao(UDim2.new(0, 10, 0, 88), UDim2.new(0, 125, 0, 34), "Goal A")
-local btnGoalB, _, goalBStroke = criarBotao(UDim2.new(0, 145, 0, 88), UDim2.new(0, 125, 0, 34), "Goal B")
-local btnFling, _, flingStroke = criarBotao(UDim2.new(0.5, -130, 0, 130), UDim2.new(0, 260, 0, 40), "fling ball [OFF]")
-local btnWallPhase, _, wallPhaseStroke = criarBotao(UDim2.new(0.5, -130, 0, 174), UDim2.new(0, 260, 0, 40), "wall phase [OFF]")
-local btnHeadFling, _, headFlingStroke = criarBotao(UDim2.new(0.5, -130, 0, 218), UDim2.new(0, 260, 0, 40), "head fling [OFF]")
+local function atualizarBotoesGoal()
+    if golSelecionado == 1 then
+        btnGoalA.Text = "Goal A ✓"
+        setBtnAtivo(btnGoalA, goalAStroke, true, C.warning)
+        setBtnAtivo(btnGoalB, goalBStroke, false)
+    elseif golSelecionado == 2 then
+        btnGoalB.Text = "Goal B ✓"
+        setBtnAtivo(btnGoalB, goalBStroke, true, C.warning)
+        setBtnAtivo(btnGoalA, goalAStroke, false)
+    else
+        btnGoalA.Text = "Goal A"
+        btnGoalB.Text = "Goal B"
+        setBtnAtivo(btnGoalA, goalAStroke, false)
+        setBtnAtivo(btnGoalB, goalBStroke, false)
+    end
+end
 
-local txtAlvo = Instance.new("TextBox")
-txtAlvo.Size = UDim2.new(0, 260, 0, 34)
-txtAlvo.Position = UDim2.new(0.5, -130, 0, 264)
-txtAlvo.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-txtAlvo.BorderSizePixel = 0
-txtAlvo.Text = ""
-txtAlvo.PlaceholderText = "Nome do alvo (1 letra basta)"
-txtAlvo.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
-txtAlvo.TextColor3 = Color3.fromRGB(200, 200, 200)
-txtAlvo.Font = Enum.Font.GothamBold
-txtAlvo.TextSize = 12
-txtAlvo.ClearTextOnFocus = false
-txtAlvo.Parent = MainFrame
-
-local txtCorner = Instance.new("UICorner")
-txtCorner.CornerRadius = UDim.new(0, 8)
-txtCorner.Parent = txtAlvo
-
-local txtStroke = Instance.new("UIStroke")
-txtStroke.Color = Color3.fromRGB(80, 80, 80)
-txtStroke.Thickness = 1
-txtStroke.Parent = txtAlvo
-
-local txtPadding = Instance.new("UIPadding")
-txtPadding.PaddingLeft = UDim.new(0, 10)
-txtPadding.PaddingRight = UDim.new(0, 10)
-txtPadding.Parent = txtAlvo
+local function atualizarVisualFling(ativo)
+    btnFling.Text = ativo and "FLING BALL ✓" or "FLING BALL"
+    setBtnAtivo(btnFling, flingStroke, ativo, C.danger)
+end
+local function atualizarVisualWallPhase(ativo)
+    btnWallPhase.Text = ativo and "WALL PHASE ✓" or "WALL PHASE"
+    setBtnAtivo(btnWallPhase, wallStroke, ativo, C.accentAlt)
+end
+local function atualizarVisualHeadFling(ativo)
+    btnHeadFling.Text = ativo and "HEAD FLING ✓" or "HEAD FLING"
+    setBtnAtivo(btnHeadFling, headFlingStroke, ativo, C.warning)
+end
+local function atualizarVisualSkill(ativo)
+    btnMain.Text = ativo and "SKILL ✓" or "SKILL"
+    setBtnAtivo(btnMain, btnMainStroke, ativo, C.accent)
+end
 
 -- =======================================================
--- 🧠 DETECÇÃO DE ALVO
+-- 🎯 DETECÇÃO DE ALVO
 -- =======================================================
 local function buscarAlvoPorTexto(search)
     search = search:lower():gsub("^%s+", ""):gsub("%s+$", "")
@@ -532,19 +1068,19 @@ txtAlvo:GetPropertyChangedSignal("Text"):Connect(function()
     local texto = txtAlvo.Text
     if #texto == 0 then
         headFlingAlvo = nil
-        txtAlvo.TextColor3 = Color3.fromRGB(200, 200, 200)
-        txtStroke.Color = Color3.fromRGB(80, 80, 80)
+        txtAlvo.TextColor3 = C.text
+        tween(txtStroke, 0.15, { Color = C.border })
         return
     end
     local match = buscarAlvoPorTexto(texto)
     if match then
         headFlingAlvo = match
-        txtAlvo.TextColor3 = Color3.fromRGB(0, 255, 120)
-        txtStroke.Color = Color3.fromRGB(0, 255, 120)
+        txtAlvo.TextColor3 = C.success
+        tween(txtStroke, 0.15, { Color = C.success })
     else
         headFlingAlvo = nil
-        txtAlvo.TextColor3 = Color3.fromRGB(255, 80, 80)
-        txtStroke.Color = Color3.fromRGB(255, 80, 80)
+        txtAlvo.TextColor3 = C.danger
+        tween(txtStroke, 0.15, { Color = C.danger })
     end
 end)
 
@@ -553,77 +1089,7 @@ txtAlvo.FocusLost:Connect(function()
 end)
 
 -- =======================================================
--- VISUAL DOS BOTÕES
--- =======================================================
-local function atualizarBotoesGoal()
-    if golSelecionado == 1 then
-        btnGoalA.Text = "Goal A [ON]"
-        btnGoalA.TextColor3 = Color3.fromRGB(255, 200, 0)
-        goalAStroke.Color = Color3.fromRGB(255, 200, 0)
-        btnGoalA.BackgroundColor3 = Color3.fromRGB(100, 80, 0)
-    else
-        btnGoalA.Text = "Goal A"
-        btnGoalA.TextColor3 = Color3.fromRGB(150, 150, 150)
-        goalAStroke.Color = Color3.fromRGB(80, 80, 80)
-        btnGoalA.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-    if golSelecionado == 2 then
-        btnGoalB.Text = "Goal B [ON]"
-        btnGoalB.TextColor3 = Color3.fromRGB(255, 200, 0)
-        goalBStroke.Color = Color3.fromRGB(255, 200, 0)
-        btnGoalB.BackgroundColor3 = Color3.fromRGB(100, 80, 0)
-    else
-        btnGoalB.Text = "Goal B"
-        btnGoalB.TextColor3 = Color3.fromRGB(150, 150, 150)
-        goalBStroke.Color = Color3.fromRGB(80, 80, 80)
-        btnGoalB.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-end
-
-local function atualizarVisualFling(ativo)
-    if ativo then
-        btnFling.Text = "fling ball [ON]"
-        btnFling.TextColor3 = Color3.fromRGB(255, 80, 80)
-        flingStroke.Color = Color3.fromRGB(255, 80, 80)
-        btnFling.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-    else
-        btnFling.Text = "fling ball [OFF]"
-        btnFling.TextColor3 = Color3.fromRGB(150, 150, 150)
-        flingStroke.Color = Color3.fromRGB(80, 80, 80)
-        btnFling.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-end
-
-local function atualizarVisualWallPhase(ativo)
-    if ativo then
-        btnWallPhase.Text = "wall phase [ON]"
-        btnWallPhase.TextColor3 = Color3.fromRGB(180, 80, 255)
-        wallPhaseStroke.Color = Color3.fromRGB(180, 80, 255)
-        btnWallPhase.BackgroundColor3 = Color3.fromRGB(60, 0, 100)
-    else
-        btnWallPhase.Text = "wall phase [OFF]"
-        btnWallPhase.TextColor3 = Color3.fromRGB(150, 150, 150)
-        wallPhaseStroke.Color = Color3.fromRGB(80, 80, 80)
-        btnWallPhase.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-end
-
-local function atualizarVisualHeadFling(ativo)
-    if ativo then
-        btnHeadFling.Text = "head fling [ON]"
-        btnHeadFling.TextColor3 = Color3.fromRGB(255, 150, 0)
-        headFlingStroke.Color = Color3.fromRGB(255, 150, 0)
-        btnHeadFling.BackgroundColor3 = Color3.fromRGB(120, 60, 0)
-    else
-        btnHeadFling.Text = "head fling [OFF]"
-        btnHeadFling.TextColor3 = Color3.fromRGB(150, 150, 150)
-        headFlingStroke.Color = Color3.fromRGB(80, 80, 80)
-        btnHeadFling.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-end
-
--- =======================================================
--- SPEED LOOP
+-- 🏃 SPEED LOOP
 -- =======================================================
 local function aplicarSpeed()
     local char = player.Character
@@ -647,9 +1113,6 @@ player.CharacterAdded:Connect(function()
     if speedLoopAtivo then aplicarSpeed() end
 end)
 
--- =======================================================
--- 🛑 LOOP ANTI-GIRO
--- =======================================================
 task.spawn(function()
     while true do
         task.wait(0.03)
@@ -690,7 +1153,7 @@ local function bolaValida()
 end
 
 -- =======================================================
--- FLING BALL
+-- 🌀 FLING BALL
 -- =======================================================
 local function pausarFlingAgora()
     if not flingRodandoAgora then return end
@@ -771,7 +1234,7 @@ local function ativarFlingBall()
 end
 
 -- =======================================================
--- WALL PHASE
+-- 🧱 WALL PHASE
 -- =======================================================
 local function pausarWallPhaseAgora()
     if not wallPhaseRodandoAgora then return end
@@ -889,7 +1352,6 @@ local function pausarHeadFlingAgora(manterAtivado)
     if not headFlingRodandoAgora then return end
     headFlingRodandoAgora = false
     removerConstraintsHeadFling()
-
     local char = player.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -898,7 +1360,6 @@ local function pausarHeadFlingAgora(manterAtivado)
             humanoid.AutoRotate = true
         end
     end
-
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
         hrp.AssemblyAngularVelocity = Vector3.zero
@@ -907,12 +1368,10 @@ local function pausarHeadFlingAgora(manterAtivado)
         hrp.Velocity = Vector3.zero
     end
     headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
-
     if not manterAtivado then
         headFlingAtivado = false
         atualizarVisualHeadFling(false)
     end
-
     pararMeuMovimento()
 end
 
@@ -923,17 +1382,13 @@ local function ativarHeadFlingAgora()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
-
     humanoid.PlatformStand = true
     humanoid.AutoRotate = false
     headFlingRodandoAgora = true
-
     removerConstraintsHeadFling()
-
     headFlingAttachment = Instance.new("Attachment")
     headFlingAttachment.Name = "HeadFlingAttach"
     headFlingAttachment.Parent = hrp
-
     headFlingAlignPos = Instance.new("AlignPosition")
     headFlingAlignPos.Name = "HeadFlingAlignPos"
     headFlingAlignPos.Attachment0 = headFlingAttachment
@@ -942,7 +1397,6 @@ local function ativarHeadFlingAgora()
     headFlingAlignPos.MaxForce = HEAD_FLING_ALIGN_FORCE
     headFlingAlignPos.Responsiveness = 200
     headFlingAlignPos.Parent = hrp
-
     headFlingAlignOri = Instance.new("AlignOrientation")
     headFlingAlignOri.Name = "HeadFlingAlignOri"
     headFlingAlignOri.Attachment0 = headFlingAttachment
@@ -952,7 +1406,6 @@ local function ativarHeadFlingAgora()
     headFlingAlignOri.Responsiveness = 200
     headFlingAlignOri.PrimaryAxisOnly = false
     headFlingAlignOri.Parent = hrp
-
     headFlingAngVel = Instance.new("AngularVelocity")
     headFlingAngVel.Name = "HeadFlingAngVel"
     headFlingAngVel.Attachment0 = headFlingAttachment
@@ -965,7 +1418,6 @@ function desativarHeadFling()
     headFlingAtivado = false
     headFlingRodandoAgora = false
     removerConstraintsHeadFling()
-
     local char = player.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -974,7 +1426,6 @@ function desativarHeadFling()
             humanoid.AutoRotate = true
         end
     end
-
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
         hrp.AssemblyAngularVelocity = Vector3.zero
@@ -982,7 +1433,6 @@ function desativarHeadFling()
         hrp.RotVelocity = Vector3.zero
         hrp.Velocity = Vector3.zero
     end
-
     pararSpectate()
     if headFlingAlvoMorreuConn then
         headFlingAlvoMorreuConn:Disconnect()
@@ -992,7 +1442,6 @@ function desativarHeadFling()
         headFlingConnection:Disconnect()
         headFlingConnection = nil
     end
-
     headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
     pararMeuMovimento()
     atualizarVisualHeadFling(false)
@@ -1005,12 +1454,11 @@ local function conectarMonitorMorte(alvoPlayer)
     end
     local function aoAlvoMorrer()
         if not headFlingAtivado then return end
-        print("💀 Alvo morreu! Parando head fling e spectate.")
         desativarHeadFling()
     end
-    local function monitorarHumanoid(humanoid)
-        if not humanoid then return end
-        headFlingAlvoMorreuConn = humanoid.Died:Connect(aoAlvoMorrer)
+    local function monitorarHumanoid(h)
+        if not h then return end
+        headFlingAlvoMorreuConn = h.Died:Connect(aoAlvoMorrer)
     end
     if alvoPlayer.Character then
         local hum = alvoPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -1030,19 +1478,14 @@ local function ativarHeadFling()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
-
     ativarHeadFlingAgora()
-
     headFlingFramesVoo = 0
     headFlingFramesSubida = 0
-
     local ativadoEm = tick()
-
     if headFlingAlvo then
         iniciarSpectate(headFlingAlvo)
         conectarMonitorMorte(headFlingAlvo)
     end
-
     if headFlingConnection then headFlingConnection:Disconnect() end
     headFlingConnection = runService.Heartbeat:Connect(function(dt)
         if not headFlingAtivado then return end
@@ -1050,106 +1493,70 @@ local function ativarHeadFling()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
-
-        if not headFlingRodandoAgora then
-            ativarHeadFlingAgora()
-        end
+        if not headFlingRodandoAgora then ativarHeadFlingAgora() end
         if not headFlingAlignPos or not headFlingAlignPos.Parent then
             headFlingAlignPos = nil; headFlingAlignOri = nil; headFlingAngVel = nil; headFlingAttachment = nil
             return
         end
-
         if not headFlingAlvo or not headFlingAlvo.Parent or not headFlingAlvo.Character then
             pausarHeadFlingAgora(true)
             return
         end
-
         local alvoChar = headFlingAlvo.Character
         local alvoCabeca = obterCabeca(alvoChar)
-        local alvoTorso  = obterTorso(alvoChar)
+        local alvoTorso = obterTorso(alvoChar)
         local alvoHum = alvoChar:FindFirstChildOfClass("Humanoid")
-
         if not alvoCabeca or not alvoTorso or not alvoHum or alvoHum.Health <= 0 then
-            print("💀 Alvo morreu! Parando head fling.")
             desativarHeadFling()
             return
         end
-
         local cabecaPos = alvoCabeca.Position
-        if not posicaoValida(cabecaPos) then
-            pausarHeadFlingAgora(true)
-            return
-        end
-
+        if not posicaoValida(cabecaPos) then pausarHeadFlingAgora(true); return end
         local minhaPos = h.Position
         local velTorso = alvoTorso.AssemblyLinearVelocity
         local velFlat = Vector3.new(velTorso.X, 0, velTorso.Z)
         local velY = velTorso.Y
-
         local passouGrace = (tick() - ativadoEm) > 0.5
-
         if passouGrace then
             local alvoRealmenteVoou = math.abs(velY) > HEAD_FLING_VOOU_LIMITE or velTorso.Magnitude > HEAD_FLING_VEL_LIMITE
-
             if alvoRealmenteVoou then
                 headFlingFramesVoo = headFlingFramesVoo + 1
             else
                 headFlingFramesVoo = 0
             end
-
             if headFlingFramesVoo >= 3 then
-                print("🎯 Alvo voou! Pausando (botão continua ON).")
-                pausarHeadFlingAgora(true)
-                return
+                pausarHeadFlingAgora(true); return
             end
-
             if minhaPos.Y < HEAD_FLING_Y_MINIMO then
-                print("⚠️ Y abaixo do mínimo — pausando.")
-                pausarHeadFlingAgora(true)
-                return
+                pausarHeadFlingAgora(true); return
             end
-
             local subiMuito = (minhaPos.Y > cabecaPos.Y + 5)
             if subiMuito then
                 headFlingFramesSubida = headFlingFramesSubida + 1
             else
                 headFlingFramesSubida = 0
             end
-
             if headFlingFramesSubida >= 3 then
-                print("⚠️ Subindo acima do alvo — pausando.")
-                pausarHeadFlingAgora(true)
-                return
+                pausarHeadFlingAgora(true); return
             end
         end
-
         local alvoAndando = velFlat.Magnitude > 10
-
         local destinoPos
         if alvoAndando then
             destinoPos = cabecaPos + velFlat.Unit * HEAD_FLING_FRENTE + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
         else
             destinoPos = cabecaPos + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
         end
-
-        if not posicaoValida(destinoPos) then
-            pausarHeadFlingAgora(true)
-            return
-        end
-
+        if not posicaoValida(destinoPos) then pausarHeadFlingAgora(true); return end
         if minhaPos.Y < cabecaPos.Y - HEAD_FLING_Y_DIF_MAX then
             h.CFrame = CFrame.new(destinoPos)
             h.AssemblyLinearVelocity = Vector3.zero
             h.AssemblyAngularVelocity = Vector3.zero
-            if headFlingAlignPos then
-                headFlingAlignPos.Position = destinoPos
-            end
+            if headFlingAlignPos then headFlingAlignPos.Position = destinoPos end
             return
         end
-
         local diff = destinoPos - minhaPos
         local dist = diff.Magnitude
-
         if dist > HEAD_FLING_RECUPERAR_DIST then
             if destinoPos.Y >= HEAD_FLING_Y_MINIMO and minhaPos.Y >= HEAD_FLING_Y_MINIMO then
                 h.CFrame = CFrame.new(destinoPos)
@@ -1158,16 +1565,13 @@ local function ativarHeadFling()
             end
             return
         end
-
         local targetVel = diff * HEAD_FLING_SEGUIR_VEL
         h.AssemblyLinearVelocity = targetVel
         h.Velocity = targetVel
-
         if headFlingAlignPos then
             headFlingAlignPos.Position = destinoPos
             headFlingAlignPos.Responsiveness = 200
         end
-
         local flatDir
         if velFlat.Magnitude > 1 then
             flatDir = velFlat.Unit
@@ -1182,14 +1586,11 @@ local function ativarHeadFling()
                 flatDir = flatDir.Unit
             end
         end
-
         local baseCFrame = CFrame.lookAt(destinoPos, destinoPos + flatDir)
         local orientacaoFinal = baseCFrame * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
-
         if headFlingAlignOri then
             headFlingAlignOri.CFrame = orientacaoFinal
         end
-
         if headFlingAngVel then
             headFlingAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
         end
@@ -1197,13 +1598,12 @@ local function ativarHeadFling()
 end
 
 -- =======================================================
--- BOTÕES
+-- 🎮 CALLBACKS DOS BOTÕES
 -- =======================================================
 local function resetarBotaoSkill()
-    btnMain.Text = "skill [OFF]"
-    btnMain.TextColor3 = Color3.fromRGB(150, 150, 150)
-    btnStroke.Color = Color3.fromRGB(80, 80, 80)
-    btnMain.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    seguirBolaAtivado = false
+    speedLoopAtivo = false
+    atualizarVisualSkill(false)
 end
 
 local function resetarSpeed()
@@ -1228,15 +1628,10 @@ btnMain.MouseButton1Click:Connect(function()
             if headFlingAtivado then desativarHeadFling() end
             seguirBolaAtivado = true
             speedLoopAtivo = true
-            btnMain.Text = "skill [ON]"
-            btnMain.TextColor3 = Color3.fromRGB(0, 255, 255)
-            btnStroke.Color = Color3.fromRGB(0, 255, 255)
-            btnMain.BackgroundColor3 = Color3.fromRGB(0, 100, 100)
+            atualizarVisualSkill(true)
             aplicarSpeed()
         end)
     else
-        seguirBolaAtivado = false
-        speedLoopAtivo = false
         resetarBotaoSkill()
         resetarSpeed()
     end
@@ -1245,7 +1640,7 @@ end)
 btnFling.MouseButton1Click:Connect(function()
     if not flingBallAtivado then
         garantirTeam(function()
-            if seguirBolaAtivado then seguirBolaAtivado = false; speedLoopAtivo = false; resetarBotaoSkill(); resetarSpeed() end
+            if seguirBolaAtivado then resetarBotaoSkill(); resetarSpeed() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
             if headFlingAtivado then desativarHeadFling() end
             flingBallAtivado = true
@@ -1261,7 +1656,7 @@ end)
 btnWallPhase.MouseButton1Click:Connect(function()
     if not wallPhaseAtivado then
         garantirTeam(function()
-            if seguirBolaAtivado then seguirBolaAtivado = false; resetarBotaoSkill() end
+            if seguirBolaAtivado then resetarBotaoSkill() end
             if flingBallAtivado then desativarFlingBall() end
             if headFlingAtivado then desativarHeadFling() end
             wallPhaseAtivado = true
@@ -1281,12 +1676,11 @@ end)
 btnHeadFling.MouseButton1Click:Connect(function()
     if not headFlingAtivado then
         if not headFlingAlvo then
-            txtAlvo.TextColor3 = Color3.fromRGB(255, 80, 80)
-            txtStroke.Color = Color3.fromRGB(255, 80, 80)
+            tween(txtStroke, 0.15, { Color = C.danger })
             return
         end
         garantirTeam(function()
-            if seguirBolaAtivado then seguirBolaAtivado = false; speedLoopAtivo = false; resetarBotaoSkill(); resetarSpeed() end
+            if seguirBolaAtivado then resetarBotaoSkill(); resetarSpeed() end
             if flingBallAtivado then desativarFlingBall() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
             headFlingAtivado = true
@@ -1309,7 +1703,7 @@ btnGoalB.MouseButton1Click:Connect(function()
 end)
 
 -- =======================================================
--- LOOP PRINCIPAL (SKILL)
+-- 🎬 LOOP PRINCIPAL (SKILL)
 -- =======================================================
 runService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
@@ -1350,7 +1744,7 @@ runService.RenderStepped:Connect(function()
 end)
 
 -- =======================================================
--- ANTI-DUMPING LOOP
+-- 🛡️ ANTI-DUMPING LOOP
 -- =======================================================
 task.spawn(function()
     while true do
@@ -1359,10 +1753,7 @@ task.spawn(function()
             if flingBallAtivado then desativarFlingBall() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
             if headFlingAtivado then desativarHeadFling() end
-            if seguirBolaAtivado then
-                seguirBolaAtivado = false
-                resetarBotaoSkill()
-            end
+            if seguirBolaAtivado then resetarBotaoSkill() end
             speedLoopAtivo = false
             resetarSpeed()
             teleportarProTransparentFrame()
@@ -1379,3 +1770,5 @@ player.CharacterAdded:Connect(function()
         if speedLoopAtivo then aplicarSpeed() end
     end
 end)
+
+print("✅ Delta Hub v68 carregado — bolha suave + canto + posição original!")
