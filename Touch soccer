@@ -1,11 +1,12 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v60) - CUSTOMIZADO
--- Head Fling: colado no alvo (frente quando anda, dentro quando parado)
+-- DELTA HUB - FUTEBOL (UI MOBILE v62) - CUSTOMIZADO
+-- + Auto-Rejoin (autorj) quando kick ou sair
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
 
 -- ⚙️ CONFIGURAÇÃO ⚙️
 local alturaFixa = 7
@@ -20,7 +21,7 @@ local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 10
+local WALL_PHASE_ALTURA = 15
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
 -- 🔥 Head Fling
@@ -47,6 +48,11 @@ local HEAD_FLING_ZERAR_DURACAO = 0.5
 local TEAM_CHECK_INTERVAL = 0.5
 local TEAM_WAIT_TIMEOUT = 3
 
+-- 🔄 Auto-Rejoin (autorj)
+local AUTO_REJOIN_ATIVADO = true
+local AUTO_REJOIN_DELAY = 1        -- segundos de espera antes de rejoin
+local AUTO_REJOIN_TENTATIVAS = 5   -- tentativas máximas
+
 -- 🥅 Posições dos Gols
 local GOALS = {
     [1] = { nome = "Goal A", pos = Vector3.new(-316.8, 12.7, 92.8) },
@@ -54,7 +60,64 @@ local GOALS = {
 }
 -- ⚙️ ⚙️ ⚙️ ⚙️ ⚙️ ⚙️
 
+-- =======================================================
+-- 🔄 AUTO-REJOIN (autorj estilo Infinity Yield)
+-- =======================================================
+local REJOIN_PLACE_ID = game.PlaceId
+local REJOIN_JOB_ID = game.JobId
+local rejoinJaDisparou = false
+
+local function tentarRejoin(motivo)
+    if not AUTO_REJOIN_ATIVADO then return end
+    if rejoinJaDisparou then return end
+    rejoinJaDisparou = true
+
+    print("🔄 [autorj] Detectado:", motivo, "— tentando reconectar...")
+
+    task.spawn(function()
+        for tentativa = 1, AUTO_REJOIN_TENTATIVAS do
+            task.wait(AUTO_REJOIN_DELAY)
+            local sucesso = pcall(function()
+                TeleportService:TeleportToPlaceInstance(REJOIN_PLACE_ID, REJOIN_JOB_ID, player)
+            end)
+            if sucesso then
+                print("✅ [autorj] Rejoin enviado! Tentativa", tentativa)
+                break
+            else
+                warn("⚠️ [autorj] Tentativa", tentativa, "falhou, tentando de novo...")
+            end
+        end
+    end)
+end
+
+if AUTO_REJOIN_ATIVADO then
+    -- 🎯 Detecta kick via mudança de parent do LocalPlayer
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
+            if not player or not player.Parent then
+                tentarRejoin("player saiu / kick (AncestryChanged)")
+                break
+            end
+        end
+    end)
+
+    -- 🎯 Detecta kick via PlayerRemoving (quando o servidor te remove)
+    Players.PlayerRemoving:Connect(function(plr)
+        if plr == player then
+            tentarRejoin("PlayerRemoving (kick do servidor)")
+        end
+    end)
+
+    -- 🎯 Detecta fechamento do jogo (game.OnClose)
+    game.OnClose = function()
+        tentarRejoin("game.OnClose (servidor fechando)")
+    end
+end
+
+-- =======================================================
 -- Variáveis de Estado
+-- =======================================================
 local seguirBolaAtivado = false
 local bolaAlvo = nil
 local speedLoopAtivo = false
@@ -822,7 +885,7 @@ local function removerConstraintsHeadFling()
     if headFlingAttachment then headFlingAttachment:Destroy(); headFlingAttachment = nil end
 end
 
-local function pausarHeadFlingAgora()
+local function pausarHeadFlingAgora(manterAtivado)
     if not headFlingRodandoAgora then return end
     headFlingRodandoAgora = false
     removerConstraintsHeadFling()
@@ -844,6 +907,11 @@ local function pausarHeadFlingAgora()
         hrp.Velocity = Vector3.zero
     end
     headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
+
+    if not manterAtivado then
+        headFlingAtivado = false
+        atualizarVisualHeadFling(false)
+    end
 
     pararMeuMovimento()
 end
@@ -895,7 +963,26 @@ end
 
 function desativarHeadFling()
     headFlingAtivado = false
-    pausarHeadFlingAgora()
+    headFlingRodandoAgora = false
+    removerConstraintsHeadFling()
+
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.AutoRotate = true
+        end
+    end
+
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.RotVelocity = Vector3.zero
+        hrp.Velocity = Vector3.zero
+    end
+
     pararSpectate()
     if headFlingAlvoMorreuConn then
         headFlingAlvoMorreuConn:Disconnect()
@@ -905,6 +992,7 @@ function desativarHeadFling()
         headFlingConnection:Disconnect()
         headFlingConnection = nil
     end
+
     headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
     pararMeuMovimento()
     atualizarVisualHeadFling(false)
@@ -918,7 +1006,6 @@ local function conectarMonitorMorte(alvoPlayer)
     local function aoAlvoMorrer()
         if not headFlingAtivado then return end
         print("💀 Alvo morreu! Parando head fling e spectate.")
-        headFlingAtivado = false
         desativarHeadFling()
     end
     local function monitorarHumanoid(humanoid)
@@ -963,13 +1050,17 @@ local function ativarHeadFling()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
+
+        if not headFlingRodandoAgora then
+            ativarHeadFlingAgora()
+        end
         if not headFlingAlignPos or not headFlingAlignPos.Parent then
             headFlingAlignPos = nil; headFlingAlignOri = nil; headFlingAngVel = nil; headFlingAttachment = nil
             return
         end
 
         if not headFlingAlvo or not headFlingAlvo.Parent or not headFlingAlvo.Character then
-            pausarHeadFlingAgora()
+            pausarHeadFlingAgora(true)
             return
         end
 
@@ -980,14 +1071,13 @@ local function ativarHeadFling()
 
         if not alvoCabeca or not alvoTorso or not alvoHum or alvoHum.Health <= 0 then
             print("💀 Alvo morreu! Parando head fling.")
-            headFlingAtivado = false
             desativarHeadFling()
             return
         end
 
         local cabecaPos = alvoCabeca.Position
         if not posicaoValida(cabecaPos) then
-            pausarHeadFlingAgora()
+            pausarHeadFlingAgora(true)
             return
         end
 
@@ -1008,16 +1098,14 @@ local function ativarHeadFling()
             end
 
             if headFlingFramesVoo >= 3 then
-                print("🎯 Alvo voou! Removendo constraints.")
-                headFlingAtivado = false
-                pausarHeadFlingAgora()
+                print("🎯 Alvo voou! Pausando (botão continua ON).")
+                pausarHeadFlingAgora(true)
                 return
             end
 
             if minhaPos.Y < HEAD_FLING_Y_MINIMO then
-                print("⚠️ Y abaixo do mínimo — parando!")
-                headFlingAtivado = false
-                pausarHeadFlingAgora()
+                print("⚠️ Y abaixo do mínimo — pausando.")
+                pausarHeadFlingAgora(true)
                 return
             end
 
@@ -1029,15 +1117,10 @@ local function ativarHeadFling()
             end
 
             if headFlingFramesSubida >= 3 then
-                print("⚠️ Subindo acima do alvo — parando!")
-                headFlingAtivado = false
-                pausarHeadFlingAgora()
+                print("⚠️ Subindo acima do alvo — pausando.")
+                pausarHeadFlingAgora(true)
                 return
             end
-        end
-
-        if not headFlingRodandoAgora then
-            ativarHeadFlingAgora()
         end
 
         local alvoAndando = velFlat.Magnitude > 10
@@ -1050,7 +1133,7 @@ local function ativarHeadFling()
         end
 
         if not posicaoValida(destinoPos) then
-            pausarHeadFlingAgora()
+            pausarHeadFlingAgora(true)
             return
         end
 
@@ -1142,7 +1225,7 @@ btnMain.MouseButton1Click:Connect(function()
         garantirTeam(function()
             if flingBallAtivado then desativarFlingBall() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
-            if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
+            if headFlingAtivado then desativarHeadFling() end
             seguirBolaAtivado = true
             speedLoopAtivo = true
             btnMain.Text = "skill [ON]"
@@ -1164,7 +1247,7 @@ btnFling.MouseButton1Click:Connect(function()
         garantirTeam(function()
             if seguirBolaAtivado then seguirBolaAtivado = false; speedLoopAtivo = false; resetarBotaoSkill(); resetarSpeed() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
-            if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
+            if headFlingAtivado then desativarHeadFling() end
             flingBallAtivado = true
             atualizarVisualFling(true)
             ativarFlingBall()
@@ -1180,7 +1263,7 @@ btnWallPhase.MouseButton1Click:Connect(function()
         garantirTeam(function()
             if seguirBolaAtivado then seguirBolaAtivado = false; resetarBotaoSkill() end
             if flingBallAtivado then desativarFlingBall() end
-            if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
+            if headFlingAtivado then desativarHeadFling() end
             wallPhaseAtivado = true
             speedLoopAtivo = true
             atualizarVisualWallPhase(true)
@@ -1211,7 +1294,6 @@ btnHeadFling.MouseButton1Click:Connect(function()
             ativarHeadFling()
         end)
     else
-        headFlingAtivado = false
         desativarHeadFling()
     end
 end)
@@ -1276,7 +1358,7 @@ task.spawn(function()
         if not tenhoTeam() then
             if flingBallAtivado then desativarFlingBall() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
-            if headFlingAtivado then headFlingAtivado = false; desativarHeadFling() end
+            if headFlingAtivado then desativarHeadFling() end
             if seguirBolaAtivado then
                 seguirBolaAtivado = false
                 resetarBotaoSkill()
