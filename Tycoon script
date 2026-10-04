@@ -1,5 +1,5 @@
 -- ==========================================
--- SCRIPT: AUTO ARMAS FUTURISTA V3
+-- SCRIPT: AUTO ARMAS FUTURISTA V4
 -- ==========================================
 
 local player = game.Players.LocalPlayer
@@ -9,14 +9,56 @@ local isRunning = false
 getgenv().killall = false -- Começa desativado
 
 -- ==========================================
--- 1. CRIAÇÃO DA GUI FUTURISTA
+-- 1. TELEPORTE AUTOMÁTICO PARA "Touch to claim!"
+-- ==========================================
+task.spawn(function()
+    task.wait(1) -- Espera 1 segundo para garantir que o jogo carregou tudo
+    
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    
+    local targetPart = nil
+    
+    -- Procura em todo o Workspace
+    for _, v in pairs(game.Workspace:GetDescendants()) do
+        if v.Name == "Touch to claim!" then
+            -- Se for uma parte, usa ela. Se for um Modelo/Pasta, pega a primeira parte dentro.
+            if v:IsA("BasePart") then
+                targetPart = v
+            else
+                targetPart = v:FindFirstChildWhichIsA("BasePart")
+            end
+            
+            if targetPart then break end -- Para no primeiro que encontrar
+        end
+    end
+    
+    -- Se encontrou, teleporta
+    if targetPart then
+        hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Sistema", 
+            Text = "Teleportado para Touch to claim!", 
+            Duration = 3
+        })
+    else
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Aviso", 
+            Text = "Nenhum 'Touch to claim!' encontrado.", 
+            Duration = 3
+        })
+    end
+end)
+
+
+-- ==========================================
+-- 2. CRIAÇÃO DA GUI FUTURISTA
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoArmasGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
--- Janela Principal (Aumentada para caber os botões)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 220, 0, 250)
@@ -47,7 +89,6 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.Parent = MainFrame
 
--- Função auxiliar para criar botões padronizados
 local function createButton(name, text, yPos, color)
     local btn = Instance.new("TextButton")
     btn.Name = name
@@ -72,7 +113,6 @@ local function createButton(name, text, yPos, color)
     return btn, btnStroke
 end
 
--- Criando os botões
 local ButtonAuto, StrokeAuto = createButton("AutoArmasButton", "AUTO ARMAS: OFF", 30, Color3.fromRGB(0, 100, 200))
 local ButtonDrop, StrokeDrop = createButton("DropButton", "DROP TOOLS", 75, Color3.fromRGB(200, 50, 50))
 local ButtonEquip, StrokeEquip = createButton("EquipButton", "EQUIP TOOLS", 120, Color3.fromRGB(50, 150, 50))
@@ -80,7 +120,7 @@ local ButtonKill, StrokeKill = createButton("KillButton", "KILL ALL: OFF", 165, 
 
 
 -- ==========================================
--- 2. LÓGICA DO AUTO ARMAS (CORRIGIDO)
+-- 3. LÓGICA DO AUTO ARMAS
 -- ==========================================
 
 local function teleportLoop()
@@ -116,7 +156,7 @@ end
 
 
 -- ==========================================
--- 3. FUNÇÕES DROP E EQUIP
+-- 4. FUNÇÕES DROP E EQUIP
 -- ==========================================
 
 local function dropTools()
@@ -165,7 +205,7 @@ end
 
 
 -- ==========================================
--- 4. LÓGICA DO KILL ALL
+-- 5. LÓGICA DO KILL ALL
 -- ==========================================
 
 local function killAllLoop()
@@ -199,10 +239,9 @@ end
 
 
 -- ==========================================
--- 5. FUNÇÕES DOS BOTÕES
+-- 6. FUNÇÕES DOS BOTÕES
 -- ==========================================
 
--- Botão Auto Armas
 ButtonAuto.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
@@ -217,23 +256,20 @@ ButtonAuto.MouseButton1Click:Connect(function()
     end
 end)
 
--- Botão Drop Tools
 ButtonDrop.MouseButton1Click:Connect(function()
     dropTools()
 end)
 
--- Botão Equip Tools
 ButtonEquip.MouseButton1Click:Connect(function()
     equipTools()
 end)
 
--- Botão Kill All
 ButtonKill.MouseButton1Click:Connect(function()
     getgenv().killall = not getgenv().killall
     
     if getgenv().killall then
         ButtonKill.Text = "KILL ALL: ON"
-        ButtonKill.BackgroundColor3 = Color3.fromRGB(200, 0, 200) -- Roxo Neon
+        ButtonKill.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
         StrokeKill.Color = Color3.fromRGB(255, 0, 255)
         task.spawn(killAllLoop)
     else
