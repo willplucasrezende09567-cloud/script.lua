@@ -1,0 +1,244 @@
+-- ==========================================
+-- SCRIPT: AUTO ARMAS FUTURISTA V3
+-- ==========================================
+
+local player = game.Players.LocalPlayer
+
+-- Variáveis de controle
+local isRunning = false
+getgenv().killall = false -- Começa desativado
+
+-- ==========================================
+-- 1. CRIAÇÃO DA GUI FUTURISTA
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoArmasGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+-- Janela Principal (Aumentada para caber os botões)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 220, 0, 250)
+MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MainFrame.BackgroundTransparency = 0.2
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 255, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0.1, 0)
+Title.Position = UDim2.new(0, 0, 0.02, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ SISTEMA DE ARMAS ⚡"
+Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
+
+-- Função auxiliar para criar botões padronizados
+local function createButton(name, text, yPos, color)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.Position = UDim2.new(0.1, 0, 0, yPos)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = MainFrame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+
+    local btnStroke = Instance.new("UIStroke")
+    btnStroke.Color = Color3.fromRGB(0, 200, 255)
+    btnStroke.Thickness = 1.5
+    btnStroke.Parent = btn
+
+    return btn, btnStroke
+end
+
+-- Criando os botões
+local ButtonAuto, StrokeAuto = createButton("AutoArmasButton", "AUTO ARMAS: OFF", 30, Color3.fromRGB(0, 100, 200))
+local ButtonDrop, StrokeDrop = createButton("DropButton", "DROP TOOLS", 75, Color3.fromRGB(200, 50, 50))
+local ButtonEquip, StrokeEquip = createButton("EquipButton", "EQUIP TOOLS", 120, Color3.fromRGB(50, 150, 50))
+local ButtonKill, StrokeKill = createButton("KillButton", "KILL ALL: OFF", 165, Color3.fromRGB(150, 50, 150))
+
+
+-- ==========================================
+-- 2. LÓGICA DO AUTO ARMAS (CORRIGIDO)
+-- ==========================================
+
+local function teleportLoop()
+    while isRunning do
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health > 0 then
+            
+            local hrp = char.HumanoidRootPart
+            local targets = {}
+            
+            for _, v in pairs(game.Workspace:GetDescendants()) do
+                if (v:IsA("Model") or v:IsA("Folder")) and string.lower(v.Name):find("gear") then
+                    local part = v:FindFirstChild("Colour_2")
+                    if part and part:IsA("BasePart") then
+                        table.insert(targets, part)
+                    end
+                end
+            end
+
+            if #targets > 0 then
+                for i, part in ipairs(targets) do
+                    if not isRunning then break end
+                    if not char.Parent then break end
+                    
+                    hrp.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+                    task.wait(0.05) 
+                end
+            end
+        end
+        task.wait(0.2)
+    end
+end
+
+
+-- ==========================================
+-- 3. FUNÇÕES DROP E EQUIP
+-- ==========================================
+
+local function dropTools()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    local dropCFrame = hrp.CFrame * CFrame.new(0, -2, -3)
+
+    for _, tool in pairs(player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = workspace
+            if tool:FindFirstChild("Handle") then
+                tool.Handle.CFrame = dropCFrame
+            end
+        end
+    end
+
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = workspace
+            if tool:FindFirstChild("Handle") then
+                tool.Handle.CFrame = dropCFrame
+            end
+        end
+    end
+    
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Sistema", Text = "Ferramentas dropadas!", Duration = 2
+    })
+end
+
+local function equipTools()
+    local char = player.Character
+    if not char then return end
+
+    for _, tool in pairs(player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = char
+        end
+    end
+    
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Sistema", Text = "Ferramentas equipadas!", Duration = 2
+    })
+end
+
+
+-- ==========================================
+-- 4. LÓGICA DO KILL ALL
+-- ==========================================
+
+local function killAllLoop()
+    local players = game:GetService("Players")
+    
+    while getgenv().killall do
+        pcall(function()
+            local char = player.Character or player.CharacterAdded:Wait()
+            local knife = char:FindFirstChildOfClass("Tool") or player.Backpack:FindFirstChildOfClass("Tool")
+            
+            if knife and knife.Parent == player.Backpack then 
+                knife.Parent = char 
+            end
+            
+            if knife then
+                for _, targetPlayer in ipairs(players:GetPlayers()) do
+                    if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        task.spawn(function()
+                            knife:Activate()
+                            firetouchinterest(targetPlayer.Character.HumanoidRootPart, knife.Handle, 0)
+                            firetouchinterest(targetPlayer.Character.HumanoidRootPart, knife.Handle, 1)
+                        end)
+                        task.wait(0.2)
+                    end
+                end
+            end
+        end)
+        task.wait()
+    end
+end
+
+
+-- ==========================================
+-- 5. FUNÇÕES DOS BOTÕES
+-- ==========================================
+
+-- Botão Auto Armas
+ButtonAuto.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        ButtonAuto.Text = "AUTO ARMAS: ON"
+        ButtonAuto.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        StrokeAuto.Color = Color3.fromRGB(0, 255, 100)
+        task.spawn(teleportLoop)
+    else
+        ButtonAuto.Text = "AUTO ARMAS: OFF"
+        ButtonAuto.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        StrokeAuto.Color = Color3.fromRGB(0, 200, 255)
+    end
+end)
+
+-- Botão Drop Tools
+ButtonDrop.MouseButton1Click:Connect(function()
+    dropTools()
+end)
+
+-- Botão Equip Tools
+ButtonEquip.MouseButton1Click:Connect(function()
+    equipTools()
+end)
+
+-- Botão Kill All
+ButtonKill.MouseButton1Click:Connect(function()
+    getgenv().killall = not getgenv().killall
+    
+    if getgenv().killall then
+        ButtonKill.Text = "KILL ALL: ON"
+        ButtonKill.BackgroundColor3 = Color3.fromRGB(200, 0, 200) -- Roxo Neon
+        StrokeKill.Color = Color3.fromRGB(255, 0, 255)
+        task.spawn(killAllLoop)
+    else
+        ButtonKill.Text = "KILL ALL: OFF"
+        ButtonKill.BackgroundColor3 = Color3.fromRGB(150, 50, 150)
+        StrokeKill.Color = Color3.fromRGB(0, 200, 255)
+    end
+end)
