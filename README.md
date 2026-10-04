@@ -1,2 +1,0 @@
-# script.lua
-aura futebol
