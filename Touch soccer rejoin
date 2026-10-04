@@ -7,7 +7,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 -- =======================================================
--- ANTI-DUPLICAÇÃO: executa APENAS UMA VEZ
+-- ANTI-DUPLICAÇÃO
 -- =======================================================
 local FLAG = "__TOUCH_SOCCER_RUNNING__"
 local env = (getgenv and getgenv()) or _G
@@ -18,36 +18,35 @@ if env[FLAG] then
 end
 env[FLAG] = true
 
--- Remove GUI antiga se sobrar de execução anterior
 pcall(function()
     local antigo = game.CoreGui:FindFirstChild("DeltaMobileHub")
     if antigo then antigo:Destroy() end
 end)
 -- =======================================================
 
--- Link CORRETO do GitHub (substituído o 'script' por 'rejoin')
-local SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20rejoin"
+-- >>> URL DO SCRIPT PRINCIPAL (o que você executa) <<<
+local SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20script"
+
+-- Comando que será re-executado no próximo servidor
 local LOAD_CMD = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
 
 -- 1) Carrega o script principal
 loadstring(game:HttpGet(SCRIPT_URL))()
 
--- 2) Se o executor suportar, agenda o script para re-executar no próximo servidor
+-- 2) Agenda para re-executar no próximo servidor (se o executor suportar)
 if type(queue_on_teleport) == "function" then
     pcall(function() queue_on_teleport(LOAD_CMD) end)
 end
 
--- 3) Detecta o kick pela mensagem do GuiService (método Infinity Yield)
+-- 3) Auto-rejoin ao ser kickado
 GuiService.ErrorMessageChanged:Connect(function(errorMessage)
     if errorMessage and errorMessage ~= "" then
         print("[Auto-Rejoin] Kick detectado: " .. errorMessage)
 
-        -- Re-agenda o script para voltar a rodar após o rejoin
         if type(queue_on_teleport) == "function" then
             pcall(function() queue_on_teleport(LOAD_CMD) end)
         end
 
-        -- Re-entra no mesmo servidor imediatamente
         pcall(function()
             TeleportService:Teleport(game.PlaceId, player)
         end)
