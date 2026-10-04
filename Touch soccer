@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v68) - DESIGN FUTURISTA
--- + Fix: bolha suave + canto da tela + restaura posição original
+-- DELTA HUB - FUTEBOL (UI MOBILE v81) - DESIGN FUTURISTA
+-- Fix: variáveis declaradas ANTES da função de detecção
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
@@ -9,23 +9,17 @@ local userInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local TweenService = game:GetService("TweenService")
 
--- ⚙️ CONFIGURAÇÃO ⚙️ (mutável via painel de config)
+-- ⚙️ CONFIGURAÇÃO ⚙️
 local alturaFixa = 7
 local inclinacaoX = 35
 local WALK_SPEED = 64
-
--- 🌀 Fling Ball
 local FLING_RAIO = 2.0
 local FLING_VELOCIDADE = 300
 local FLING_FORCA = 800
 local FLING_ALTURA = 2
-
--- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 10,3
+local WALL_PHASE_ALTURA = 10.5
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
-
--- 🔥 Head Fling
 local HEAD_FLING_PROFUNDIDADE = -2
 local HEAD_FLING_FRENTE = 1.5
 local HEAD_FLING_INCLINACAO = 90
@@ -34,24 +28,65 @@ local HEAD_FLING_ALIGN_FORCE = 1e5
 local HEAD_FLING_ALIGN_TORQUE = 1e5
 local HEAD_FLING_RECUPERAR_DIST = 10
 local HEAD_FLING_SEGUIR_VEL = 15
-
--- 🛡️ Anti-kick
 local HEAD_FLING_VEL_LIMITE = 60
 local HEAD_FLING_VOOU_LIMITE = 30
 local HEAD_FLING_SUBIDA_LIMITE = 30
 local HEAD_FLING_Y_MINIMO = 5
 local HEAD_FLING_Y_DIF_MAX = 3
 local HEAD_FLING_ZERAR_DURACAO = 0.5
-
--- 🛡️ Anti-dumping
 local TEAM_CHECK_INTERVAL = 0.5
 local TEAM_WAIT_TIMEOUT = 3
+local AUTO_GOL_ATIVADO = true
+local AUTO_GOL_CHECK_INTERVAL = 1
+local AUTO_ENTER_ATIVADO = true
+local AUTO_ENTER_CHECK_INTERVAL = 1.5
+local AUTO_ENTER_TIMEOUT = 10
 
--- 🥅 Gols
 local GOALS = {
     [1] = { nome = "Goal A", pos = Vector3.new(-316.8, 12.7, 92.8) },
     [2] = { nome = "Goal B", pos = Vector3.new(-112.2, 12.7, 92.6) },
 }
+
+-- =======================================================
+-- 📦 VARIÁVEIS DE ESTADO (declaradas cedo!)
+-- =======================================================
+local seguirBolaAtivado = false
+local bolaAlvo = nil
+local speedLoopAtivo = false
+local golSelecionado = 0
+local flingBallAtivado = false
+local flingRodandoAgora = false
+local flingConnection = nil
+local flingAngle = 0
+local originalCanCollide = {}
+
+local wallPhaseAtivado = false
+local wallPhaseRodandoAgora = false
+local wallPhaseConnection = nil
+local wallPhaseAnimationTrack = nil
+local wallPhaseAnimationId = nil
+local wallPhaseAnimConnection = nil
+
+local headFlingAtivado = false
+local headFlingRodandoAgora = false
+local headFlingAlvo = nil
+local headFlingConnection = nil
+local headFlingAlvoMorreuConn = nil
+local headFlingFramesVoo = 0
+local headFlingFramesSubida = 0
+local headFlingZerarAte = 0
+local headFlingAlignPos = nil
+local headFlingAlignOri = nil
+local headFlingAngVel = nil
+local headFlingAttachment = nil
+
+local SPECTATE_ATIVADO = true
+local spectateOriginalSubject = nil
+local spectateOriginalType = nil
+
+local autoEnterJaDisparou = false
+local golJaDetectadoNesseSpawn = false
+local autoAtivo = true
 
 -- =======================================================
 -- 🎨 PALETA DE CORES
@@ -72,7 +107,7 @@ local C = {
 }
 
 -- =======================================================
--- 🔧 HELPERS DE UI
+-- 🔧 HELPERS
 -- =======================================================
 local function tween(obj, time, props, style, dir)
     local info = TweenInfo.new(time, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
@@ -107,7 +142,7 @@ local function addGradient(parent, colors, rotation)
 end
 
 -- =======================================================
--- 🛑 FUNÇÕES UTILITÁRIAS
+-- 🛑 UTILITÁRIAS
 -- =======================================================
 local function pararMeuMovimento()
     local char = player.Character
@@ -156,10 +191,7 @@ local function extrairAnimationId(assetId)
         end
         return nil
     end)
-    if sucesso and resultado then
-        print("✅ AnimationId:", resultado)
-        return resultado
-    end
+    if sucesso and resultado then return resultado end
     return nil
 end
 
@@ -203,6 +235,23 @@ local function tenhoTeam()
             if obj.Name:match("^Team%d+$") then return true end
             if obj.Name == "Team" and (obj:IsA("NumberValue") or obj:IsA("IntValue")) then
                 if obj.Value and obj.Value > 0 then return true end
+            end
+        end
+    end
+    return false
+end
+
+local function outrosPlayersTemTeam()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            if plr.Team ~= nil then return true end
+            if plr.Character then
+                for _, obj in pairs(plr.Character:GetChildren()) do
+                    if obj.Name:match("^Team%d+$") then return true end
+                    if obj.Name == "Team" and (obj:IsA("NumberValue") or obj:IsA("IntValue")) then
+                        if obj.Value and obj.Value > 0 then return true end
+                    end
+                end
             end
         end
     end
@@ -259,6 +308,126 @@ local function garantirTeam(continuar)
 end
 
 -- =======================================================
+-- 🚪 AUTO-ENTER
+-- =======================================================
+local function podeEntrarPartida()
+    if tenhoTeam() then return false end
+    if not outrosPlayersTemTeam() then return false end
+    return true
+end
+
+local function tentarEntrarPartida()
+    if not AUTO_ENTER_ATIVADO then return end
+    if not podeEntrarPartida() then return end
+    if autoEnterJaDisparou then return end
+    autoEnterJaDisparou = true
+
+    task.spawn(function()
+        local tempo = 0
+        while tempo < AUTO_ENTER_TIMEOUT do
+            if not outrosPlayersTemTeam() and not tenhoTeam() then
+                autoEnterJaDisparou = false
+                return
+            end
+            if tenhoTeam() then return end
+            teleportarProTransparentFrame()
+            task.wait(0.8)
+            tempo = tempo + 0.8
+        end
+        autoEnterJaDisparou = false
+    end)
+end
+
+-- =======================================================
+-- ⚽ BOLA
+-- =======================================================
+local function encontrarBola()
+    local campo = workspace:FindFirstChild("FootballField")
+    if campo then
+        local bola = campo:FindFirstChild("SoccerBall") or campo:FindFirstChild("ServerSoccerBall")
+        if bola then return bola end
+    end
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if (obj.Name == "SoccerBall" or obj.Name == "ServerSoccerBall") and obj:IsA("BasePart") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function existeBolaNoMapa()
+    local campo = workspace:FindFirstChild("FootballField")
+    if campo then
+        if campo:FindFirstChild("SoccerBall") or campo:FindFirstChild("ServerSoccerBall") then
+            return true
+        end
+    end
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if (obj.Name == "SoccerBall" or obj.Name == "ServerSoccerBall") and obj:IsA("BasePart") then
+            return true
+        end
+    end
+    return false
+end
+
+-- =======================================================
+-- 🎯 AUTO-DETECÇÃO DE GOL
+-- =======================================================
+local function encontrarSpawnMaisProximo(minhaPos, prefixo)
+    local melhorDist = math.huge
+    local melhorPos = nil
+
+    local campo = workspace:FindFirstChild("FootballField")
+    if not campo then return nil, math.huge end
+
+    local prefixoLower = prefixo:lower()
+    local padrao = "^" .. prefixoLower .. "[_%-]?%d+$"
+
+    for _, sp in pairs(campo:GetDescendants()) do
+        if sp:IsA("BasePart") then
+            local nomeLower = sp.Name:lower()
+            if nomeLower:match(padrao) then
+                local d = (minhaPos - sp.Position).Magnitude
+                if d < melhorDist then
+                    melhorDist = d
+                    melhorPos = sp.Position
+                end
+            end
+        end
+    end
+
+    return melhorPos, melhorDist
+end
+
+local function detectarGolAutomatico(forcar)
+    if not AUTO_GOL_ATIVADO then return end
+    if golJaDetectadoNesseSpawn and not forcar then return end
+    if not tenhoTeam() then return end
+    if not existeBolaNoMapa() then return end
+
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local minhaPos = hrp.Position
+    local posA, distA = encontrarSpawnMaisProximo(minhaPos, "SpawnA")
+    local posB, distB = encontrarSpawnMaisProximo(minhaPos, "SpawnB")
+
+    if not posA or not posB then return end
+
+    local golDetectado
+    if distA < distB then
+        golDetectado = 2
+    else
+        golDetectado = 1
+    end
+
+    golSelecionado = golDetectado
+    golJaDetectadoNesseSpawn = true
+end
+
+-- =======================================================
 -- 🔄 AUTO-REJOIN
 -- =======================================================
 local REJOIN_PLACE_ID = game.PlaceId
@@ -269,13 +438,11 @@ local LOAD_CMD = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
 
 if type(queue_on_teleport) == "function" then
     pcall(function() queue_on_teleport(LOAD_CMD) end)
-    print("✅ [autorj] Queue OK")
 end
 
 local function rejoin()
     if rejoinJaDisparou then return end
     rejoinJaDisparou = true
-    print("🔄 [autorj] REJOIN!")
     if type(queue_on_teleport) == "function" then
         pcall(function() queue_on_teleport(LOAD_CMD) end)
     end
@@ -295,7 +462,6 @@ if hookfunction and newcclosure then
         end
         return oldPrint(...)
     end)
-    print("✅ [autorj] Hook print")
 end
 
 if hookmetamethod and getnamecallmethod then
@@ -305,7 +471,6 @@ if hookmetamethod and getnamecallmethod then
         if m == "Kick" or m == "kick" then rejoin() end
         return oldNamecall(self, ...)
     end)
-    print("✅ [autorj] Hook namecall")
 end
 
 player.AncestryChanged:Connect(function()
@@ -314,43 +479,6 @@ end)
 Players.PlayerRemoving:Connect(function(p)
     if p == player then rejoin() end
 end)
-
--- =======================================================
--- 📦 VARIÁVEIS DE ESTADO
--- =======================================================
-local seguirBolaAtivado = false
-local bolaAlvo = nil
-local speedLoopAtivo = false
-local golSelecionado = 0
-local flingBallAtivado = false
-local flingRodandoAgora = false
-local flingConnection = nil
-local flingAngle = 0
-local originalCanCollide = {}
-
-local wallPhaseAtivado = false
-local wallPhaseRodandoAgora = false
-local wallPhaseConnection = nil
-local wallPhaseAnimationTrack = nil
-local wallPhaseAnimationId = nil
-local wallPhaseAnimConnection = nil
-
-local headFlingAtivado = false
-local headFlingRodandoAgora = false
-local headFlingAlvo = nil
-local headFlingConnection = nil
-local headFlingAlvoMorreuConn = nil
-local headFlingFramesVoo = 0
-local headFlingFramesSubida = 0
-local headFlingZerarAte = 0
-local headFlingAlignPos = nil
-local headFlingAlignOri = nil
-local headFlingAngVel = nil
-local headFlingAttachment = nil
-
-local SPECTATE_ATIVADO = true
-local spectateOriginalSubject = nil
-local spectateOriginalType = nil
 
 -- =======================================================
 -- 👁️ SPECTATE
@@ -388,7 +516,7 @@ local function pararSpectate()
 end
 
 -- =======================================================
--- 🎨 UI - CRIAÇÃO
+-- 🎨 UI
 -- =======================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DeltaMobileHub"
@@ -396,7 +524,6 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ═══ FRAME PRINCIPAL ═══
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 280, 0, 400)
@@ -412,7 +539,7 @@ addGradient(MainFrame, {
     ColorSequenceKeypoint.new(0, C.bg),
     ColorSequenceKeypoint.new(1, C.bgAlt)
 }, 135)
-local MainStroke = addStroke(MainFrame, C.accent, 1.5, 0.2)
+addStroke(MainFrame, C.accent, 1.5, 0.2)
 
 local GlowFrame = Instance.new("Frame")
 GlowFrame.Name = "Glow"
@@ -425,7 +552,6 @@ GlowFrame.ZIndex = -1
 GlowFrame.Parent = MainFrame
 addCorner(GlowFrame, 20)
 
--- ═══ TITLE BAR ═══
 local TitleBar = Instance.new("Frame")
 TitleBar.Name = "TitleBar"
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -499,9 +625,6 @@ local ConfigBtn = criarBtnTitulo(UDim2.new(1, -73, 0, 6), "⚙", C.accent)
 local CloseBtn = criarBtnTitulo(UDim2.new(1, -41, 0, 6), "×", C.danger)
 CloseBtn.TextSize = 20
 
--- ═══════════════════════════════════════════════════════
--- 📄 ABA 1: PRINCIPAL
--- ═══════════════════════════════════════════════════════
 local Content = Instance.new("Frame")
 Content.Name = "ContentMain"
 Content.Size = UDim2.new(1, -20, 1, -50)
@@ -551,8 +674,11 @@ local function criarBtnMain(pos, size, texto)
 end
 
 local btnMain, btnMainStroke = criarBtnMain(UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 42), "SKILL")
-local btnGoalA, goalAStroke = criarBtnMain(UDim2.new(0, 0, 0, 52), UDim2.new(0.48, 0, 0, 34), "Goal A")
-local btnGoalB, goalBStroke = criarBtnMain(UDim2.new(0.52, 0, 0, 52), UDim2.new(0.48, 0, 0, 34), "Goal B")
+local btnGoalA, goalAStroke = criarBtnMain(UDim2.new(0, 0, 0, 52), UDim2.new(0.36, 0, 0, 34), "Goal A")
+local btnGoalB, goalBStroke = criarBtnMain(UDim2.new(0.38, 0, 0, 52), UDim2.new(0.36, 0, 0, 34), "Goal B")
+local btnAuto, autoStroke = criarBtnMain(UDim2.new(0.76, 0, 0, 52), UDim2.new(0.24, 0, 0, 34), "AUTO")
+btnAuto.TextSize = 11
+
 local btnFling, flingStroke = criarBtnMain(UDim2.new(0, 0, 0, 96), UDim2.new(1, 0, 0, 42), "FLING BALL")
 local btnWallPhase, wallStroke = criarBtnMain(UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 42), "WALL PHASE")
 local btnHeadFling, headFlingStroke = criarBtnMain(UDim2.new(0, 0, 0, 196), UDim2.new(1, 0, 0, 42), "HEAD FLING")
@@ -606,16 +732,13 @@ local VersionLabel = Instance.new("TextLabel")
 VersionLabel.Size = UDim2.new(1, 0, 0, 18)
 VersionLabel.Position = UDim2.new(0, 0, 1, -4)
 VersionLabel.BackgroundTransparency = 1
-VersionLabel.Text = "v68 • by @willnzx.mt"
+VersionLabel.Text = "v81 • by @willnzx.mt"
 VersionLabel.TextColor3 = C.textDim
 VersionLabel.Font = Enum.Font.Gotham
 VersionLabel.TextSize = 10
 VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
 VersionLabel.Parent = Content
 
--- ═══════════════════════════════════════════════════════
--- ⚙️ ABA 2: CONFIGURAÇÕES
--- ═══════════════════════════════════════════════════════
 local ConfigContent = Instance.new("Frame")
 ConfigContent.Name = "ContentConfig"
 ConfigContent.Size = UDim2.new(1, -20, 1, -50)
@@ -778,7 +901,7 @@ local cfgItems = {
     { "Fling Velocidade", function() return FLING_VELOCIDADE end, function(v) FLING_VELOCIDADE = v end, 10, 50, 800 },
     { "Fling Força", function() return FLING_FORCA end, function(v) FLING_FORCA = v end, 10, 100, 2000 },
     { "Fling Altura", function() return FLING_ALTURA end, function(v) FLING_ALTURA = v end, 0.5, 0, 10 },
-    { "Wall Phase Altura", function() return WALL_PHASE_ALTURA end, function(v) WALL_PHASE_ALTURA = v end, 1, 5, 50 },
+    { "Wall Phase Altura", function() return WALL_PHASE_ALTURA end, function(v) WALL_PHASE_ALTURA = v end, 0.5, 5, 50 },
     { "Head Fling Profundidade", function() return HEAD_FLING_PROFUNDIDADE end, function(v) HEAD_FLING_PROFUNDIDADE = v end, 0.5, -10, 5 },
     { "Head Fling Frente", function() return HEAD_FLING_FRENTE end, function(v) HEAD_FLING_FRENTE = v end, 0.5, 0, 10 },
     { "Head Fling Inclinação", function() return HEAD_FLING_INCLINACAO end, function(v) HEAD_FLING_INCLINACAO = v end, 5, -90, 90 },
@@ -797,7 +920,7 @@ task.spawn(function()
 end)
 
 -- =======================================================
--- 🫧 BOLHA MINIMIZADA (drag suave + corner fix)
+-- 🫧 BOLHA MINIMIZADA
 -- =======================================================
 local Bubble = Instance.new("TextButton")
 Bubble.Name = "Bubble"
@@ -829,7 +952,6 @@ BubbleGlow.ZIndex = -1
 BubbleGlow.Parent = Bubble
 addCorner(BubbleGlow, 32)
 
--- 🎯 DRAG SUAVE (UserInputService global - não solta)
 local bubbleDragging = false
 local bubbleDragStart = nil
 local bubbleStartPos = nil
@@ -844,7 +966,6 @@ Bubble.InputBegan:Connect(function(input)
     end
 end)
 
--- 🎯 InputChanged GLOBAL - movimento em tempo real, sem drift
 userInputService.InputChanged:Connect(function(input)
     if not bubbleDragging then return end
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -852,12 +973,10 @@ userInputService.InputChanged:Connect(function(input)
         if math.abs(delta.X) > 3 or math.abs(delta.Y) > 3 then
             bubbleMoved = true
         end
-        -- Posição em Offset puro = segue o dedo exato
         Bubble.Position = UDim2.new(0, bubbleStartPos.X.Offset + delta.X, 0, bubbleStartPos.Y.Offset + delta.Y)
     end
 end)
 
--- 🎯 InputEnded GLOBAL - garante que sempre "solta"
 userInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         if bubbleDragging then
@@ -866,7 +985,6 @@ userInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Animação pulse
 task.spawn(function()
     while true do
         task.wait(1.5)
@@ -879,7 +997,7 @@ task.spawn(function()
 end)
 
 -- =======================================================
--- 🔄 SISTEMA DE ABAS (troca Main <-> Config)
+-- 🔄 SISTEMA DE ABAS
 -- =======================================================
 local abaAtual = "main"
 
@@ -892,7 +1010,6 @@ local function trocarAba(novaAba)
         ConfigContent.Visible = true
         ConfigContent.Position = UDim2.new(0, 30, 0, 45)
         tween(ConfigContent, 0.3, { Position = UDim2.new(0, 10, 0, 45) }, Enum.EasingStyle.Quart)
-
         TitleText.Text = "⚙  CONFIG"
         tween(TitleText, 0.2, { TextColor3 = C.accentAlt })
         tween(ConfigBtn, 0.2, { BackgroundColor3 = C.accentAlt, TextColor3 = C.bg, BackgroundTransparency = 0.1 })
@@ -901,7 +1018,6 @@ local function trocarAba(novaAba)
         Content.Visible = true
         Content.Position = UDim2.new(0, 30, 0, 45)
         tween(Content, 0.3, { Position = UDim2.new(0, 10, 0, 45) }, Enum.EasingStyle.Quart)
-
         TitleText.Text = "DELTA HUB"
         tween(TitleText, 0.2, { TextColor3 = C.text })
         tween(ConfigBtn, 0.2, { BackgroundColor3 = C.card, TextColor3 = C.accent, BackgroundTransparency = 0.5 })
@@ -911,24 +1027,17 @@ end
 -- =======================================================
 -- 🎯 AÇÕES DA UI
 -- =======================================================
--- 💾 Salva a posição antes de minimizar
 local posicaoGuardadaGUI = UDim2.new(0.5, -140, 0.5, -200)
 
 MinimizeBtn.MouseButton1Click:Connect(function()
-    -- Salva posição atual
     posicaoGuardadaGUI = MainFrame.Position
-
-    -- Tween shrink
     local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     local t = TweenService:Create(MainFrame, tweenInfo, { Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 })
     t:Play()
     t.Completed:Connect(function()
         MainFrame.Visible = false
-
-        -- 🎯 Coloca bolha no CANTO SUPERIOR DIREITO da tela
         local viewportSize = workspace.CurrentCamera.ViewportSize
         Bubble.Position = UDim2.new(0, viewportSize.X - 75, 0, 100)
-
         Bubble.Size = UDim2.new(0, 0, 0, 0)
         Bubble.Visible = true
         tween(Bubble, 0.3, { Size = UDim2.new(0, 55, 0, 55) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
@@ -954,27 +1063,19 @@ ConfigBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-btnConfigRodape.MouseButton1Click:Connect(function()
-    trocarAba("config")
-end)
+btnConfigRodape.MouseButton1Click:Connect(function() trocarAba("config") end)
+btnVoltar.MouseButton1Click:Connect(function() trocarAba("main") end)
 
-btnVoltar.MouseButton1Click:Connect(function()
-    trocarAba("main")
-end)
-
--- 🎯 Bubble click → restaura GUI na posição ORIGINAL
 Bubble.MouseButton1Click:Connect(function()
     if not bubbleMoved then
         Bubble.Visible = false
         MainFrame.Visible = true
         MainFrame.Size = UDim2.new(0, 280, 0, 400)
-        -- Restaura na posição salva
         MainFrame.Position = posicaoGuardadaGUI
         tween(MainFrame, 0.3, { BackgroundTransparency = 0.05 })
     end
 end)
 
--- Arrastar MainFrame
 local mfDrag = false
 local mfStart, mfStartPos
 TitleBar.InputBegan:Connect(function(input)
@@ -1011,7 +1112,7 @@ local function setBtnAtivo(btn, stroke, ativo, corAtiva)
     end
 end
 
-local function atualizarBotoesGoal()
+local function atualizarBotoesGoalGlobal()
     if golSelecionado == 1 then
         btnGoalA.Text = "Goal A ✓"
         setBtnAtivo(btnGoalA, goalAStroke, true, C.warning)
@@ -1025,6 +1126,17 @@ local function atualizarBotoesGoal()
         btnGoalB.Text = "Goal B"
         setBtnAtivo(btnGoalA, goalAStroke, false)
         setBtnAtivo(btnGoalB, goalBStroke, false)
+    end
+end
+
+local function atualizarVisualAuto(ativo)
+    btnAuto.Text = ativo and "AUTO ✓" or "AUTO"
+    if ativo then
+        autoStroke.Color = C.success
+        btnAuto.TextColor3 = C.success
+    else
+        autoStroke.Color = C.border
+        btnAuto.TextColor3 = C.textDim
     end
 end
 
@@ -1044,6 +1156,8 @@ local function atualizarVisualSkill(ativo)
     btnMain.Text = ativo and "SKILL ✓" or "SKILL"
     setBtnAtivo(btnMain, btnMainStroke, ativo, C.accent)
 end
+
+atualizarVisualAuto(autoAtivo)
 
 -- =======================================================
 -- 🎯 DETECÇÃO DE ALVO
@@ -1128,31 +1242,6 @@ task.spawn(function()
 end)
 
 -- =======================================================
--- BOLA
--- =======================================================
-local function encontrarBola()
-    local campo = workspace:FindFirstChild("FootballField")
-    if campo then
-        local bola = campo:FindFirstChild("SoccerBall") or campo:FindFirstChild("ServerSoccerBall")
-        if bola then return bola end
-    end
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if (obj.Name == "SoccerBall" or obj.Name == "ServerSoccerBall") and obj:IsA("BasePart") then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function bolaValida()
-    if not bolaAlvo then return false end
-    if not bolaAlvo.Parent then return false end
-    if not bolaAlvo:IsDescendantOf(workspace) then return false end
-    if not bolaAlvo:IsA("BasePart") then return false end
-    return true
-end
-
--- =======================================================
 -- 🌀 FLING BALL
 -- =======================================================
 local function pausarFlingAgora()
@@ -1218,8 +1307,10 @@ local function ativarFlingBall()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
-        if not bolaValida() then bolaAlvo = encontrarBola() end
-        if not bolaValida() then pausarFlingAgora(); return end
+        if not bolaAlvo or not bolaAlvo.Parent then
+            bolaAlvo = encontrarBola()
+        end
+        if not bolaAlvo or not bolaAlvo.Parent then pausarFlingAgora(); return end
         if not flingRodandoAgora then ativarFlingAgora() end
         flingAngle = flingAngle + dt * FLING_VELOCIDADE
         local offset = Vector3.new(math.cos(flingAngle) * FLING_RAIO, 0, math.sin(flingAngle) * FLING_RAIO)
@@ -1310,8 +1401,10 @@ local function ativarWallPhase()
         if not c then return end
         local h = c:FindFirstChild("HumanoidRootPart")
         if not h then return end
-        if not bolaValida() then bolaAlvo = encontrarBola() end
-        if not bolaValida() then pausarWallPhaseAgora(); return end
+        if not bolaAlvo or not bolaAlvo.Parent then
+            bolaAlvo = encontrarBola()
+        end
+        if not bolaAlvo or not bolaAlvo.Parent then pausarWallPhaseAgora(); return end
         if not wallPhaseRodandoAgora then ativarWallPhaseAgora() end
         local targetPos = Vector3.new(bolaAlvo.Position.X, WALL_PHASE_ALTURA, bolaAlvo.Position.Z)
         local camera = workspace.CurrentCamera
@@ -1524,21 +1617,15 @@ local function ativarHeadFling()
             else
                 headFlingFramesVoo = 0
             end
-            if headFlingFramesVoo >= 3 then
-                pausarHeadFlingAgora(true); return
-            end
-            if minhaPos.Y < HEAD_FLING_Y_MINIMO then
-                pausarHeadFlingAgora(true); return
-            end
+            if headFlingFramesVoo >= 3 then pausarHeadFlingAgora(true); return end
+            if minhaPos.Y < HEAD_FLING_Y_MINIMO then pausarHeadFlingAgora(true); return end
             local subiMuito = (minhaPos.Y > cabecaPos.Y + 5)
             if subiMuito then
                 headFlingFramesSubida = headFlingFramesSubida + 1
             else
                 headFlingFramesSubida = 0
             end
-            if headFlingFramesSubida >= 3 then
-                pausarHeadFlingAgora(true); return
-            end
+            if headFlingFramesSubida >= 3 then pausarHeadFlingAgora(true); return end
         end
         local alvoAndando = velFlat.Magnitude > 10
         local destinoPos
@@ -1598,7 +1685,7 @@ local function ativarHeadFling()
 end
 
 -- =======================================================
--- 🎮 CALLBACKS DOS BOTÕES
+-- 🎮 BOTÕES
 -- =======================================================
 local function resetarBotaoSkill()
     seguirBolaAtivado = false
@@ -1620,9 +1707,42 @@ local function resetarSpeed()
     pararMeuMovimento()
 end
 
-btnMain.MouseButton1Click:Connect(function()
+local function selecionarGoalA(desligarAuto)
+    if desligarAuto then
+        AUTO_GOL_ATIVADO = false
+        autoAtivo = false
+        atualizarVisualAuto(false)
+    end
+    golSelecionado = 1
+    atualizarBotoesGoalGlobal()
+end
+
+local function selecionarGoalB(desligarAuto)
+    if desligarAuto then
+        AUTO_GOL_ATIVADO = false
+        autoAtivo = false
+        atualizarVisualAuto(false)
+    end
+    golSelecionado = 2
+    atualizarBotoesGoalGlobal()
+end
+
+local function ativarSkill()
     if not seguirBolaAtivado then
-        garantirTeam(function()
+        if not tenhoTeam() then
+            garantirTeam(function()
+                if not tenhoTeam() then return end
+                if not existeBolaNoMapa() then return end
+                if flingBallAtivado then desativarFlingBall() end
+                if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
+                if headFlingAtivado then desativarHeadFling() end
+                seguirBolaAtivado = true
+                speedLoopAtivo = true
+                atualizarVisualSkill(true)
+                aplicarSpeed()
+            end)
+        else
+            if not existeBolaNoMapa() then return end
             if flingBallAtivado then desativarFlingBall() end
             if wallPhaseAtivado then wallPhaseAtivado = false; desativarWallPhase() end
             if headFlingAtivado then desativarHeadFling() end
@@ -1630,12 +1750,16 @@ btnMain.MouseButton1Click:Connect(function()
             speedLoopAtivo = true
             atualizarVisualSkill(true)
             aplicarSpeed()
-        end)
+        end
     else
         resetarBotaoSkill()
         resetarSpeed()
     end
-end)
+end
+
+btnGoalA.MouseButton1Click:Connect(function() selecionarGoalA(true) end)
+btnGoalB.MouseButton1Click:Connect(function() selecionarGoalB(true) end)
+btnMain.MouseButton1Click:Connect(ativarSkill)
 
 btnFling.MouseButton1Click:Connect(function()
     if not flingBallAtivado then
@@ -1692,18 +1816,33 @@ btnHeadFling.MouseButton1Click:Connect(function()
     end
 end)
 
-btnGoalA.MouseButton1Click:Connect(function()
-    golSelecionado = (golSelecionado == 1) and 0 or 1
-    atualizarBotoesGoal()
-end)
+btnAuto.MouseButton1Click:Connect(function()
+    autoAtivo = not autoAtivo
+    AUTO_GOL_ATIVADO = autoAtivo
+    atualizarVisualAuto(autoAtivo)
 
-btnGoalB.MouseButton1Click:Connect(function()
-    golSelecionado = (golSelecionado == 2) and 0 or 2
-    atualizarBotoesGoal()
+    if autoAtivo then
+        golJaDetectadoNesseSpawn = false
+        detectarGolAutomatico(true)
+
+        task.wait(0.15)
+
+        if golSelecionado == 1 then
+            selecionarGoalA(false)
+        elseif golSelecionado == 2 then
+            selecionarGoalB(false)
+        end
+
+        task.wait(0.15)
+
+        if not seguirBolaAtivado then
+            ativarSkill()
+        end
+    end
 end)
 
 -- =======================================================
--- 🎬 LOOP PRINCIPAL (SKILL)
+-- 🎬 LOOP SKILL
 -- =======================================================
 runService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
@@ -1713,12 +1852,18 @@ runService.RenderStepped:Connect(function()
     local hrp = char.HumanoidRootPart
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return end
+
     if flingBallAtivado or wallPhaseAtivado or headFlingAtivado then return end
+
     if seguirBolaAtivado then
-        if not bolaValida() then bolaAlvo = encontrarBola() end
-        if bolaValida() then
+        if not bolaAlvo or not bolaAlvo.Parent then
+            bolaAlvo = encontrarBola()
+        end
+
+        if bolaAlvo and bolaAlvo.Parent then
             humanoid.PlatformStand = true
             humanoid.AutoRotate = false
+
             local targetPos = Vector3.new(bolaAlvo.Position.X, alturaFixa, bolaAlvo.Position.Z)
             local lookDir
             if golSelecionado > 0 then
@@ -1744,7 +1889,7 @@ runService.RenderStepped:Connect(function()
 end)
 
 -- =======================================================
--- 🛡️ ANTI-DUMPING LOOP
+-- 🛡️ ANTI-DUMPING
 -- =======================================================
 task.spawn(function()
     while true do
@@ -1761,8 +1906,109 @@ task.spawn(function()
     end
 end)
 
+-- =======================================================
+-- 🎯 AUTO-GOL: LOOP
+-- =======================================================
+task.spawn(function()
+    while true do
+        task.wait(AUTO_GOL_CHECK_INTERVAL)
+        if AUTO_GOL_ATIVADO then
+            detectarGolAutomatico()
+        end
+    end
+end)
+
+-- =======================================================
+-- 🚪 AUTO-ENTER: LOOP
+-- =======================================================
+task.spawn(function()
+    task.wait(1.5)
+    while true do
+        if AUTO_ENTER_ATIVADO then
+            tentarEntrarPartida()
+        end
+        task.wait(AUTO_ENTER_CHECK_INTERVAL)
+    end
+end)
+
+-- =======================================================
+-- 🎯 ENTRAR EM TEAM
+-- =======================================================
+local function aoEntrarNoTeam()
+    golJaDetectadoNesseSpawn = false
+    task.spawn(function()
+        for i = 1, 10 do
+            if tenhoTeam() and existeBolaNoMapa() then
+                detectarGolAutomatico(true)
+
+                if golSelecionado == 1 then
+                    selecionarGoalA(false)
+                elseif golSelecionado == 2 then
+                    selecionarGoalB(false)
+                end
+
+                task.wait(0.15)
+
+                if AUTO_GOL_ATIVADO and not seguirBolaAtivado then
+                    ativarSkill()
+                end
+                break
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+player.ChildAdded:Connect(function(child)
+    if child.Name:match("^Team%d+$") then
+        aoEntrarNoTeam()
+    end
+end)
+
+local tinhaTeamAntes = tenhoTeam()
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        local tenhoAgora = tenhoTeam()
+        if tenhoAgora and not tinhaTeamAntes then
+            aoEntrarNoTeam()
+            autoEnterJaDisparou = false
+        end
+        tinhaTeamAntes = tenhoAgora
+    end
+end)
+
+-- =======================================================
+-- 🎯 RESPAWN
+-- =======================================================
 player.CharacterAdded:Connect(function()
     task.wait(1)
+    golJaDetectadoNesseSpawn = false
+
+    if AUTO_GOL_ATIVADO then
+        task.spawn(function()
+            for _ = 1, 5 do
+                if tenhoTeam() and existeBolaNoMapa() then
+                    detectarGolAutomatico(true)
+
+                    if golSelecionado == 1 then
+                        selecionarGoalA(false)
+                    elseif golSelecionado == 2 then
+                        selecionarGoalB(false)
+                    end
+
+                    task.wait(0.15)
+
+                    if AUTO_GOL_ATIVADO and not seguirBolaAtivado then
+                        ativarSkill()
+                    end
+                    break
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+
     if tenhoTeam() then
         if flingBallAtivado then ativarFlingBall() end
         if wallPhaseAtivado then ativarWallPhase() end
@@ -1771,4 +2017,16 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("✅ Delta Hub v68 carregado — bolha suave + canto + posição original!")
+-- Detecta 1x quando carrega
+task.spawn(function()
+    task.wait(2)
+    if tenhoTeam() then
+        detectarGolAutomatico(true)
+    end
+end)
+
+-- Tenta entrar na partida automaticamente ao carregar
+task.spawn(function()
+    task.wait(2)
+    tentarEntrarPartida()
+end)
