@@ -1,6 +1,6 @@
 -- =======================================================
--- DELTA HUB - FUTEBOL (UI MOBILE v51) - CUSTOMIZADO
--- Head Fling: AlignPosition + AlignOrientation (trava sem kick)
+-- DELTA HUB - FUTEBOL (UI MOBILE v59) - CUSTOMIZADO
+-- Head Fling: fix de rotação pós-desativação (para de girar no ar)
 -- =======================================================
 local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
@@ -20,19 +20,28 @@ local FLING_ALTURA = 2
 
 -- 🧱 Wall Phase
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 13
+local WALL_PHASE_ALTURA = 10
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 
 -- 🔥 Head Fling
 local HEAD_FLING_PROFUNDIDADE = -1
 local HEAD_FLING_FRENTE = 2
-local HEAD_FLING_INCLINACAO = 90          -- 90 = pro chão
+local HEAD_FLING_INCLINACAO = 90
 local HEAD_FLING_ANGULAR = 1500
-local HEAD_FLING_ALIGN_FORCE = 1e5        -- força do AlignPosition (trava)
-local HEAD_FLING_ALIGN_TORQUE = 1e5       -- torque do AlignOrientation (trava)
-local HEAD_FLING_WALK_VEL = 350
-local HEAD_FLING_DURACAO = 1.5
+local HEAD_FLING_ALIGN_FORCE = 1e5
+local HEAD_FLING_ALIGN_TORQUE = 1e5
 local HEAD_FLING_RECUPERAR_DIST = 10
+local HEAD_FLING_SEGUIR_VEL = 15
+
+-- 🛡️ Anti-kick / Anti-voo
+local HEAD_FLING_VEL_LIMITE = 60
+local HEAD_FLING_VOOU_LIMITE = 30
+local HEAD_FLING_SUBIDA_LIMITE = 30
+local HEAD_FLING_Y_MINIMO = 5
+local HEAD_FLING_Y_DIF_MAX = 3
+
+-- 🛑 Anti-giro pós-desativação
+local HEAD_FLING_ZERAR_DURACAO = 0.5 -- segundos que continua zerando rotação
 
 -- 🛡️ Anti-dumping / Team
 local TEAM_CHECK_INTERVAL = 0.5
@@ -67,10 +76,13 @@ local headFlingAtivado = false
 local headFlingRodandoAgora = false
 local headFlingAlvo = nil
 local headFlingConnection = nil
-local headFlingStartTime = 0
 local headFlingAlvoMorreuConn = nil
 
--- 🌀 Constraints (AlignPosition + AlignOrientation + AngularVelocity)
+local headFlingFramesVoo = 0
+local headFlingFramesSubida = 0
+local headFlingZerarAte = 0 -- 🛑 timestamp até quando zerar rotação
+
+-- 🌀 Constraints
 local headFlingAlignPos = nil
 local headFlingAlignOri = nil
 local headFlingAngVel = nil
@@ -573,6 +585,24 @@ player.CharacterAdded:Connect(function()
 end)
 
 -- =======================================================
+-- 🛑 LOOP ANTI-GIRO (zera rotação até o timer passar)
+-- =======================================================
+task.spawn(function()
+    while true do
+        task.wait(0.03) -- ~33fps
+
+        if headFlingZerarAte > 0 and tick() < headFlingZerarAte then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                hrp.RotVelocity = Vector3.zero
+            end
+        end
+    end
+end)
+
+-- =======================================================
 -- BOLA
 -- =======================================================
 local function encontrarBola()
@@ -644,6 +674,7 @@ function desativarFlingBall()
         flingConnection:Disconnect()
         flingConnection = nil
     end
+    headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
     pararMeuMovimento()
     atualizarVisualFling(false)
 end
@@ -735,6 +766,7 @@ function desativarWallPhase()
         wallPhaseConnection:Disconnect()
         wallPhaseConnection = nil
     end
+    headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
     pararMeuMovimento()
     atualizarVisualWallPhase(false)
 end
@@ -782,7 +814,7 @@ local function ativarWallPhase()
 end
 
 -- =======================================================
--- 🔥 HEAD FLING (AlignPosition + AlignOrientation — TRAVA DE VERDADE)
+-- 🔥 HEAD FLING
 -- =======================================================
 local function removerConstraintsHeadFling()
     if headFlingAlignPos then headFlingAlignPos:Destroy(); headFlingAlignPos = nil end
@@ -795,6 +827,7 @@ local function pausarHeadFlingAgora()
     if not headFlingRodandoAgora then return end
     headFlingRodandoAgora = false
     removerConstraintsHeadFling()
+
     local char = player.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -803,6 +836,17 @@ local function pausarHeadFlingAgora()
             humanoid.AutoRotate = true
         end
     end
+
+    -- 🛑 ZERA ROTAÇÃO E MARCA TIMER
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.RotVelocity = Vector3.zero
+        hrp.Velocity = Vector3.zero
+    end
+    headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
+
     pararMeuMovimento()
 end
 
@@ -817,26 +861,22 @@ local function ativarHeadFlingAgora()
     humanoid.PlatformStand = true
     humanoid.AutoRotate = false
     headFlingRodandoAgora = true
-    headFlingStartTime = tick()
 
     removerConstraintsHeadFling()
 
-    -- 📍 Attachment no HRP (referência pra AlignPosition/Orientation)
     headFlingAttachment = Instance.new("Attachment")
     headFlingAttachment.Name = "HeadFlingAttach"
     headFlingAttachment.Parent = hrp
 
-    -- 🚀 AlignPosition: TRAVA a posição do HRP no ponto alvo
     headFlingAlignPos = Instance.new("AlignPosition")
     headFlingAlignPos.Name = "HeadFlingAlignPos"
     headFlingAlignPos.Attachment0 = headFlingAttachment
     headFlingAlignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
     headFlingAlignPos.Position = hrp.Position
     headFlingAlignPos.MaxForce = HEAD_FLING_ALIGN_FORCE
-    headFlingAlignPos.Responsiveness = 200 -- ⬅️ quanto maior, mais rápido cola
+    headFlingAlignPos.Responsiveness = 200
     headFlingAlignPos.Parent = hrp
 
-    -- 🎯 AlignOrientation: TRAVA a rotação do HRP
     headFlingAlignOri = Instance.new("AlignOrientation")
     headFlingAlignOri.Name = "HeadFlingAlignOri"
     headFlingAlignOri.Attachment0 = headFlingAttachment
@@ -844,10 +884,9 @@ local function ativarHeadFlingAgora()
     headFlingAlignOri.CFrame = hrp.CFrame
     headFlingAlignOri.MaxTorque = HEAD_FLING_ALIGN_TORQUE
     headFlingAlignOri.Responsiveness = 200
-    headFlingAlignOri.PrimaryAxisOnly = false -- ⬅️ trava os 3 eixos
+    headFlingAlignOri.PrimaryAxisOnly = false
     headFlingAlignOri.Parent = hrp
 
-    -- 🌀 AngularVelocity: spin adicional (arremessa)
     headFlingAngVel = Instance.new("AngularVelocity")
     headFlingAngVel.Name = "HeadFlingAngVel"
     headFlingAngVel.Attachment0 = headFlingAttachment
@@ -868,6 +907,9 @@ function desativarHeadFling()
         headFlingConnection:Disconnect()
         headFlingConnection = nil
     end
+
+    headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
+
     pararMeuMovimento()
     atualizarVisualHeadFling(false)
 end
@@ -908,6 +950,11 @@ local function ativarHeadFling()
 
     ativarHeadFlingAgora()
 
+    headFlingFramesVoo = 0
+    headFlingFramesSubida = 0
+
+    local ativadoEm = tick()
+
     if headFlingAlvo then
         iniciarSpectate(headFlingAlvo)
         conectarMonitorMorte(headFlingAlvo)
@@ -922,12 +969,6 @@ local function ativarHeadFling()
         if not h then return end
         if not headFlingAlignPos or not headFlingAlignPos.Parent then
             headFlingAlignPos = nil; headFlingAlignOri = nil; headFlingAngVel = nil; headFlingAttachment = nil
-            return
-        end
-
-        -- ⏱️ Timer
-        if headFlingRodandoAgora and (tick() - headFlingStartTime) >= HEAD_FLING_DURACAO then
-            pausarHeadFlingAgora()
             return
         end
 
@@ -954,21 +995,57 @@ local function ativarHeadFling()
             return
         end
 
+        local minhaPos = h.Position
         local velTorso = alvoTorso.AssemblyLinearVelocity
         local velFlat = Vector3.new(velTorso.X, 0, velTorso.Z)
+        local velY = velTorso.Y
 
-        if math.abs(velTorso.Y) > 25 or velTorso.Magnitude > 70 then
-            pausarHeadFlingAgora()
-            return
+        local passouGrace = (tick() - ativadoEm) > 0.5
+
+        if passouGrace then
+            local alvoRealmenteVoou = math.abs(velY) > HEAD_FLING_VOOU_LIMITE or velTorso.Magnitude > HEAD_FLING_VEL_LIMITE
+
+            if alvoRealmenteVoou then
+                headFlingFramesVoo = headFlingFramesVoo + 1
+            else
+                headFlingFramesVoo = 0
+            end
+
+            if headFlingFramesVoo >= 3 then
+                print("🎯 Alvo voou! Removendo constraints.")
+                headFlingAtivado = false
+                pausarHeadFlingAgora()
+                return
+            end
+
+            if minhaPos.Y < HEAD_FLING_Y_MINIMO then
+                print("⚠️ Y abaixo do mínimo — parando!")
+                headFlingAtivado = false
+                pausarHeadFlingAgora()
+                return
+            end
+
+            local subiMuito = (minhaPos.Y > cabecaPos.Y + 5)
+            if subiMuito then
+                headFlingFramesSubida = headFlingFramesSubida + 1
+            else
+                headFlingFramesSubida = 0
+            end
+
+            if headFlingFramesSubida >= 3 then
+                print("⚠️ Subindo acima do alvo — parando!")
+                headFlingAtivado = false
+                pausarHeadFlingAgora()
+                return
+            end
         end
 
         if not headFlingRodandoAgora then
             ativarHeadFlingAgora()
         end
 
-        local alvoAndando = velFlat.Magnitude > 3
+        local alvoAndando = velFlat.Magnitude > 10
 
-        -- 🎯 DESTINO: dentro da cabeça (com offset se andando)
         local destinoPos
         if alvoAndando then
             destinoPos = cabecaPos + velFlat.Unit * HEAD_FLING_FRENTE + Vector3.new(0, HEAD_FLING_PROFUNDIDADE, 0)
@@ -981,11 +1058,7 @@ local function ativarHeadFling()
             return
         end
 
-        local minhaPos = h.Position
-        local dist = (destinoPos - minhaPos).Magnitude
-
-        -- 🛟 Recuperação (só se ficar MUITO longe)
-        if dist > HEAD_FLING_RECUPERAR_DIST then
+        if minhaPos.Y < cabecaPos.Y - HEAD_FLING_Y_DIF_MAX then
             h.CFrame = CFrame.new(destinoPos)
             h.AssemblyLinearVelocity = Vector3.zero
             h.AssemblyAngularVelocity = Vector3.zero
@@ -995,24 +1068,50 @@ local function ativarHeadFling()
             return
         end
 
-        -- 🎯 Orientação: virado pro alvo + inclinado pro chão
-        local lookTarget = Vector3.new(cabecaPos.X, destinoPos.Y, cabecaPos.Z)
-        local baseCFrame = CFrame.lookAt(destinoPos, lookTarget)
-        local orientacaoFinal = baseCFrame * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
+        local diff = destinoPos - minhaPos
+        local dist = diff.Magnitude
 
-        -- 🚀 Atualiza o AlignPosition (trava na posição exata)
-        if headFlingAlignPos then
-            headFlingAlignPos.Position = destinoPos
-            -- Responsiveness alta quando perto, mais baixa quando longe
-            headFlingAlignPos.Responsiveness = dist > 3 and 60 or 200
+        if dist > HEAD_FLING_RECUPERAR_DIST then
+            if destinoPos.Y >= HEAD_FLING_Y_MINIMO and minhaPos.Y >= HEAD_FLING_Y_MINIMO then
+                h.CFrame = CFrame.new(destinoPos)
+                h.AssemblyLinearVelocity = Vector3.zero
+                h.AssemblyAngularVelocity = Vector3.zero
+            end
+            return
         end
 
-        -- 🎯 Atualiza o AlignOrientation (trava na rotação exata)
+        local targetVel = diff * HEAD_FLING_SEGUIR_VEL
+        h.AssemblyLinearVelocity = targetVel
+        h.Velocity = targetVel
+
+        if headFlingAlignPos then
+            headFlingAlignPos.Position = destinoPos
+            headFlingAlignPos.Responsiveness = 200
+        end
+
+        -- 🎯 Orientação (fix gimbal lock quando parado)
+        local flatDir
+        if velFlat.Magnitude > 1 then
+            flatDir = velFlat.Unit
+        else
+            local minhaLook = h.CFrame.LookVector
+            flatDir = Vector3.new(minhaLook.X, 0, minhaLook.Z)
+            if flatDir.Magnitude < 0.1 then
+                local cam = workspace.CurrentCamera
+                local camLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, 1)
+                flatDir = Vector3.new(camLook.X, 0, camLook.Z).Unit
+            else
+                flatDir = flatDir.Unit
+            end
+        end
+
+        local baseCFrame = CFrame.lookAt(destinoPos, destinoPos + flatDir)
+        local orientacaoFinal = baseCFrame * CFrame.Angles(math.rad(HEAD_FLING_INCLINACAO), 0, 0)
+
         if headFlingAlignOri then
             headFlingAlignOri.CFrame = orientacaoFinal
         end
 
-        -- 🌀 Reforça o spin
         if headFlingAngVel then
             headFlingAngVel.AngularVelocity = Vector3.new(0, HEAD_FLING_ANGULAR, 0)
         end
@@ -1039,6 +1138,7 @@ local function resetarSpeed()
             humanoid.AutoRotate = true
         end
     end
+    headFlingZerarAte = tick() + HEAD_FLING_ZERAR_DURACAO
     pararMeuMovimento()
 end
 
