@@ -1,4 +1,22 @@
 -- =======================================================
+-- ANTI-DUPLICAÇÃO: executa APENAS UMA VEZ
+-- =======================================================
+local FLAG = "__TOUCH_SOCCER_RUNNING__"
+local env = (getgenv and getgenv()) or _G
+
+if env[FLAG] then
+    warn("[Touch Soccer] Bloqueado: script já está em execução.")
+    return
+end
+env[FLAG] = true
+
+pcall(function()
+    local antigo = game.CoreGui:FindFirstChild("DeltaMobileHub")
+    if antigo then antigo:Destroy() end
+end)
+-- =======================================================
+
+-- =======================================================
 -- DELTA HUB - FUTEBOL (UI MOBILE v81) - DESIGN FUTURISTA
 -- Fix: variáveis declaradas ANTES da função de detecção
 -- =======================================================
@@ -6,7 +24,6 @@ local player = game.Players.LocalPlayer
 local Players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
 local TweenService = game:GetService("TweenService")
 
 -- ⚙️ CONFIGURAÇÃO ⚙️
@@ -14,11 +31,11 @@ local alturaFixa = 7
 local inclinacaoX = 35
 local WALK_SPEED = 64
 local FLING_RAIO = 2.0
-local FLING_VELOCIDADE = 400
-local FLING_FORCA = 900
+local FLING_VELOCIDADE = 300
+local FLING_FORCA = 800
 local FLING_ALTURA = 2
 local WALL_PHASE_INCLINACAO = -90
-local WALL_PHASE_ALTURA = 10.3
+local WALL_PHASE_ALTURA = 10.5
 local WALL_PHASE_ANIMATION_ASSET_ID = 79017619155911
 local HEAD_FLING_PROFUNDIDADE = -2
 local HEAD_FLING_FRENTE = 1.5
@@ -427,58 +444,38 @@ local function detectarGolAutomatico(forcar)
     golJaDetectadoNesseSpawn = true
 end
 
--- =======================================================
--- 🔄 AUTO-REJOIN
--- =======================================================
-local REJOIN_PLACE_ID = game.PlaceId
-local REJOIN_JOB_ID = game.JobId
-local rejoinJaDisparou = false
-local SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer"
-local LOAD_CMD = 'loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()'
+-- ►►► NOVO: sincroniza o gol com o time atual (roda mesmo em modo manual) ◄◄◄
+local function sincronizarGolComTeam()
+    golJaDetectadoNesseSpawn = false
+    task.spawn(function()
+        for _ = 1, 10 do
+            task.wait(0.3)
+            if tenhoTeam() and existeBolaNoMapa() then
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then continue end
 
-if type(queue_on_teleport) == "function" then
-    pcall(function() queue_on_teleport(LOAD_CMD) end)
-end
+                local minhaPos = hrp.Position
+                local posA, distA = encontrarSpawnMaisProximo(minhaPos, "SpawnA")
+                local posB, distB = encontrarSpawnMaisProximo(minhaPos, "SpawnB")
+                if not posA or not posB then continue end
 
-local function rejoin()
-    if rejoinJaDisparou then return end
-    rejoinJaDisparou = true
-    if type(queue_on_teleport) == "function" then
-        pcall(function() queue_on_teleport(LOAD_CMD) end)
-    end
-    pcall(function()
-        TeleportService:TeleportToPlaceInstance(REJOIN_PLACE_ID, REJOIN_JOB_ID, player)
-    end)
-end
+                -- Perto do SpawnA → ataca o Goal B (2)
+                -- Perto do SpawnB → ataca o Goal A (1)
+                local novoGol = (distA < distB) and 2 or 1
+                golSelecionado = novoGol
+                golJaDetectadoNesseSpawn = true
+                atualizarBotoesGoalGlobal()
 
-if hookfunction and newcclosure then
-    local oldPrint = print
-    print = newcclosure(function(...)
-        local args = {...}
-        local msg = ""
-        for _, v in ipairs(args) do msg = msg .. tostring(v) .. " " end
-        if string.find(msg, "Server Kick Message") or string.find(msg, "kicked due to") then
-            rejoin()
+                if AUTO_GOL_ATIVADO and not seguirBolaAtivado then
+                    ativarSkill()
+                end
+                return
+            end
         end
-        return oldPrint(...)
     end)
 end
-
-if hookmetamethod and getnamecallmethod then
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local m = getnamecallmethod()
-        if m == "Kick" or m == "kick" then rejoin() end
-        return oldNamecall(self, ...)
-    end)
-end
-
-player.AncestryChanged:Connect(function()
-    if not player.Parent then rejoin() end
-end)
-Players.PlayerRemoving:Connect(function(p)
-    if p == player then rejoin() end
-end)
+-- ►►► FIM ◄◄◄
 
 -- =======================================================
 -- 👁️ SPECTATE
@@ -1053,6 +1050,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     pararMeuMovimento()
     pararSpectate()
     ScreenGui:Destroy()
+    if getgenv then getgenv()[FLAG] = nil else _G[FLAG] = nil end
 end)
 
 ConfigBtn.MouseButton1Click:Connect(function()
@@ -1932,36 +1930,17 @@ task.spawn(function()
 end)
 
 -- =======================================================
--- 🎯 ENTRAR EM TEAM
+-- 🎯 ENTRAR EM TEAM (agora usa sincronização)
 -- =======================================================
-local function aoEntrarNoTeam()
-    golJaDetectadoNesseSpawn = false
-    task.spawn(function()
-        for i = 1, 10 do
-            if tenhoTeam() and existeBolaNoMapa() then
-                detectarGolAutomatico(true)
-
-                if golSelecionado == 1 then
-                    selecionarGoalA(false)
-                elseif golSelecionado == 2 then
-                    selecionarGoalB(false)
-                end
-
-                task.wait(0.15)
-
-                if AUTO_GOL_ATIVADO and not seguirBolaAtivado then
-                    ativarSkill()
-                end
-                break
-            end
-            task.wait(0.5)
-        end
-    end)
-end
-
 player.ChildAdded:Connect(function(child)
     if child.Name:match("^Team%d+$") then
-        aoEntrarNoTeam()
+        sincronizarGolComTeam()
+    end
+end)
+
+player.ChildRemoved:Connect(function(child)
+    if child.Name:match("^Team%d+$") then
+        golJaDetectadoNesseSpawn = false
     end
 end)
 
@@ -1971,11 +1950,16 @@ task.spawn(function()
         task.wait(0.3)
         local tenhoAgora = tenhoTeam()
         if tenhoAgora and not tinhaTeamAntes then
-            aoEntrarNoTeam()
+            sincronizarGolComTeam()
             autoEnterJaDisparou = false
         end
         tinhaTeamAntes = tenhoAgora
     end
+end)
+
+-- ►►► FIX: detecta troca de time (Team1 → Team2 direto, ou nil → Team) ◄◄◄
+player:GetPropertyChangedSignal("Team"):Connect(function()
+    sincronizarGolComTeam()
 end)
 
 -- =======================================================
