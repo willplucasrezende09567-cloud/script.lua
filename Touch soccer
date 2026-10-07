@@ -1,6 +1,66 @@
 -- Futuristic GUI by willnzx.mt + miguelestrellaaa
 -- Auto-Gol + Bring Ball + Loop Bring + Freeze All + Boost + Slider + Sky Ball + Touch Goal + Move Ball + Orbit Ball + Cmds + CmdBar2 + Config Viewer + 3 TABS
 
+--============================================================
+-- VERIFICAÇÃO DE MAPA - Touch Soccer
+--============================================================
+local PLACE_ID_CORRETO = 11232592166
+
+if game.PlaceId ~= PLACE_ID_CORRETO then
+    warn("[Touch Soccer] Você não está no mapa Touch Soccer. Script encerrado.")
+
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+
+    if player then
+        local playerGui = player:WaitForChild("PlayerGui")
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "TouchSoccerAviso"
+        screenGui.ResetOnSpawn = false
+        screenGui.IgnoreGuiInset = true
+        screenGui.Parent = playerGui
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 420, 0, 110)
+        frame.Position = UDim2.new(0.5, -210, 0.5, -55)
+        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        frame.BackgroundTransparency = 0.1
+        frame.BorderSizePixel = 0
+        frame.Parent = screenGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = frame
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(255, 60, 60)
+        stroke.Thickness = 2
+        stroke.Parent = frame
+
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, -20, 1, -20)
+        text.Position = UDim2.new(0, 10, 0, 10)
+        text.BackgroundTransparency = 1
+        text.Text = "⚠️ Você não está no Touch Soccer!\nEste script só funciona no mapa Touch Soccer."
+        text.TextColor3 = Color3.fromRGB(255, 255, 255)
+        text.TextScaled = true
+        text.Font = Enum.Font.GothamBold
+        text.TextWrapped = true
+        text.Parent = frame
+
+        -- Remove o aviso após 5 segundos (remova esse bloco se quiser aviso permanente)
+        task.delay(5, function()
+            if screenGui and screenGui.Parent then
+                screenGui:Destroy()
+            end
+        end)
+    end
+
+    return
+end
+--============================================================
+
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
