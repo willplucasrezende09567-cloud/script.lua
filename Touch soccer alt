@@ -10,21 +10,20 @@ local CAS = game:GetService("ContextActionService")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
--- ✅ FLAG ANTI-DUPLICAÇÃO
+-- FLAG ANTI-DUPLICACAO
 if W.loaded_base then
-    warn("[Willnzx] GUI já está carregada! Ignorando execução duplicada.")
+    warn("[Willnzx] GUI ja carregada. Ignorando execucao duplicada.")
     return
 end
 W.loaded_base = true
 
--- ✅ LIMPEZA DE GUIs ÓRFÃS
+-- LIMPEZA DE GUIs ORFAS
 pcall(function()
     local old1 = CoreGui:FindFirstChild("WillnzxGUI"); if old1 then old1:Destroy() end
     local old2 = CoreGui:FindFirstChild("WillnzxCmdsGUI"); if old2 then old2:Destroy() end
     local old3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI"); if old3 then old3:Destroy() end
     local old4 = CoreGui:FindFirstChild("ArrowControlGUI"); if old4 then old4:Destroy() end
 end)
-
 -- resto do script...
 
 local CoreGui = game:GetService("CoreGui")
