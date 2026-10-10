@@ -1161,9 +1161,6 @@ W.CFGV.bugMaxForce = 3000
 W.CFGV.bugForceMult = 150
 W.CFGV.bugDelay = 0.05
 
--- ... (todo o script em cima) ...
-
--- 👇 COLA O BLOCO DO REJOIN AQUI 👇
 local REJOIN_SCRIPT = [[
     _G.Willnzx = nil
     loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()
@@ -1186,6 +1183,5 @@ pcall(function()
         fluxus.queue_on_teleport(REJOIN_SCRIPT)
     end
 end)
--- 👆 FIM DO BLOCO 👆
 
 print("[Willnzx] GUI base carregada")
