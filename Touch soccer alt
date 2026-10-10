@@ -1,9 +1,12 @@
--- após rejoin re-executar
 local REJOIN_SCRIPT = [[
-    loadstring(game:HttpGet("loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()"))()
+    _G.Willnzx = nil
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()
     pcall(function()
         if queue_on_teleport then
-            queue_on_teleport("loadstring(game:HttpGet('loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()'))()")
+            queue_on_teleport([[
+                _G.Willnzx = nil
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()
+            ]])
         end
     end)
 ]]
@@ -1151,5 +1154,32 @@ W.CFGV.bugSpeed = 4
 W.CFGV.bugMaxForce = 3000
 W.CFGV.bugForceMult = 150
 W.CFGV.bugDelay = 0.05
+
+-- ... (todo o script em cima) ...
+
+-- 👇 COLA O BLOCO DO REJOIN AQUI 👇
+local REJOIN_SCRIPT = [[
+    _G.Willnzx = nil
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()
+    pcall(function()
+        if queue_on_teleport then
+            queue_on_teleport([[
+                _G.Willnzx = nil
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()
+            ]])
+        end
+    end)
+]]
+
+pcall(function()
+    if queue_on_teleport then
+        queue_on_teleport(REJOIN_SCRIPT)
+    elseif syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(REJOIN_SCRIPT)
+    elseif fluxus and fluxus.queue_on_teleport then
+        fluxus.queue_on_teleport(REJOIN_SCRIPT)
+    end
+end)
+-- 👆 FIM DO BLOCO 👆
 
 print("[Willnzx] GUI base carregada")
