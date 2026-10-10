@@ -10,6 +10,35 @@ local CAS = game:GetService("ContextActionService")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
+-- ✅ FLAG ANTI-DUPLICAÇÃO
+if W.loaded_base then
+    warn("[Willnzx] GUI já está carregada! Ignorando execução duplicada.")
+    return
+end
+W.loaded_base = true
+
+-- ✅ LIMPEZA DE GUIs ÓRFÃS
+pcall(function()
+    local old1 = CoreGui:FindFirstChild("WillnzxGUI"); if old1 then old1:Destroy() end
+    local old2 = CoreGui:FindFirstChild("WillnzxCmdsGUI"); if old2 then old2:Destroy() end
+    local old3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI"); if old3 then old3:Destroy() end
+    local old4 = CoreGui:FindFirstChild("ArrowControlGUI"); if old4 then old4:Destroy() end
+end)
+
+-- resto do script...
+
+local CoreGui = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local GuiS = game:GetService("GuiService")
+local TPS = game:GetService("TeleportService")
+local CAS = game:GetService("ContextActionService")
+
+local LP = Players.LocalPlayer
+local W = _G.Willnzx or {}
+
 W.urls = {
     cmds    = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmds",
     cmdbar2 = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmdbar2",
