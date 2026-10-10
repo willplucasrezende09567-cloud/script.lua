@@ -3,7 +3,7 @@ local REJOIN_SCRIPT = [[
     loadstring(game:HttpGet("loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()"))()
     pcall(function()
         if queue_on_teleport then
-            queue_on_teleport("loadstring(game:HttpGet('https://pastefy.app/Q9OA2L8K/raw'))()")
+            queue_on_teleport("loadstring(game:HttpGet('loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()'))()")
         end
     end)
 ]]
