@@ -1,3 +1,23 @@
+-- após rejoin re-executar
+local REJOIN_SCRIPT = [[
+    loadstring(game:HttpGet("loadstring(game:HttpGet("https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20alt"))()"))()
+    pcall(function()
+        if queue_on_teleport then
+            queue_on_teleport("loadstring(game:HttpGet('https://pastefy.app/Q9OA2L8K/raw'))()")
+        end
+    end)
+]]
+
+pcall(function()
+    if queue_on_teleport then
+        queue_on_teleport(REJOIN_SCRIPT)
+    elseif syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(REJOIN_SCRIPT)
+    elseif fluxus and fluxus.queue_on_teleport then
+        fluxus.queue_on_teleport(REJOIN_SCRIPT)
+    end
+end)
+
 local CoreGui = game:GetService("CoreGui")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
