@@ -1172,11 +1172,11 @@ W.CFGV.skyForce = 5000
 W.CFGV.touchGoalDist = 3
 W.CFGV.boostMaxSpeed = 250
 W.CFGV.boostDelay = 0.15
-W.CFGV.bugRadius = 15
-W.CFGV.bugHeight = 6
-W.CFGV.bugSpeed = 6
-W.CFGV.bugMaxForce = 8000
+W.CFGV.bugRadius = 30
+W.CFGV.bugHeight = 9
+W.CFGV.bugSpeed = 9
+W.CFGV.bugMaxForce = 9000
 W.CFGV.bugForceMult = 400
-W.CFGV.bugDelay = 0.03
+W.CFGV.bugDelay = 0.01
 
 print("[Willnzx] GUI base carregada")
