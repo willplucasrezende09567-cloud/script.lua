@@ -6,78 +6,70 @@ local Players = game:GetService("Players")
 local GuiS = game:GetService("GuiService")
 local TPS = game:GetService("TeleportService")
 local CAS = game:GetService("ContextActionService")
+
 local LP = Players.LocalPlayer
-local UID = LP.UserId
-local TKN = LP.Name
-local KBE = RS:WaitForChild("KickBall")
-local TPPOS = Vector3.new(-186.25, 6.29, -28.13)
-local GOALS = {[1]={pos=Vector3.new(-316.8,12.7,92.8)}, [2]={pos=Vector3.new(-112.2,12.7,92.6)}}
-local MOVEA = Vector3.new(-213.81, 6.32, 26.87)
-local MOVEB = Vector3.new(-215.15, 6.32, 160.50)
-local ORB = {
+local W = _G.Willnzx or {}
+
+if W.loaded_base then
+    warn("[Willnzx] GUI ja carregada. Ignorando execucao duplicada.")
+    return
+end
+W.loaded_base = true
+
+pcall(function()
+    local o1 = CoreGui:FindFirstChild("WillnzxGUI"); if o1 then o1:Destroy() end
+    local o2 = CoreGui:FindFirstChild("WillnzxCmdsGUI"); if o2 then o2:Destroy() end
+    local o3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI"); if o3 then o3:Destroy() end
+    local o4 = CoreGui:FindFirstChild("ArrowControlGUI"); if o4 then o4:Destroy() end
+end)
+
+W.urls = {
+    cmds    = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmds",
+    cmdbar2 = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmdbar2",
+    control = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Control",
+}
+
+W.CoreGui = CoreGui
+W.UIS = UIS
+W.TS = TS
+W.RS = RS
+W.Players = Players
+W.LP = LP
+W.UID = LP.UserId
+W.TKN = LP.Name
+W.KBE = RS:WaitForChild("KickBall")
+W.TPPOS = Vector3.new(-186.25, 6.29, -28.13)
+W.GOALS = {[1]={pos=Vector3.new(-316.8,12.7,92.8)}, [2]={pos=Vector3.new(-112.2,12.7,92.6)}}
+W.MOVEA = Vector3.new(-213.81, 6.32, 26.87)
+W.MOVEB = Vector3.new(-215.15, 6.32, 160.50)
+W.ORB = {
     Vector3.new(-214.45, 6.32, 115.19),
     Vector3.new(-235.27, 6.32, 91.72),
     Vector3.new(-214.60, 6.32, 70.07),
     Vector3.new(-193.58, 6.32, 93.71)
 }
-local CFGV = {}
-local isActive, isBringing, isLoopBringing, isFreezing, isBoostingAll, isSkying, isTouchGoal, isMoveBall, isOrbitBall, isBugBall, isTpGoal, isControl, isDefending, isCollectingCoins = false, false, false, false, false, false, false, false, false, false, false, false, false, false
-local loopThread, bringThread, loopBringThread, freezeThread, boostAllThread, skyThread, touchGoalThread, moveBallThread, orbitBallThread, bugBallThread, tpGoalThread, defendThread, coinTpThread = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
-local controlScreenGui, controlLastFire, defendLastFire, defendLastKick, defendKickCount = nil, 0, 0, 0, 0
-local spectatedPlayer, selectedGoalIndex, defendSelectedGoal, boostMultiplier, hookSkip = nil, 1, "A", 3, false
-local Button, TpGoalBtn, ControlBtn, TouchGoalBtn, SkyBtn, BoostAllBtn, BringBtn, LoopBringBtn, MoveBallBtn, OrbitBallBtn, FreezeAllBtn, BugBallBtn, DefendGoalBtn, CoinTpBtn, Knob, setBtnActive, setBtnInactive = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
-local toggleCmds, toggleCmdBar, processCommandRef = nil, nil, nil
+W.CFGV = {}
+W.loaded = {}
+W.toggles = {}
+W.states = {}
+W.boostMultiplier = 3
+W.selectedGoalIndex = 1
+W.defendSelectedGoal = "A"
 
-local function rejoin()
-    local jobId = game.JobId
-    pcall(function()
-        if jobId and jobId ~= "" then
-            TPS:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
-        else
-            TPS:Teleport(game.PlaceId, LP)
-        end
-    end)
-end
-GuiS.ErrorMessageChanged:Connect(function(e)
-    if e and e ~= "" then task.wait(0.01); rejoin() end
-end)
+local hookSkip = false
 
-local function getBall()
+W.getBall = function()
     local f = workspace:FindFirstChild("FootballField")
     return f and f:FindFirstChild("SoccerBall")
 end
 
-local function safeFire(...)
+W.safeFire = function(...)
     hookSkip = true
-    KBE:FireServer(...)
+    W.KBE:FireServer(...)
     hookSkip = false
 end
 
-local function addTap(btn, cb)
-    local touchStart, touchMoved, touchTime = nil, false, 0
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            touchStart = input.Position
-            touchMoved = false
-            touchTime = tick()
-        end
-    end)
-    btn.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            if touchStart and (input.Position - touchStart).Magnitude > 12 then touchMoved = true end
-        end
-    end)
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if touchStart then
-                if not touchMoved and (input.Position - touchStart).Magnitude <= 12 and (tick() - touchTime) <= 0.4 then cb() end
-                touchStart = nil
-            end
-        end
-    end)
-end
-
-local function sendToChat(t)
+W.sendToChat = function(t)
     local TCS = game:GetService("TextChatService")
     local ok = pcall(function()
         if TCS.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -89,12 +81,32 @@ local function sendToChat(t)
     if not ok then pcall(function() LP:Chat(t) end) end
 end
 
-local function catmull(p0, p1, p2, p3, t)
+W.addTap = function(btn, cb)
+    local ts, tm, tt = nil, false, 0
+    btn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            ts = i.Position; tm = false; tt = tick()
+        end
+    end)
+    btn.InputChanged:Connect(function(i)
+        if (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) and ts then
+            if (i.Position - ts).Magnitude > 12 then tm = true end
+        end
+    end)
+    btn.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            if ts and not tm and (i.Position - ts).Magnitude <= 12 and (tick() - tt) <= 0.4 then cb() end
+            ts = nil
+        end
+    end)
+end
+
+W.catmull = function(p0, p1, p2, p3, t)
     local t2, t3 = t*t, t*t*t
     return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3)
 end
 
-local function isInTeam()
+W.isInTeam = function()
     local c = LP.Character
     if not c then return false end
     for _, o in pairs(c:GetChildren()) do
@@ -105,7 +117,7 @@ local function isInTeam()
     return false
 end
 
-local function getRandomPlayer()
+W.getRandomPlayer = function()
     local l = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then table.insert(l, p) end
@@ -113,18 +125,88 @@ local function getRandomPlayer()
     if #l > 0 then return l[math.random(1, #l)] end
 end
 
-local function startSpectating()
-    local t = getRandomPlayer()
+W.setBtnActive = function(btn, text)
+    btn:SetAttribute("IsActive", true); btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(100, 200, 255); btn.BackgroundTransparency = 0.05
+    btn.TextColor3 = Color3.fromRGB(10, 30, 60); btn.TextStrokeTransparency = 1
+end
+
+W.setBtnInactive = function(btn, text)
+    btn:SetAttribute("IsActive", false); btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextStrokeTransparency = 0.4
+    btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); btn.BackgroundTransparency = 0.4
+end
+
+W.loadModule = function(name)
+    if W.loaded[name] then
+        local tg = W.toggles[name]
+        if tg then tg() end
+        return
+    end
+    W.loaded[name] = true
+    local url = W.urls[name]
+    if not url then
+        warn("[Willnzx] URL nao configurada para: " .. name)
+        W.loaded[name] = false
+        return
+    end
+    local ok, err = pcall(function()
+        local code = game:HttpGet(url)
+        loadstring(code)()
+    end)
+    if not ok then
+        W.loaded[name] = false
+        warn("[Willnzx] Erro ao carregar " .. name .. ": " .. tostring(err))
+    end
+end
+
+_G.Willnzx = W
+
+local function rejoin()
+    local jid = game.JobId
+    pcall(function()
+        if jid and jid ~= "" then TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
+        else TPS:Teleport(game.PlaceId, LP) end
+    end)
+end
+GuiS.ErrorMessageChanged:Connect(function(e)
+    if e and e ~= "" then task.wait(0.01); rejoin() end
+end)
+
+W.fireSingle = function(gi)
+    local b = W.getBall()
+    if not b then return end
+    local d = (W.GOALS[gi].pos - b.Position).Unit
+    local f = (d * W.CFGV.autoGoalForce) + Vector3.new(0, W.CFGV.autoGoalY, 0)
+    W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
+end
+
+W.startAutoGoal = function()
+    W.states.loopThread = task.spawn(function()
+        while W.states.isActive do
+            local b = W.getBall()
+            if b then
+                local d = (W.GOALS[W.selectedGoalIndex].pos - b.Position).Unit
+                local f = (d * W.CFGV.autoGoalForce) + Vector3.new(0, W.CFGV.autoGoalY, 0)
+                W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
+            end
+            task.wait(0.05)
+        end
+    end)
+end
+
+W.startSpectating = function()
+    local t = W.getRandomPlayer()
     if t then
-        spectatedPlayer = t
+        W.states.spectatedPlayer = t
         local cam = workspace.CurrentCamera
         local h = t.Character:FindFirstChildOfClass("Humanoid")
         if h then cam.CameraSubject = h; cam.CameraType = Enum.CameraType.Custom end
     end
 end
 
-local function stopSpectating()
-    spectatedPlayer = nil
+W.stopSpectating = function()
+    W.states.spectatedPlayer = nil
     local c = LP.Character
     if c then
         local h = c:FindFirstChildOfClass("Humanoid")
@@ -132,499 +214,274 @@ local function stopSpectating()
     end
 end
 
-Players.PlayerRemoving:Connect(function(p)
-    if spectatedPlayer == p and isTpGoal then task.wait(0.5); startSpectating() end
-end)
-
-local function fireSingle(gi)
-    local b = getBall()
-    if not b then return end
-    local d = (GOALS[gi].pos - b.Position).Unit
-    local f = (d * CFGV.autoGoalForce) + Vector3.new(0, CFGV.autoGoalY, 0)
-    safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
-end
-
-local function startAutoGoal()
-    loopThread = task.spawn(function()
-        while isActive do
-            local b = getBall()
-            if b then
-                local d = (GOALS[selectedGoalIndex].pos - b.Position).Unit
-                local f = (d * CFGV.autoGoalForce) + Vector3.new(0, CFGV.autoGoalY, 0)
-                safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
-            end
-            task.wait(0.05)
-        end
-    end)
-end
-
-local function startTpGoal()
-    tpGoalThread = task.spawn(function()
-        while isTpGoal do
-            if isInTeam() then
+W.startTpGoal = function()
+    W.states.tpGoalThread = task.spawn(function()
+        while W.states.isTpGoal do
+            if W.isInTeam() then
                 local c = LP.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
-                if h then h.CFrame = CFrame.new(TPPOS) end
-                local b = getBall()
+                if h then h.CFrame = CFrame.new(W.TPPOS) end
+                local b = W.getBall()
                 if b then
-                    local d = (GOALS[selectedGoalIndex].pos - b.Position).Unit
+                    local d = (W.GOALS[W.selectedGoalIndex].pos - b.Position).Unit
                     local f = (d * 5000) + Vector3.new(0, 50, 0)
-                    safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
+                    W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
                 end
             end
             task.wait(0.1)
         end
-        tpGoalThread = nil
+        W.states.tpGoalThread = nil
     end)
 end
 
-local function startTouchGoal()
-    touchGoalThread = task.spawn(function()
-        while isTouchGoal do
-            local b = getBall()
-            if not b then
-                isTouchGoal = false
-                if TouchGoalBtn and setBtnInactive then setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO") end
-                break
-            end
+W.startTouchGoal = function()
+    W.states.touchGoalThread = task.spawn(function()
+        while W.states.isTouchGoal do
+            local b = W.getBall()
+            if not b then W.states.isTouchGoal = false; break end
             local c = LP.Character
             local h = c and c:FindFirstChild("HumanoidRootPart")
-            if h and (b.Position - h.Position).Magnitude < CFGV.touchGoalDist then
-                local d = (GOALS[selectedGoalIndex].pos - b.Position).Unit
-                local f = (d * CFGV.autoGoalForce) + Vector3.new(0, CFGV.autoGoalY, 0)
-                safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
+            if h and (b.Position - h.Position).Magnitude < W.CFGV.touchGoalDist then
+                local d = (W.GOALS[W.selectedGoalIndex].pos - b.Position).Unit
+                local f = (d * W.CFGV.autoGoalForce) + Vector3.new(0, W.CFGV.autoGoalY, 0)
+                W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
             end
             task.wait(0.03)
         end
-        touchGoalThread = nil
+        W.states.touchGoalThread = nil
     end)
 end
 
-local function startMoveBall()
-    moveBallThread = task.spawn(function()
-        local usingA, tStart, counter = true, tick(), 0
-        while isMoveBall do
-            local b = getBall()
+W.startMoveBall = function()
+    W.states.moveBallThread = task.spawn(function()
+        local uA, tS, cnt = true, tick(), 0
+        while W.states.isMoveBall do
+            local b = W.getBall()
             if not b then task.wait(0.2) continue end
-            local target = usingA and MOVEA or MOVEB
-            local dist = (target - b.Position).Magnitude
-            if dist < 5 then usingA = not usingA; tStart = tick(); task.wait(0.05)
+            local tg = uA and W.MOVEA or W.MOVEB
+            if (tg - b.Position).Magnitude < 5 then uA = not uA; tS = tick(); task.wait(0.05)
             else
-                counter = counter + 1
-                if counter % 3 == 0 then safeFire(TKN, UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
-                local d = (target - b.Position).Unit
-                local f = (d * CFGV.moveForce) + Vector3.new(0, CFGV.moveY, 0)
-                safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
-                task.wait(CFGV.moveDelay)
+                cnt = cnt + 1
+                if cnt % 3 == 0 then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
+                local d = (tg - b.Position).Unit
+                local f = (d * W.CFGV.moveForce) + Vector3.new(0, W.CFGV.moveY, 0)
+                W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
+                task.wait(W.CFGV.moveDelay)
             end
-            if (tick() - tStart) > 10 then usingA = not usingA; tStart = tick() end
+            if (tick() - tS) > 10 then uA = not uA; tS = tick() end
         end
-        moveBallThread = nil
+        W.states.moveBallThread = nil
     end)
 end
 
-local function startOrbitBall()
-    orbitBallThread = task.spawn(function()
-        local n = #ORB
-        local seg, t, counter = 1, 0, 0
-        while isOrbitBall do
-            local b = getBall()
-            if not b then
-                isOrbitBall = false
-                if OrbitBallBtn and setBtnInactive then setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO") end
-                break
+W.startOrbitBall = function()
+    W.states.orbitBallThread = task.spawn(function()
+        local n = #W.ORB
+        local seg, t, cnt = 1, 0, 0
+        while W.states.isOrbitBall do
+            local b = W.getBall()
+            if not b then W.states.isOrbitBall = false; break end
+            local p0 = W.ORB[((seg - 2) % n) + 1]
+            local p1 = W.ORB[seg]
+            local p2 = W.ORB[(seg % n) + 1]
+            local p3 = W.ORB[((seg + 1) % n) + 1]
+            local tg = W.catmull(p0, p1, p2, p3, t)
+            cnt = cnt + 1
+            if cnt % 2 == 0 then
+                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
+                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
+                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
             end
-            local p0 = ORB[((seg - 2) % n) + 1]
-            local p1 = ORB[seg]
-            local p2 = ORB[(seg % n) + 1]
-            local p3 = ORB[((seg + 1) % n) + 1]
-            local target = catmull(p0, p1, p2, p3, t)
-            counter = counter + 1
-            if counter % 2 == 0 then
-                safeFire(TKN, UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
-                safeFire(TKN, UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
-                safeFire(TKN, UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
-            end
-            local dir = target - b.Position
+            local dir = tg - b.Position
             if dir.Magnitude > 1 then
-                local f = dir * CFGV.orbitForce
+                local f = dir * W.CFGV.orbitForce
                 if f.Magnitude > 8000 then f = f.Unit * 8000 end
-                f = f + Vector3.new(0, CFGV.orbitY, 0)
-                safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
+                f = f + Vector3.new(0, W.CFGV.orbitY, 0)
+                W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
             end
-            t = t + CFGV.orbitStep
+            t = t + W.CFGV.orbitStep
             if t >= 1 then t = 0; seg = (seg % n) + 1 end
-            task.wait(CFGV.orbitDelay)
+            task.wait(W.CFGV.orbitDelay)
         end
-        orbitBallThread = nil
+        W.states.orbitBallThread = nil
     end)
 end
 
-local function startBugBall()
-    bugBallThread = task.spawn(function()
+W.startBugBall = function()
+    W.states.bugBallThread = task.spawn(function()
         local t = 0
-        while isBugBall do
-            local b = getBall()
+        while W.states.isBugBall do
+            local b = W.getBall()
             local c = LP.Character
             local h = c and c:FindFirstChild("HumanoidRootPart")
             if b and h then
                 t = t + 0.1
-                local target = h.Position + Vector3.new(math.cos(t*CFGV.bugSpeed)*CFGV.bugRadius, CFGV.bugHeight, math.sin(t*CFGV.bugSpeed)*CFGV.bugRadius)
-                local dir = target - b.Position
-                local f = dir.Unit * math.min(dir.Magnitude * CFGV.bugForceMult, CFGV.bugMaxForce)
-                safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
+                local tg = h.Position + Vector3.new(math.cos(t*W.CFGV.bugSpeed)*W.CFGV.bugRadius, W.CFGV.bugHeight, math.sin(t*W.CFGV.bugSpeed)*W.CFGV.bugRadius)
+                local dir = tg - b.Position
+                local f = dir.Unit * math.min(dir.Magnitude * W.CFGV.bugForceMult, W.CFGV.bugMaxForce)
+                W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
             end
-            task.wait(CFGV.bugDelay)
+            task.wait(W.CFGV.bugDelay)
         end
-        bugBallThread = nil
+        W.states.bugBallThread = nil
     end)
 end
 
-local function stickBall()
-    local b = getBall()
+W.stickBall = function()
+    local b = W.getBall()
     local c = LP.Character
     local h = c and c:FindFirstChild("HumanoidRootPart")
     if not b or not h then return end
     local dir = h.Position - b.Position
     if dir.Magnitude > 1 then
-        local f = dir * CFGV.bringForce
+        local f = dir * W.CFGV.bringForce
         if f.Magnitude > 8000 then f = f.Unit * 8000 end
-        f = f + Vector3.new(0, CFGV.bringY, 0)
-        safeFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
+        f = f + Vector3.new(0, W.CFGV.bringY, 0)
+        W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
     end
 end
 
-local function startBring()
-    bringThread = task.spawn(function()
+W.startBring = function()
+    W.states.bringThread = task.spawn(function()
         local st = tick()
-        while isBringing and (tick() - st) < 0.5 do stickBall(); task.wait(0.03) end
-        isBringing = false
-        if BringBtn and setBtnInactive then setBtnInactive(BringBtn, "BRING BALL: DESATIVADO") end
-        bringThread = nil
+        while W.states.isBringing and (tick() - st) < 0.5 do W.stickBall(); task.wait(0.03) end
+        W.states.isBringing = false
+        W.states.bringThread = nil
     end)
 end
 
-local function startLoopBring()
-    loopBringThread = task.spawn(function()
-        while isLoopBringing do stickBall(); task.wait(0.03) end
-        loopBringThread = nil
+W.startLoopBring = function()
+    W.states.loopBringThread = task.spawn(function()
+        while W.states.isLoopBringing do W.stickBall(); task.wait(0.03) end
+        W.states.loopBringThread = nil
     end)
 end
 
-local function startSky()
-    skyThread = task.spawn(function()
-        while isSkying do
-            local b = getBall()
-            if b then safeFire(TKN, UID, "", b.Position, Vector3.new(0, CFGV.skyForce, 0), Vector3.new(0,0,0)) end
+W.startSky = function()
+    W.states.skyThread = task.spawn(function()
+        while W.states.isSkying do
+            local b = W.getBall()
+            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0, W.CFGV.skyForce, 0), Vector3.new(0,0,0)) end
             task.wait(0.05)
         end
     end)
 end
 
-local function startFreeze()
-    isFreezing = true
-    freezeThread = task.spawn(function()
-        while isFreezing do
-            local b = getBall()
-            if b then safeFire(TKN, UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
-            task.wait(CFGV.freezeDelay)
+W.startFreeze = function()
+    W.states.isFreezing = true
+    W.states.freezeThread = task.spawn(function()
+        while W.states.isFreezing do
+            local b = W.getBall()
+            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
+            task.wait(W.CFGV.freezeDelay)
         end
     end)
 end
 
-local function stopFreeze()
-    isFreezing = false
-    if freezeThread then task.cancel(freezeThread); freezeThread = nil end
+W.stopFreeze = function()
+    W.states.isFreezing = false
+    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread = nil end
 end
 
-local function startBoostAll()
-    boostAllThread = task.spawn(function()
-        while isBoostingAll do
-            local b = getBall()
+W.startBoostAll = function()
+    W.states.boostAllThread = task.spawn(function()
+        while W.states.isBoostingAll do
+            local b = W.getBall()
             if b then
                 local vel = b.Velocity
                 local sp = vel.Magnitude
-                if sp > 5 and sp < CFGV.boostMaxSpeed then
-                    local ts = math.min(sp * boostMultiplier, CFGV.boostMaxSpeed)
-                    safeFire(TKN, UID, "", b.Position, vel.Unit * ts, Vector3.new(0,0,0))
+                if sp > 5 and sp < W.CFGV.boostMaxSpeed then
+                    local ts = math.min(sp * W.boostMultiplier, W.CFGV.boostMaxSpeed)
+                    W.safeFire(W.TKN, W.UID, "", b.Position, vel.Unit * ts, Vector3.new(0,0,0))
                 end
             end
-            task.wait(CFGV.boostDelay)
+            task.wait(W.CFGV.boostDelay)
         end
     end)
 end
 
-local function collectCoins()
-    if isCollectingCoins then return end
+W.DEFEND = {radius=5, force=5000, lift=50, delay=0.08, cooldown=0.15}
+W.states.defendLastFire = 0
+W.states.defendLastKick = 0
+
+W.tryDefend = function()
+    local b = W.getBall()
+    if not b then return end
+    local goal = W.GOALS[W.defendSelectedGoal == "A" and 1 or 2].pos
+    if (b.Position - goal).Magnitude > W.DEFEND.radius then return end
+    local now = tick()
+    if now - W.states.defendLastKick < W.DEFEND.cooldown then return end
+    W.states.defendLastKick = now
+    local sz = b.Position.Z > goal.Z and 1 or -1
+    local f = (Vector3.new(0,0,sz) * W.DEFEND.force) + Vector3.new(0, W.DEFEND.lift, 0)
+    if f.Magnitude > 8000 then f = f.Unit * 8000 end
+    local n2 = tick()
+    if n2 - W.states.defendLastFire < 0.1 then return end
+    W.states.defendLastFire = n2
+    W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
+end
+
+W.startDefend = function()
+    W.states.defendThread = task.spawn(function()
+        while W.states.isDefending do pcall(W.tryDefend); task.wait(W.DEFEND.delay) end
+        W.states.defendThread = nil
+    end)
+end
+
+W.stopDefend = function()
+    W.states.isDefending = false
+    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread = nil end
+end
+
+W.states.isFarming = false
+W.states.farmThread = nil
+W.states.farmSeen = {}
+W.states.farmSeenTime = {}
+W.states.farmTotal = 0
+
+W.collectNewCoins = function()
     local c = LP.Character
     local h = c and c:FindFirstChild("HumanoidRootPart")
     if not h then return end
     local folder = workspace:FindFirstChild("Coins")
-    if not folder then
-        if CoinTpBtn and setBtnInactive then setBtnInactive(CoinTpBtn, "COLETAR COINS") end
-        return
-    end
-    isCollectingCoins = true
-    local orig = h.CFrame
-    local list = {}
-    for _, o in ipairs(folder:GetChildren()) do
-        if o:IsA("BasePart") then table.insert(list, o)
-        elseif o:IsA("Model") then
-            local p = o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart")
-            if p then table.insert(list, p) end
+    if not folder then return end
+    local now = tick()
+    for k, t in pairs(W.states.farmSeenTime) do
+        if now - t > 3 then
+            W.states.farmSeenTime[k] = nil
+            W.states.farmSeen[k] = nil
         end
     end
-    coinTpThread = task.spawn(function()
-        for _, coin in ipairs(list) do
-            if coin and coin.Parent and h and h.Parent then
-                pcall(function() h.CFrame = CFrame.new(coin.Position + Vector3.new(0, 3, 0)) end)
+    for _, obj in ipairs(folder:GetChildren()) do
+        if obj.Parent and not W.states.farmSeen[obj] then
+            W.states.farmSeen[obj] = true
+            W.states.farmSeenTime[obj] = now
+            local p
+            if obj:IsA("BasePart") then p = obj
+            elseif obj:IsA("Model") then p = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart") end
+            if p and p.Parent then
+                pcall(function() h.CFrame = CFrame.new(p.Position + Vector3.new(0, 3, 0)) end)
+                W.states.farmTotal = W.states.farmTotal + 1
                 task.wait(0.1)
             end
         end
-        if h and h.Parent then pcall(function() h.CFrame = orig end) end
-        isCollectingCoins = false
-        coinTpThread = nil
-        if CoinTpBtn and setBtnInactive then setBtnInactive(CoinTpBtn, "COLETAR COINS") end
-    end)
-end
-
-local CONTROL = {force=5000, lift=50, cooldown=0.15, holdRepeat=0.12}
-
-local function ctrlFire(...)
-    local now = tick()
-    if now - controlLastFire < CONTROL.cooldown then return false end
-    controlLastFire = now
-    safeFire(...)
-    return true
-end
-
-local DIRS = {
-    up = function(c) return c.CFrame.LookVector end,
-    down = function(c) return -c.CFrame.LookVector end,
-    left = function(c) return -c.CFrame.RightVector end,
-    right = function(c) return c.CFrame.RightVector end,
-    upleft = function(c) return (c.CFrame.LookVector - c.CFrame.RightVector).Unit end,
-    upright = function(c) return (c.CFrame.LookVector + c.CFrame.RightVector).Unit end,
-    downleft = function(c) return (-c.CFrame.LookVector - c.CFrame.RightVector).Unit end,
-    downright = function(c) return (-c.CFrame.LookVector + c.CFrame.RightVector).Unit end,
-}
-
-local function ctrlKick(name)
-    local b = getBall()
-    local cam = workspace.CurrentCamera
-    if not b or not cam then return end
-    local fn = DIRS[name]
-    if not fn then return end
-    local dir = fn(cam)
-    dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude < 0.01 then return end
-    dir = dir.Unit
-    local f = (dir * CONTROL.force) + Vector3.new(0, CONTROL.lift, 0)
-    if f.Magnitude > 8000 then f = f.Unit * 8000 end
-    ctrlFire(TKN, UID, "", b.Position, f, Vector3.new(0,0,0))
-end
-
-local function buildControlGui()
-    pcall(function()
-        local old = CoreGui:FindFirstChild("ArrowControlGUI")
-        if old then old:Destroy() end
-    end)
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "ArrowControlGUI"
-    sg.ResetOnSpawn = false
-    sg.IgnoreGuiInset = true
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    pcall(function() sg.Parent = CoreGui end)
-    if not sg.Parent then sg.Parent = LP:WaitForChild("PlayerGui") end
-    do
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(0, 200, 0, 240)
-        Frame.Position = UDim2.new(0.5, -100, 0, 100)
-        Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-        Frame.BackgroundTransparency = 0.15
-        Frame.BorderSizePixel = 0
-        Frame.Active = true
-        Frame.Draggable = true
-        Frame.ClipsDescendants = true
-        Frame.Parent = sg
-        local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 12); c.Parent = Frame
-        local s = Instance.new("UIStroke"); s.Thickness = 1.5; s.Color = Color3.fromRGB(0, 220, 255); s.Transparency = 0.2; s.Parent = Frame
-        local Title = Instance.new("TextLabel")
-        Title.Size = UDim2.new(1, -40, 0, 20); Title.Position = UDim2.new(0, 10, 0, 6)
-        Title.BackgroundTransparency = 1
-        Title.Text = "🎮 CONTROL"
-        Title.TextColor3 = Color3.fromRGB(0, 220, 255); Title.TextSize = 12
-        Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left
-        Title.Parent = Frame
-        local Close = Instance.new("TextButton")
-        Close.Size = UDim2.new(0, 22, 0, 22); Close.Position = UDim2.new(1, -28, 0, 4)
-        Close.BackgroundColor3 = Color3.fromRGB(0, 0, 0); Close.BackgroundTransparency = 0.5
-        Close.Text = "✕"; Close.TextSize = 12; Close.TextColor3 = Color3.fromRGB(255, 60, 60)
-        Close.Font = Enum.Font.GothamBold; Close.AutoButtonColor = false; Close.Parent = Frame
-        local cc = Instance.new("UICorner"); cc.CornerRadius = UDim.new(0, 5); cc.Parent = Close
-        local Grid = Instance.new("Frame")
-        Grid.Size = UDim2.new(1, -20, 0, 140); Grid.Position = UDim2.new(0, 10, 0, 32)
-        Grid.BackgroundTransparency = 1; Grid.Parent = Frame
-        local CN = Color3.fromRGB(0, 120, 180)
-        local CH = Color3.fromRGB(0, 180, 240)
-        local CA = Color3.fromRGB(0, 255, 100)
-        local function mkArrow(col, row, sim, dname)
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(0.31, 0, 0.31, 0)
-            btn.Position = UDim2.new(col * 0.345, 0, row * 0.345, 0)
-            btn.BackgroundColor3 = CN
-            btn.BackgroundTransparency = 0.15
-            btn.Text = sim
-            btn.TextSize = 28
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.GothamBold
-            btn.AutoButtonColor = false
-            btn.Parent = Grid
-            local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 8); bc.Parent = btn
-            local bs = Instance.new("UIStroke"); bs.Thickness = 1.5; bs.Color = Color3.fromRGB(0, 220, 255); bs.Transparency = 0.3; bs.Parent = btn
-            local holding, ht = false, nil
-            local function doKick()
-                ctrlKick(dname)
-                btn.BackgroundColor3 = CA
-                task.delay(0.1, function()
-                    if not holding then TS:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = CN}):Play() end
-                end)
-            end
-            btn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    holding = true
-                    btn.BackgroundColor3 = CH
-                    doKick()
-                    if ht then task.cancel(ht) end
-                    ht = task.spawn(function()
-                        while holding do task.wait(CONTROL.holdRepeat); if holding then doKick() end end
-                    end)
-                end
-            end)
-            btn.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    holding = false
-                    if ht then task.cancel(ht); ht = nil end
-                    TS:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = CN}):Play()
-                end
-            end)
-        end
-        mkArrow(0, 0, "↖", "upleft")
-        mkArrow(1, 0, "↑", "up")
-        mkArrow(2, 0, "↗", "upright")
-        mkArrow(0, 1, "←", "left")
-        mkArrow(2, 1, "→", "right")
-        mkArrow(0, 2, "↙", "downleft")
-        mkArrow(1, 2, "↓", "down")
-        mkArrow(2, 2, "↘", "downright")
-        local SF = Instance.new("Frame")
-        SF.Size = UDim2.new(1, -20, 0, 30); SF.Position = UDim2.new(0, 10, 0, 178)
-        SF.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SF.BackgroundTransparency = 0.5
-        SF.BorderSizePixel = 0; SF.Parent = Frame
-        local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(0, 6); sc.Parent = SF
-        local SL = Instance.new("TextLabel")
-        SL.Size = UDim2.new(1, -10, 0, 12); SL.Position = UDim2.new(0, 5, 0, 2)
-        SL.BackgroundTransparency = 1
-        SL.Text = "FORÇA: " .. CONTROL.force
-        SL.TextColor3 = Color3.fromRGB(0, 220, 255); SL.TextSize = 10
-        SL.Font = Enum.Font.GothamBold; SL.TextXAlignment = Enum.TextXAlignment.Left
-        SL.Parent = SF
-        local FT = Instance.new("Frame")
-        FT.Size = UDim2.new(1, -20, 0, 4); FT.Position = UDim2.new(0, 10, 0, 20)
-        FT.BackgroundColor3 = Color3.fromRGB(50, 50, 70); FT.BorderSizePixel = 0; FT.Parent = SF
-        local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(0, 2); fc.Parent = FT
-        local FKnob = Instance.new("TextButton")
-        FKnob.Size = UDim2.new(0, 16, 0, 16)
-        FKnob.Position = UDim2.new((CONTROL.force - 1000)/7000, -8, 0.5, -8)
-        FKnob.BackgroundColor3 = Color3.fromRGB(0, 220, 255); FKnob.Text = ""
-        FKnob.AutoButtonColor = false; FKnob.BorderSizePixel = 0; FKnob.ZIndex = 6; FKnob.Parent = FT
-        local fkc = Instance.new("UICorner"); fkc.CornerRadius = UDim.new(1, 0); fkc.Parent = FKnob
-        local dragging = false
-        FKnob.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local w = FT.AbsoluteSize.X
-                local rel = math.clamp((input.Position.X - FT.AbsolutePosition.X) / w, 0, 1)
-                local v = math.clamp(math.floor((1000 + rel * 7000) / 100) * 100, 1000, 8000)
-                FKnob.Position = UDim2.new((v - 1000)/7000, -8, 0.5, -8)
-                SL.Text = "FORÇA: " .. v
-                CONTROL.force = v
-            end
-        end)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-        end)
-        Close.MouseButton1Down:Connect(function()
-            isControl = false
-            if controlScreenGui then controlScreenGui:Destroy(); controlScreenGui = nil end
-            if ControlBtn and setBtnInactive then setBtnInactive(ControlBtn, "CONTROL: DESATIVADO") end
-        end)
-        do
-            local d, di, ds, sp
-            Frame.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    if input.Target and (input.Target:IsA("TextButton") or input.Target:IsA("TextBox")) then return end
-                    d = true; ds = input.Position; sp = Frame.Position
-                    input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then d = false end end)
-                end
-            end)
-            Frame.InputChanged:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then di = input end
-            end)
-            UIS.InputChanged:Connect(function(input)
-                if input == di and d then
-                    local delta = input.Position - ds
-                    Frame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
-                end
-            end)
-        end
     end
-    return sg
 end
 
-local function startControl()
-    if controlScreenGui then controlScreenGui:Destroy() end
-    controlScreenGui = buildControlGui()
-    isControl = true
-end
-
-local function stopControl()
-    isControl = false
-    if controlScreenGui then controlScreenGui:Destroy(); controlScreenGui = nil end
-end
-
-local DEFEND = {radius=5, force=5000, lift=50, delay=0.08, cooldown=0.15}
-
-local function tryDefend()
-    local b = getBall()
-    if not b then return end
-    local goal = GOALS[defendSelectedGoal == "A" and 1 or 2].pos
-    if (b.Position - goal).Magnitude > DEFEND.radius then return end
-    local now = tick()
-    if now - defendLastKick < DEFEND.cooldown then return end
-    defendLastKick = now
-    local sideZ = b.Position.Z > goal.Z and 1 or -1
-    local dir = Vector3.new(0, 0, sideZ)
-    local f = (dir * DEFEND.force) + Vector3.new(0, DEFEND.lift, 0)
-    if f.Magnitude > 8000 then f = f.Unit * 8000 end
-    local now2 = tick()
-    if now2 - defendLastFire < 0.1 then return end
-    defendLastFire = now2
-    safeFire(TKN, UID, "", b.Position, f, Vector3.new(0, 0, 0))
-end
-
-local function startDefend()
-    defendThread = task.spawn(function()
-        while isDefending do pcall(tryDefend); task.wait(DEFEND.delay) end
-        defendThread = nil
+W.startFarmCoins = function()
+    if W.states.farmThread then task.cancel(W.states.farmThread) end
+    W.states.isFarming = true
+    W.states.farmThread = task.spawn(function()
+        while W.states.isFarming do
+            W.collectNewCoins()
+            task.wait(0.1)
+        end
     end)
 end
 
-local function stopDefend()
-    isDefending = false
-    if defendThread then task.cancel(defendThread); defendThread = nil end
+W.stopFarmCoins = function()
+    W.states.isFarming = false
+    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
 end
 
 pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
@@ -636,966 +493,690 @@ ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LP:WaitForChild("PlayerGui") end
+W.ScreenGui = ScreenGui
 
-do
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    MainFrame.BackgroundTransparency = 1
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-    local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 12); mc.Parent = MainFrame
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(0, 200, 255); Stroke.Transparency = 1
-    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; Stroke.Parent = MainFrame
-    local sg = Instance.new("UIGradient")
-    sg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 0, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)),
-    })
-    sg.Parent = Stroke
-    local bg = Instance.new("UIGradient")
-    bg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 35)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 5, 20)),
-    })
-    bg.Rotation = 45; bg.Parent = MainFrame
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -80, 0, 22); Title.Position = UDim2.new(0, 10, 0, 10)
-    Title.BackgroundTransparency = 1; Title.Text = "By: @willnzx.mt + miguelestrellaaa"
-    Title.TextColor3 = Color3.fromRGB(0, 230, 255); Title.TextScaled = true
-    Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = MainFrame
-    local tg = Instance.new("UIGradient")
-    tg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 255)),
-    })
-    tg.Parent = Title
-    local MinBtn = Instance.new("TextButton")
-    MinBtn.Size = UDim2.new(0, 26, 0, 26); MinBtn.Position = UDim2.new(1, -62, 0, 8)
-    MinBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MinBtn.BackgroundTransparency = 0.5
-    MinBtn.Text = "■"; MinBtn.TextSize = 16; MinBtn.TextColor3 = Color3.fromRGB(0, 230, 255)
-    MinBtn.Font = Enum.Font.GothamBold; MinBtn.AutoButtonColor = false; MinBtn.Parent = MainFrame
-    local mcc = Instance.new("UICorner"); mcc.CornerRadius = UDim.new(0, 5); mcc.Parent = MinBtn
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 26, 0, 26); CloseBtn.Position = UDim2.new(1, -32, 0, 8)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CloseBtn.BackgroundTransparency = 0.5
-    CloseBtn.Text = "✕"; CloseBtn.TextSize = 16; CloseBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
-    CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.AutoButtonColor = false; CloseBtn.Parent = MainFrame
-    local ccc = Instance.new("UICorner"); ccc.CornerRadius = UDim.new(0, 5); ccc.Parent = CloseBtn
-    local TabBar = Instance.new("Frame")
-    TabBar.Size = UDim2.new(1, -30, 0, 28); TabBar.Position = UDim2.new(0, 15, 0, 36)
-    TabBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    TabBar.BackgroundTransparency = 0.5
-    TabBar.BorderSizePixel = 0
-    TabBar.Parent = MainFrame
-    local tbc = Instance.new("UICorner"); tbc.CornerRadius = UDim.new(0, 8); tbc.Parent = TabBar
-    local tbs = Instance.new("UIStroke"); tbs.Thickness = 1; tbs.Color = Color3.fromRGB(0, 200, 255); tbs.Transparency = 0.5; tbs.Parent = TabBar
-    local TabContainer = Instance.new("Frame")
-    TabContainer.Size = UDim2.new(1, 0, 1, 0)
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.Parent = TabBar
-    local tabButtons = {}
-    local tabNames = {"⚔️ ATQ", "⚽ BOLA", "🎁 OUTROS", "⚙️ CFG"}
-    for i, name in ipairs(tabNames) do
-        local tab = Instance.new("TextButton")
-        tab.Size = UDim2.new(1/4, -3, 1, -8)
-        tab.Position = UDim2.new((i-1)/4, 1.5, 0, 4)
-        tab.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        tab.BackgroundTransparency = 0.5
-        tab.Text = name
-        tab.TextSize = 10
-        tab.Font = Enum.Font.GothamBold
-        tab.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tab.AutoButtonColor = false
-        tab.Parent = TabContainer
-        local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 6); c.Parent = tab
-        local s = Instance.new("UIStroke"); s.Thickness = 1; s.Color = Color3.fromRGB(80, 80, 80); s.Transparency = 0.5; s.Parent = tab
-        tabButtons[i] = tab
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MainFrame.BackgroundTransparency = 1
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+W.MainFrame = MainFrame
+
+local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 12); mc.Parent = MainFrame
+local Stroke = Instance.new("UIStroke")
+Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(0, 200, 255); Stroke.Transparency = 1
+Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; Stroke.Parent = MainFrame
+local sg = Instance.new("UIGradient")
+sg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)),
+})
+sg.Parent = Stroke
+local bg = Instance.new("UIGradient")
+bg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 35)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 5, 20)),
+})
+bg.Rotation = 45; bg.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 0, 22); Title.Position = UDim2.new(0, 10, 0, 10)
+Title.BackgroundTransparency = 1; Title.Text = "By: @willnzx.mt + miguelestrellaaa"
+Title.TextColor3 = Color3.fromRGB(0, 230, 255); Title.TextScaled = true
+Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = MainFrame
+local tg = Instance.new("UIGradient")
+tg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 255)),
+})
+tg.Parent = Title
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 26, 0, 26); MinBtn.Position = UDim2.new(1, -62, 0, 8)
+MinBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MinBtn.BackgroundTransparency = 0.5
+MinBtn.Text = "-"; MinBtn.TextSize = 16; MinBtn.TextColor3 = Color3.fromRGB(0, 230, 255)
+MinBtn.Font = Enum.Font.GothamBold; MinBtn.AutoButtonColor = false; MinBtn.Parent = MainFrame
+local mcc = Instance.new("UICorner"); mcc.CornerRadius = UDim.new(0, 5); mcc.Parent = MinBtn
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 26, 0, 26); CloseBtn.Position = UDim2.new(1, -32, 0, 8)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CloseBtn.BackgroundTransparency = 0.5
+CloseBtn.Text = "X"; CloseBtn.TextSize = 16; CloseBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.AutoButtonColor = false; CloseBtn.Parent = MainFrame
+local ccc = Instance.new("UICorner"); ccc.CornerRadius = UDim.new(0, 5); ccc.Parent = CloseBtn
+
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -30, 0, 28); TabBar.Position = UDim2.new(0, 15, 0, 36)
+TabBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TabBar.BackgroundTransparency = 0.5
+TabBar.BorderSizePixel = 0
+TabBar.Parent = MainFrame
+local tbc = Instance.new("UICorner"); tbc.CornerRadius = UDim.new(0, 8); tbc.Parent = TabBar
+local tbs = Instance.new("UIStroke"); tbs.Thickness = 1; tbs.Color = Color3.fromRGB(0, 200, 255); tbs.Transparency = 0.5; tbs.Parent = TabBar
+
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(1, 0, 1, 0)
+TabContainer.BackgroundTransparency = 1
+TabContainer.Parent = TabBar
+
+local tabButtons = {}
+local tabNames = {"ATQ", "BOLA", "OUTROS"}
+for i, name in ipairs(tabNames) do
+    local tab = Instance.new("TextButton")
+    tab.Size = UDim2.new(1/3, -3, 1, -8)
+    tab.Position = UDim2.new((i-1)/3, 1.5, 0, 4)
+    tab.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    tab.BackgroundTransparency = 0.5
+    tab.Text = name
+    tab.TextSize = 12
+    tab.Font = Enum.Font.GothamBold
+    tab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab.AutoButtonColor = false
+    tab.Parent = TabContainer
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 6); c.Parent = tab
+    local s = Instance.new("UIStroke"); s.Thickness = 1; s.Color = Color3.fromRGB(80, 80, 80); s.Transparency = 0.5; s.Parent = tab
+    tabButtons[i] = tab
+end
+
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -30, 1, -110)
+ContentArea.Position = UDim2.new(0, 15, 0, 72)
+ContentArea.BackgroundTransparency = 1
+ContentArea.ClipsDescendants = true
+ContentArea.Parent = MainFrame
+
+local Tab1 = Instance.new("ScrollingFrame")
+Tab1.Size = UDim2.new(1, 0, 1, 0)
+Tab1.BackgroundTransparency = 1; Tab1.BorderSizePixel = 0
+Tab1.ScrollBarThickness = 5; Tab1.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
+Tab1.ScrollBarImageTransparency = 0.3
+Tab1.CanvasSize = UDim2.new(0, 0, 0, 420)
+Tab1.ScrollingDirection = Enum.ScrollingDirection.Y
+Tab1.ElasticBehavior = Enum.ElasticBehavior.Never
+Tab1.Parent = ContentArea
+
+local Tab2 = Instance.new("ScrollingFrame")
+Tab2.Size = UDim2.new(1, 0, 1, 0)
+Tab2.BackgroundTransparency = 1; Tab2.BorderSizePixel = 0
+Tab2.ScrollBarThickness = 5; Tab2.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
+Tab2.ScrollBarImageTransparency = 0.3
+Tab2.CanvasSize = UDim2.new(0, 0, 0, 320)
+Tab2.ScrollingDirection = Enum.ScrollingDirection.Y
+Tab2.ElasticBehavior = Enum.ElasticBehavior.Never
+Tab2.Visible = false
+Tab2.Parent = ContentArea
+
+local Tab4 = Instance.new("ScrollingFrame")
+Tab4.Size = UDim2.new(1, 0, 1, 0)
+Tab4.BackgroundTransparency = 1; Tab4.BorderSizePixel = 0
+Tab4.ScrollBarThickness = 5; Tab4.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
+Tab4.ScrollBarImageTransparency = 0.3
+Tab4.CanvasSize = UDim2.new(0, 0, 0, 320)
+Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
+Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
+Tab4.Visible = false
+Tab4.Parent = ContentArea
+
+local function makeButton(parent, text, y, color1, color2, name)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -4, 0, 36); btn.Position = UDim2.new(0, 2, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); btn.BackgroundTransparency = 0.4
+    btn.Text = text; btn.TextSize = 14; btn.Font = Enum.Font.GothamBold
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextStrokeTransparency = 0.4
+    btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); btn.AutoButtonColor = false
+    btn.Active = true; btn.ZIndex = 5; btn.Parent = parent
+    if name then btn.Name = name end
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 8); c.Parent = btn
+    local s = Instance.new("UIStroke"); s.Thickness = 1.5; s.Color = color1; s.Transparency = 0.3; s.Parent = btn
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
+    g.Rotation = 90
+    g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0.7)})
+    g.Parent = btn
+    btn:SetAttribute("IsActive", false)
+    return btn
+end
+W.makeButton = makeButton
+
+local GoalSelectFrame = Instance.new("Frame")
+GoalSelectFrame.Size = UDim2.new(1, -4, 0, 30); GoalSelectFrame.Position = UDim2.new(0, 2, 0, 4)
+GoalSelectFrame.BackgroundTransparency = 1; GoalSelectFrame.Parent = Tab1
+
+local BtnGoalA = Instance.new("TextButton")
+BtnGoalA.Size = UDim2.new(0.5, -3, 1, 0)
+BtnGoalA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalA.BackgroundTransparency = 0.4
+BtnGoalA.Text = "GOL A"; BtnGoalA.TextSize = 14; BtnGoalA.Font = Enum.Font.GothamBold
+BtnGoalA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalA.TextStrokeTransparency = 0.4
+BtnGoalA.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); BtnGoalA.AutoButtonColor = false; BtnGoalA.Parent = GoalSelectFrame
+local aC = Instance.new("UICorner"); aC.CornerRadius = UDim.new(0, 6); aC.Parent = BtnGoalA
+local aS = Instance.new("UIStroke"); aS.Thickness = 1; aS.Color = Color3.fromRGB(80, 80, 80); aS.Transparency = 0.5; aS.Parent = BtnGoalA
+
+local BtnGoalB = Instance.new("TextButton")
+BtnGoalB.Size = UDim2.new(0.5, -3, 1, 0); BtnGoalB.Position = UDim2.new(0.5, 3, 0, 0)
+BtnGoalB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalB.BackgroundTransparency = 0.4
+BtnGoalB.Text = "GOL B"; BtnGoalB.TextSize = 14; BtnGoalB.Font = Enum.Font.GothamBold
+BtnGoalB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalB.TextStrokeTransparency = 0.4
+BtnGoalB.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); BtnGoalB.AutoButtonColor = false; BtnGoalB.Parent = GoalSelectFrame
+local bC = Instance.new("UICorner"); bC.CornerRadius = UDim.new(0, 6); bC.Parent = BtnGoalB
+local bS = Instance.new("UIStroke"); bS.Thickness = 1; bS.Color = Color3.fromRGB(80, 80, 80); bS.Transparency = 0.5; bS.Parent = BtnGoalB
+
+local function updGoals()
+    if W.selectedGoalIndex == 1 then
+        BtnGoalA.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalA.BackgroundTransparency = 0.1; BtnGoalA.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalA.TextStrokeTransparency = 1
+        aS.Color = Color3.fromRGB(200, 240, 255); aS.Transparency = 0
+        BtnGoalB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalB.BackgroundTransparency = 0.4; BtnGoalB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalB.TextStrokeTransparency = 0.4
+        bS.Color = Color3.fromRGB(80, 80, 80); bS.Transparency = 0.5
+    else
+        BtnGoalB.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalB.BackgroundTransparency = 0.1; BtnGoalB.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalB.TextStrokeTransparency = 1
+        bS.Color = Color3.fromRGB(200, 240, 255); bS.Transparency = 0
+        BtnGoalA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalA.BackgroundTransparency = 0.4; BtnGoalA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalA.TextStrokeTransparency = 0.4
+        aS.Color = Color3.fromRGB(80, 80, 80); aS.Transparency = 0.5
     end
-    local ContentArea = Instance.new("Frame")
-    ContentArea.Size = UDim2.new(1, -30, 1, -110)
-    ContentArea.Position = UDim2.new(0, 15, 0, 72)
-    ContentArea.BackgroundTransparency = 1
-    ContentArea.ClipsDescendants = true
-    ContentArea.Parent = MainFrame
-    local Tab1 = Instance.new("ScrollingFrame")
-    Tab1.Size = UDim2.new(1, 0, 1, 0)
-    Tab1.BackgroundTransparency = 1; Tab1.BorderSizePixel = 0
-    Tab1.ScrollBarThickness = 5; Tab1.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
-    Tab1.ScrollBarImageTransparency = 0.3
-    Tab1.CanvasSize = UDim2.new(0, 0, 0, 420)
-    Tab1.ScrollingDirection = Enum.ScrollingDirection.Y
-    Tab1.ElasticBehavior = Enum.ElasticBehavior.Never
-    Tab1.Parent = ContentArea
-    local Tab2 = Instance.new("ScrollingFrame")
-    Tab2.Size = UDim2.new(1, 0, 1, 0)
-    Tab2.BackgroundTransparency = 1; Tab2.BorderSizePixel = 0
-    Tab2.ScrollBarThickness = 5; Tab2.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
-    Tab2.ScrollBarImageTransparency = 0.3
-    Tab2.CanvasSize = UDim2.new(0, 0, 0, 320)
-    Tab2.ScrollingDirection = Enum.ScrollingDirection.Y
-    Tab2.ElasticBehavior = Enum.ElasticBehavior.Never
-    Tab2.Visible = false
-    Tab2.Parent = ContentArea
-    local Tab4 = Instance.new("ScrollingFrame")
-    Tab4.Size = UDim2.new(1, 0, 1, 0)
-    Tab4.BackgroundTransparency = 1; Tab4.BorderSizePixel = 0
-    Tab4.ScrollBarThickness = 5; Tab4.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
-    Tab4.ScrollBarImageTransparency = 0.3
-    Tab4.CanvasSize = UDim2.new(0, 0, 0, 320)
-    Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
-    Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
-    Tab4.Visible = false
-    Tab4.Parent = ContentArea
-    local Tab3 = Instance.new("Frame")
-    Tab3.Size = UDim2.new(1, 0, 1, 0)
-    Tab3.BackgroundTransparency = 1
-    Tab3.Visible = false
-    Tab3.Parent = ContentArea
-    local function makeButton(parent, text, y, color1, color2)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -4, 0, 36); btn.Position = UDim2.new(0, 2, 0, y)
-        btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); btn.BackgroundTransparency = 0.4
-        btn.Text = text; btn.TextSize = 14; btn.Font = Enum.Font.GothamBold
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextStrokeTransparency = 0.4
-        btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); btn.AutoButtonColor = false
-        btn.Active = true; btn.ZIndex = 5; btn.Parent = parent
-        local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 8); c.Parent = btn
-        local s = Instance.new("UIStroke"); s.Thickness = 1.5; s.Color = color1; s.Transparency = 0.3; s.Parent = btn
-        local g = Instance.new("UIGradient")
-        g.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
-        g.Rotation = 90
-        g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0.7)})
-        g.Parent = btn
-        btn:SetAttribute("IsActive", false)
-        return btn
+end
+W.updGoals = updGoals
+
+W.addTap(BtnGoalA, function() W.selectedGoalIndex = 1; updGoals() end)
+W.addTap(BtnGoalB, function() W.selectedGoalIndex = 2; updGoals() end)
+updGoals()
+
+local Button = makeButton(Tab1, "AUTO-GOL: DESATIVADO", 40, Color3.fromRGB(0,120,180), Color3.fromRGB(120,0,180), "AutoGolBtn")
+local TpGoalBtn = makeButton(Tab1, "TP GOAL: DESATIVADO", 82, Color3.fromRGB(200, 0, 255), Color3.fromRGB(0, 180, 255), "TpGoalBtn")
+local TouchGoalBtn = makeButton(Tab1, "TOUCH GOAL: DESATIVADO", 124, Color3.fromRGB(255, 100, 0), Color3.fromRGB(200, 0, 100), "TouchGoalBtn")
+local SkyBtn = makeButton(Tab1, "SKY BALL: DESATIVADO", 166, Color3.fromRGB(80, 200, 255), Color3.fromRGB(0, 100, 200), "SkyBtn")
+local BoostAllBtn = makeButton(Tab1, "BOOST ALL: DESATIVADO", 208, Color3.fromRGB(255,100,0), Color3.fromRGB(255,200,0), "BoostAllBtn")
+
+local SliderFrame = Instance.new("Frame")
+SliderFrame.Size = UDim2.new(1, -4, 0, 45); SliderFrame.Position = UDim2.new(0, 2, 0, 250)
+SliderFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SliderFrame.BackgroundTransparency = 0.5
+SliderFrame.BorderSizePixel = 0; SliderFrame.Parent = Tab1
+local sfc = Instance.new("UICorner"); sfc.CornerRadius = UDim.new(0, 8); sfc.Parent = SliderFrame
+local sfs = Instance.new("UIStroke"); sfs.Thickness = 1.5; sfs.Color = Color3.fromRGB(255,200,0); sfs.Transparency = 0.3; sfs.Parent = SliderFrame
+local SL = Instance.new("TextLabel")
+SL.Size = UDim2.new(1, 0, 0, 14); SL.Position = UDim2.new(0, 0, 0, 2)
+SL.BackgroundTransparency = 1; SL.Text = "MULTIPLICADOR: 3x"
+SL.TextColor3 = Color3.fromRGB(255, 200, 0); SL.TextSize = 11
+SL.Font = Enum.Font.GothamBold; SL.Parent = SliderFrame
+local Track = Instance.new("Frame")
+Track.Size = UDim2.new(1, -20, 0, 4); Track.Position = UDim2.new(0, 10, 0, 30)
+Track.BackgroundColor3 = Color3.fromRGB(50, 50, 70); Track.BorderSizePixel = 0; Track.Parent = SliderFrame
+local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0, 2); tc.Parent = Track
+local dotButtons = {}
+for i = 1, 6 do
+    local dot = Instance.new("TextButton")
+    dot.Size = UDim2.new(0, 12, 0, 12); dot.Position = UDim2.new((i-1)/5, -6, 0.5, -6)
+    dot.BackgroundColor3 = Color3.fromRGB(80, 80, 100); dot.Text = ""
+    dot.AutoButtonColor = false; dot.BorderSizePixel = 0; dot.Parent = Track
+    local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(1, 0); dc.Parent = dot
+    table.insert(dotButtons, dot)
+end
+local Knob = Instance.new("TextButton")
+Knob.Size = UDim2.new(0, 22, 0, 22); Knob.Position = UDim2.new(2/5, -11, 0.5, -11)
+Knob.BackgroundColor3 = Color3.fromRGB(255, 200, 0); Knob.Text = "3"
+Knob.TextSize = 12; Knob.TextColor3 = Color3.fromRGB(0, 0, 0)
+Knob.Font = Enum.Font.GothamBold; Knob.AutoButtonColor = false
+Knob.BorderSizePixel = 0; Knob.ZIndex = 6; Knob.Parent = Track
+local kc = Instance.new("UICorner"); kc.CornerRadius = UDim.new(1, 0); kc.Parent = Knob
+local ks = Instance.new("UIStroke"); ks.Thickness = 1.5; ks.Color = Color3.fromRGB(255, 255, 255); ks.Parent = Knob
+W.Knob = Knob
+
+W.updDots = function(v)
+    for i, d in ipairs(dotButtons) do
+        d.BackgroundColor3 = i <= v and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(80, 80, 100)
     end
-    function setBtnActive(btn, text)
-        btn:SetAttribute("IsActive", true); btn.Text = text
-        btn.BackgroundColor3 = Color3.fromRGB(100, 200, 255); btn.BackgroundTransparency = 0.05
-        btn.TextColor3 = Color3.fromRGB(10, 30, 60); btn.TextStrokeTransparency = 1
+    SL.Text = "MULTIPLICADOR: " .. v .. "x"
+    Knob.Text = tostring(v); W.boostMultiplier = v
+end
+
+local drag = false
+Knob.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = true end
+end)
+UIS.InputChanged:Connect(function(i)
+    if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+        local w = Track.AbsoluteSize.X
+        local rx = math.clamp((i.Position.X - Track.AbsolutePosition.X) / w, 0, 1)
+        local v = math.clamp(math.floor(rx * 5 + 0.5) + 1, 1, 6)
+        Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11); W.updDots(v)
     end
-    function setBtnInactive(btn, text)
-        btn:SetAttribute("IsActive", false); btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextStrokeTransparency = 0.4
-        btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); btn.BackgroundTransparency = 0.4
-    end
-    do
-        local GoalSelectFrame = Instance.new("Frame")
-        GoalSelectFrame.Size = UDim2.new(1, -4, 0, 30); GoalSelectFrame.Position = UDim2.new(0, 2, 0, 4)
-        GoalSelectFrame.BackgroundTransparency = 1; GoalSelectFrame.Parent = Tab1
-        local BtnA = Instance.new("TextButton")
-        BtnA.Size = UDim2.new(0.5, -3, 1, 0)
-        BtnA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnA.BackgroundTransparency = 0.4
-        BtnA.Text = "GOL A"; BtnA.TextSize = 14; BtnA.Font = Enum.Font.GothamBold
-        BtnA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnA.TextStrokeTransparency = 0.4
-        BtnA.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); BtnA.AutoButtonColor = false; BtnA.Parent = GoalSelectFrame
-        local aC = Instance.new("UICorner"); aC.CornerRadius = UDim.new(0, 6); aC.Parent = BtnA
-        local aS = Instance.new("UIStroke"); aS.Thickness = 1; aS.Color = Color3.fromRGB(80, 80, 80); aS.Transparency = 0.5; aS.Parent = BtnA
-        local BtnB = Instance.new("TextButton")
-        BtnB.Size = UDim2.new(0.5, -3, 1, 0); BtnB.Position = UDim2.new(0.5, 3, 0, 0)
-        BtnB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnB.BackgroundTransparency = 0.4
-        BtnB.Text = "GOL B"; BtnB.TextSize = 14; BtnB.Font = Enum.Font.GothamBold
-        BtnB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnB.TextStrokeTransparency = 0.4
-        BtnB.TextStrokeColor3 = Color3.fromRGB(0, 0, 0); BtnB.AutoButtonColor = false; BtnB.Parent = GoalSelectFrame
-        local bC = Instance.new("UICorner"); bC.CornerRadius = UDim.new(0, 6); bC.Parent = BtnB
-        local bS = Instance.new("UIStroke"); bS.Thickness = 1; bS.Color = Color3.fromRGB(80, 80, 80); bS.Transparency = 0.5; bS.Parent = BtnB
-        local function upd()
-            if selectedGoalIndex == 1 then
-                BtnA.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnA.BackgroundTransparency = 0.1; BtnA.TextColor3 = Color3.fromRGB(10, 30, 60); BtnA.TextStrokeTransparency = 1
-                aS.Color = Color3.fromRGB(200, 240, 255); aS.Transparency = 0
-                BtnB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnB.BackgroundTransparency = 0.4; BtnB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnB.TextStrokeTransparency = 0.4
-                bS.Color = Color3.fromRGB(80, 80, 80); bS.Transparency = 0.5
-            else
-                BtnB.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnB.BackgroundTransparency = 0.1; BtnB.TextColor3 = Color3.fromRGB(10, 30, 60); BtnB.TextStrokeTransparency = 1
-                bS.Color = Color3.fromRGB(200, 240, 255); bS.Transparency = 0
-                BtnA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnA.BackgroundTransparency = 0.4; BtnA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnA.TextStrokeTransparency = 0.4
-                aS.Color = Color3.fromRGB(80, 80, 80); aS.Transparency = 0.5
-            end
-        end
-        addTap(BtnA, function() selectedGoalIndex = 1; upd() end)
-        addTap(BtnB, function() selectedGoalIndex = 2; upd() end)
-        upd()
-    end
-    Button = makeButton(Tab1, "AUTO-GOL: DESATIVADO", 40, Color3.fromRGB(0,120,180), Color3.fromRGB(120,0,180))
-    TpGoalBtn = makeButton(Tab1, "TP GOAL: DESATIVADO", 82, Color3.fromRGB(200, 0, 255), Color3.fromRGB(0, 180, 255))
-    ControlBtn = makeButton(Tab1, "CONTROL: DESATIVADO", 124, Color3.fromRGB(0, 220, 255), Color3.fromRGB(0, 100, 255))
-    TouchGoalBtn = makeButton(Tab1, "TOUCH GOAL: DESATIVADO", 166, Color3.fromRGB(255, 100, 0), Color3.fromRGB(200, 0, 100))
-    SkyBtn = makeButton(Tab1, "SKY BALL: DESATIVADO", 208, Color3.fromRGB(80, 200, 255), Color3.fromRGB(0, 100, 200))
-    BoostAllBtn = makeButton(Tab1, "BOOST ALL: DESATIVADO", 250, Color3.fromRGB(255,100,0), Color3.fromRGB(255,200,0))
-    do
-        local SF = Instance.new("Frame")
-        SF.Size = UDim2.new(1, -4, 0, 45); SF.Position = UDim2.new(0, 2, 0, 292)
-        SF.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SF.BackgroundTransparency = 0.5
-        SF.BorderSizePixel = 0; SF.Parent = Tab1
-        local sfc = Instance.new("UICorner"); sfc.CornerRadius = UDim.new(0, 8); sfc.Parent = SF
-        local sfs = Instance.new("UIStroke"); sfs.Thickness = 1.5; sfs.Color = Color3.fromRGB(255,200,0); sfs.Transparency = 0.3; sfs.Parent = SF
-        local SL = Instance.new("TextLabel")
-        SL.Size = UDim2.new(1, 0, 0, 14); SL.Position = UDim2.new(0, 0, 0, 2)
-        SL.BackgroundTransparency = 1; SL.Text = "MULTIPLICADOR: 3x"
-        SL.TextColor3 = Color3.fromRGB(255, 200, 0); SL.TextSize = 11
-        SL.Font = Enum.Font.GothamBold; SL.Parent = SF
-        local Track = Instance.new("Frame")
-        Track.Size = UDim2.new(1, -20, 0, 4); Track.Position = UDim2.new(0, 10, 0, 30)
-        Track.BackgroundColor3 = Color3.fromRGB(50, 50, 70); Track.BorderSizePixel = 0; Track.Parent = SF
-        local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0, 2); tc.Parent = Track
-        local dotButtons = {}
-        for i = 1, 6 do
-            local dot = Instance.new("TextButton")
-            dot.Size = UDim2.new(0, 12, 0, 12); dot.Position = UDim2.new((i-1)/5, -6, 0.5, -6)
-            dot.BackgroundColor3 = Color3.fromRGB(80, 80, 100); dot.Text = ""
-            dot.AutoButtonColor = false; dot.BorderSizePixel = 0; dot.Parent = Track
-            local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(1, 0); dc.Parent = dot
-            table.insert(dotButtons, dot)
-        end
-        Knob = Instance.new("TextButton")
-        Knob.Size = UDim2.new(0, 22, 0, 22); Knob.Position = UDim2.new(2/5, -11, 0.5, -11)
-        Knob.BackgroundColor3 = Color3.fromRGB(255, 200, 0); Knob.Text = "3"
-        Knob.TextSize = 12; Knob.TextColor3 = Color3.fromRGB(0, 0, 0)
-        Knob.Font = Enum.Font.GothamBold; Knob.AutoButtonColor = false
-        Knob.BorderSizePixel = 0; Knob.ZIndex = 6; Knob.Parent = Track
-        local kc = Instance.new("UICorner"); kc.CornerRadius = UDim.new(1, 0); kc.Parent = Knob
-        local ks = Instance.new("UIStroke"); ks.Thickness = 1.5; ks.Color = Color3.fromRGB(255, 255, 255); ks.Parent = Knob
-        local function updDots(v)
-            for i, d in ipairs(dotButtons) do
-                d.BackgroundColor3 = i <= v and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(80, 80, 100)
-            end
-            SL.Text = "MULTIPLICADOR: " .. v .. "x"
-            Knob.Text = tostring(v); boostMultiplier = v
-        end
-        local drag = false
-        Knob.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then drag = true end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if drag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local w = Track.AbsoluteSize.X
-                local rx = math.clamp((input.Position.X - Track.AbsolutePosition.X) / w, 0, 1)
-                local v = math.clamp(math.floor(rx * 5 + 0.5) + 1, 1, 6)
-                Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11); updDots(v)
-            end
-        end)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then drag = false end
-        end)
-        for i, d in ipairs(dotButtons) do
-            addTap(d, function() Knob.Position = UDim2.new((i-1)/5, -11, 0.5, -11); updDots(i) end)
-        end
-        updDots(3)
-    end
-    BringBtn = makeButton(Tab2, "BRING BALL: DESATIVADO", 4, Color3.fromRGB(120,0,180), Color3.fromRGB(0,230,255))
-    LoopBringBtn = makeButton(Tab2, "LOOP BRING: DESATIVADO", 46, Color3.fromRGB(200,0,255), Color3.fromRGB(0,150,255))
-    MoveBallBtn = makeButton(Tab2, "MOVE BALL: DESATIVADO", 88, Color3.fromRGB(150, 0, 255), Color3.fromRGB(0, 200, 100))
-    OrbitBallBtn = makeButton(Tab2, "ORBIT BALL: DESATIVADO", 130, Color3.fromRGB(0, 220, 255), Color3.fromRGB(255, 0, 200))
-    FreezeAllBtn = makeButton(Tab2, "FREEZE BALL: DESATIVADO", 172, Color3.fromRGB(0,255,200), Color3.fromRGB(0,100,255))
-    BugBallBtn = makeButton(Tab2, "BUG BALL: DESATIVADO", 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100))
-    DefendGoalBtn = makeButton(Tab2, "DEFEND GOAL: DESATIVADO", 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0))
-    CoinTpBtn = makeButton(Tab4, "COLETAR COINS", 4, Color3.fromRGB(255, 215, 0), Color3.fromRGB(255, 140, 0))
-    do
-        local CF = Instance.new("Frame")
-        CF.Size = UDim2.new(1, 0, 1, 0); CF.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CF.BackgroundTransparency = 0.4
-        CF.BorderSizePixel = 0; CF.Parent = Tab3
-        local cf1 = Instance.new("UICorner"); cf1.CornerRadius = UDim.new(0, 8); cf1.Parent = CF
-        local cf2 = Instance.new("UIStroke"); cf2.Thickness = 1.5; cf2.Color = Color3.fromRGB(0, 200, 255); cf2.Transparency = 0.4; cf2.Parent = CF
-        local function getList()
-            return {
-                {"USER_ID", tostring(UID)},
-                {"TOKEN", tostring(TKN)},
-                {"boostMultiplier", tostring(boostMultiplier)},
-                {"selGoalIndex", tostring(selectedGoalIndex)},
-                {"defendGoal", defendSelectedGoal},
-                {"autoGoalForce", tostring(CFGV.autoGoalForce or "?")},
-                {"autoGoalY", tostring(CFGV.autoGoalY or "?")},
-                {"bringForce", tostring(CFGV.bringForce or "?")},
-                {"freezeDelay", tostring(CFGV.freezeDelay or "?")},
-                {"moveForce", tostring(CFGV.moveForce or "?")},
-                {"orbitForce", tostring(CFGV.orbitForce or "?")},
-                {"skyForce", tostring(CFGV.skyForce or "?")},
-                {"touchGoalDist", tostring(CFGV.touchGoalDist or "?")},
-                {"boostMaxSpeed", tostring(CFGV.boostMaxSpeed or "?")},
-                {"bugRadius", tostring(CFGV.bugRadius or "?")},
-                {"controlForce", tostring(CONTROL.force)},
-                {"defendRadius", tostring(DEFEND.radius)},
-                {"defendForce", tostring(DEFEND.force)},
-            }
-        end
-        local CS = Instance.new("ScrollingFrame")
-        CS.Size = UDim2.new(1, -8, 1, -8); CS.Position = UDim2.new(0, 4, 0, 4)
-        CS.BackgroundTransparency = 1; CS.BorderSizePixel = 0
-        CS.ScrollBarThickness = 3; CS.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
-        CS.CanvasSize = UDim2.new(0, 0, 0, 0); CS.ScrollingDirection = Enum.ScrollingDirection.Y
-        CS.ElasticBehavior = Enum.ElasticBehavior.Never; CS.Parent = CF
-        local rows = {}
-        local function refresh()
-            local list = getList()
-            for i, e in ipairs(list) do
-                local row = rows[i]
-                if not row then
-                    row = Instance.new("Frame")
-                    row.Size = UDim2.new(1, -5, 0, 16); row.Position = UDim2.new(0, 0, 0, (i-1) * 17)
-                    row.BackgroundTransparency = 1; row.Parent = CS
-                    local n1 = Instance.new("TextLabel")
-                    n1.Size = UDim2.new(0.5, 0, 1, 0); n1.Position = UDim2.new(0, 4, 0, 0)
-                    n1.BackgroundTransparency = 1; n1.Text = e[1]
-                    n1.TextColor3 = Color3.fromRGB(0, 200, 255); n1.TextSize = 10
-                    n1.Font = Enum.Font.Code; n1.TextXAlignment = Enum.TextXAlignment.Left; n1.Parent = row
-                    local n2 = Instance.new("TextLabel")
-                    n2.Size = UDim2.new(0, 12, 1, 0); n2.Position = UDim2.new(0.5, 0, 0, 0)
-                    n2.BackgroundTransparency = 1; n2.Text = "="
-                    n2.TextColor3 = Color3.fromRGB(180, 0, 255); n2.TextSize = 10
-                    n2.Font = Enum.Font.Code; n2.Parent = row
-                    local n3 = Instance.new("TextLabel")
-                    n3.Name = "V"
-                    n3.Size = UDim2.new(0.5, -16, 1, 0); n3.Position = UDim2.new(0.5, 14, 0, 0)
-                    n3.BackgroundTransparency = 1; n3.Text = e[2]
-                    n3.TextColor3 = Color3.fromRGB(220, 220, 240); n3.TextSize = 10
-                    n3.Font = Enum.Font.Code; n3.TextXAlignment = Enum.TextXAlignment.Left
-                    n3.TextTruncate = Enum.TextTruncate.AtEnd; n3.Parent = row
-                    rows[i] = row
-                else
-                    local v = row:FindFirstChild("V")
-                    if v then v.Text = e[2] end
-                end
-            end
-            CS.CanvasSize = UDim2.new(0, 0, 0, #list * 17 + 4)
-        end
-        refresh()
-        task.spawn(function()
-            while ScreenGui and ScreenGui.Parent do
-                task.wait(0.5)
-                pcall(refresh)
-            end
-        end)
-    end
-    local currentTab = 1
-    local tabContents = {Tab1, Tab2, Tab4, Tab3}
-    local function switchTab(index)
-        currentTab = index
-        for i, c in ipairs(tabContents) do c.Visible = (i == index) end
-        for i, t in ipairs(tabButtons) do
-            if i == index then
-                TS:Create(t, TweenInfo.new(0.15), {
-                    BackgroundTransparency = 0.1,
-                    BackgroundColor3 = Color3.fromRGB(100, 200, 255),
-                    TextColor3 = Color3.fromRGB(10, 30, 60),
-                }):Play()
-            else
-                TS:Create(t, TweenInfo.new(0.15), {
-                    BackgroundTransparency = 0.5,
-                    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                }):Play()
-            end
-        end
-    end
+end)
+UIS.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+end)
+for i, d in ipairs(dotButtons) do
+    W.addTap(d, function() Knob.Position = UDim2.new((i-1)/5, -11, 0.5, -11); W.updDots(i) end)
+end
+W.updDots(3)
+
+local BringBtn = makeButton(Tab2, "BRING BALL: DESATIVADO", 4, Color3.fromRGB(120,0,180), Color3.fromRGB(0,230,255), "BringBtn")
+local LoopBringBtn = makeButton(Tab2, "LOOP BRING: DESATIVADO", 46, Color3.fromRGB(200,0,255), Color3.fromRGB(0,150,255), "LoopBringBtn")
+local MoveBallBtn = makeButton(Tab2, "MOVE BALL: DESATIVADO", 88, Color3.fromRGB(150, 0, 255), Color3.fromRGB(0, 200, 100), "MoveBallBtn")
+local OrbitBallBtn = makeButton(Tab2, "ORBIT BALL: DESATIVADO", 130, Color3.fromRGB(0, 220, 255), Color3.fromRGB(255, 0, 200), "OrbitBallBtn")
+local FreezeAllBtn = makeButton(Tab2, "FREEZE BALL: DESATIVADO", 172, Color3.fromRGB(0,255,200), Color3.fromRGB(0,100,255), "FreezeAllBtn")
+local BugBallBtn = makeButton(Tab2, "BUG BALL: DESATIVADO", 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100), "BugBallBtn")
+local DefendGoalBtn = makeButton(Tab2, "DEFEND GOAL: DESATIVADO", 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0), "DefendGoalBtn")
+
+local FarmCoinsBtn = makeButton(Tab4, "FARM COINS: OFF", 4, Color3.fromRGB(200, 160, 0), Color3.fromRGB(255, 220, 0), "FarmCoinsBtn")
+
+local currentTab = 1
+local tabContents = {Tab1, Tab2, Tab4}
+W.switchTab = function(index)
+    currentTab = index
+    for i, c in ipairs(tabContents) do c.Visible = (i == index) end
     for i, t in ipairs(tabButtons) do
-        addTap(t, function() switchTab(i) end)
-    end
-    switchTab(1)
-    local function resetVis()
-        setBtnInactive(Button, "AUTO-GOL: DESATIVADO")
-        setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO")
-        setBtnInactive(ControlBtn, "CONTROL: DESATIVADO")
-        setBtnInactive(BringBtn, "BRING BALL: DESATIVADO")
-        setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO")
-        setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO")
-        setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO")
-        setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO")
-        setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO")
-        setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO")
-        setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO")
-        setBtnInactive(BugBallBtn, "BUG BALL: DESATIVADO")
-        setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
-        setBtnInactive(CoinTpBtn, "COLETAR COINS")
-    end
-    local function stopAll()
-        isActive = false; isBringing = false; isLoopBringing = false
-        isFreezing = false; isBoostingAll = false
-        isSkying = false; isTouchGoal = false; isMoveBall = false
-        isOrbitBall = false; isBugBall = false
-        isTpGoal = false; isControl = false; isDefending = false; isCollectingCoins = false
-        if loopThread then task.cancel(loopThread); loopThread = nil end
-        if tpGoalThread then task.cancel(tpGoalThread); tpGoalThread = nil end
-        if bringThread then task.cancel(bringThread); bringThread = nil end
-        if loopBringThread then task.cancel(loopBringThread); loopBringThread = nil end
-        if freezeThread then task.cancel(freezeThread); freezeThread = nil end
-        if boostAllThread then task.cancel(boostAllThread); boostAllThread = nil end
-        if skyThread then task.cancel(skyThread); skyThread = nil end
-        if touchGoalThread then task.cancel(touchGoalThread); touchGoalThread = nil end
-        if moveBallThread then task.cancel(moveBallThread); moveBallThread = nil end
-        if orbitBallThread then task.cancel(orbitBallThread); orbitBallThread = nil end
-        if bugBallThread then task.cancel(bugBallThread); bugBallThread = nil end
-        if defendThread then task.cancel(defendThread); defendThread = nil end
-        if coinTpThread then task.cancel(coinTpThread); coinTpThread = nil end
-        if controlScreenGui then controlScreenGui:Destroy(); controlScreenGui = nil end
-        stopSpectating()
-        resetVis()
-    end
-    addTap(Button, function()
-        if isActive then isActive = false; setBtnInactive(Button, "AUTO-GOL: DESATIVADO"); if loopThread then task.cancel(loopThread); loopThread = nil end
-        else stopAll(); isActive = true; setBtnActive(Button, "AUTO-GOL: ATIVADO"); startAutoGoal() end
-    end)
-    addTap(TpGoalBtn, function()
-        if isTpGoal then isTpGoal = false; if tpGoalThread then task.cancel(tpGoalThread); tpGoalThread = nil end; stopSpectating(); setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO")
-        else stopAll(); isTpGoal = true; setBtnActive(TpGoalBtn, "TP GOAL: ATIVADO"); startSpectating(); startTpGoal() end
-    end)
-    addTap(ControlBtn, function()
-        if isControl then stopControl(); setBtnInactive(ControlBtn, "CONTROL: DESATIVADO")
-        else setBtnActive(ControlBtn, "CONTROL: ATIVADO"); startControl() end
-    end)
-    addTap(BringBtn, function()
-        if isBringing then isBringing = false; if bringThread then task.cancel(bringThread); bringThread = nil end; setBtnInactive(BringBtn, "BRING BALL: DESATIVADO")
-        else stopAll(); isBringing = true; setBtnActive(BringBtn, "BRING BALL: ATIVADO"); startBring() end
-    end)
-    addTap(LoopBringBtn, function()
-        if isLoopBringing then isLoopBringing = false; if loopBringThread then task.cancel(loopBringThread); loopBringThread = nil end; setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO")
-        else stopAll(); isLoopBringing = true; setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); startLoopBring() end
-    end)
-    addTap(FreezeAllBtn, function()
-        if isFreezing then stopFreeze(); setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO")
-        else stopAll(); setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); startFreeze() end
-    end)
-    addTap(BoostAllBtn, function()
-        if isBoostingAll then isBoostingAll = false; setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO"); if boostAllThread then task.cancel(boostAllThread); boostAllThread = nil end
-        else stopAll(); isBoostingAll = true; setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. boostMultiplier .. "x)"); startBoostAll() end
-    end)
-    addTap(SkyBtn, function()
-        if isSkying then isSkying = false; if skyThread then task.cancel(skyThread); skyThread = nil end; setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO")
-        else stopAll(); isSkying = true; setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); startSky() end
-    end)
-    addTap(TouchGoalBtn, function()
-        if isTouchGoal then isTouchGoal = false; if touchGoalThread then task.cancel(touchGoalThread); touchGoalThread = nil end; setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO")
-        else stopAll(); isTouchGoal = true; setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); startTouchGoal() end
-    end)
-    addTap(MoveBallBtn, function()
-        if isMoveBall then isMoveBall = false; if moveBallThread then task.cancel(moveBallThread); moveBallThread = nil end; setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO")
-        else stopAll(); isMoveBall = true; setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); startMoveBall() end
-    end)
-    addTap(OrbitBallBtn, function()
-        if isOrbitBall then isOrbitBall = false; if orbitBallThread then task.cancel(orbitBallThread); orbitBallThread = nil end; setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO")
-        else stopAll(); isOrbitBall = true; setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); startOrbitBall() end
-    end)
-    addTap(BugBallBtn, function()
-        if isBugBall then return end
-        stopAll(); isBugBall = true; setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); startBugBall()
-    end)
-    addTap(DefendGoalBtn, function()
-        if isDefending then stopDefend(); setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
-        else setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. defendSelectedGoal .. ")"); isDefending = true; startDefend() end
-    end)
-    addTap(CoinTpBtn, function()
-        if isCollectingCoins then return end
-        setBtnActive(CoinTpBtn, "COLETANDO..."); collectCoins()
-    end)
-    local minimized = false
-    local FULL = UDim2.new(0, 360, 0, 520)
-    local MIN = UDim2.new(0, 360, 0, 42)
-    addTap(MinBtn, function()
-        minimized = not minimized
-        if minimized then
-            TabBar.Visible = false; ContentArea.Visible = false
-            TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = MIN}):Play()
-            MinBtn.Text = "▢"
-        else
-            TabBar.Visible = true; ContentArea.Visible = true
-            TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = FULL}):Play()
-            MinBtn.Text = "■"
-        end
-    end)
-    addTap(CloseBtn, function()
-        stopAll()
-        TabBar.Visible = false; ContentArea.Visible = false
-        local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1
-        })
-        tw:Play()
-        TS:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
-        tw.Completed:Wait()
-        ScreenGui:Destroy()
-    end)
-    task.spawn(function()
-        task.wait(0.05)
-        TS:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = FULL, Position = UDim2.new(0.5, -180, 0.5, -260), BackgroundTransparency = 0.25
-        }):Play()
-        TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
-    end)
-    do
-        local d, di, ds, sp
-        MainFrame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                if input.Target and (input.Target:IsA("TextButton") or input.Target:IsA("TextBox")) then return end
-                d = true; ds = input.Position; sp = MainFrame.Position
-                input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then d = false end end)
-            end
-        end)
-        MainFrame.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then di = input end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if input == di and d then
-                local delta = input.Position - ds
-                MainFrame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
-            end
-        end)
-    end
-end
-
-local cmdsList = {
-    {";cmdbar2", "Abre a barra de comando 2"},
-    {";cmds", "Abre/fecha esta lista"},
-    {";loop goal a", "Loop auto-gol Gol A"},
-    {";loop goal b", "Loop auto-gol Gol B"},
-    {";unloop goal", "Para o loop do gol"},
-    {";gol a", "Chute único no Gol A"},
-    {";gol b", "Chute único no Gol B"},
-    {";tpgoal", "Teleporta + chuta + espeta"},
-    {";untpgoal", "Para o TP GOAL"},
-    {";control", "Abre/fecha setas"},
-    {";defendgoal", "Ativa defesa"},
-    {";defendgol a", "Defende Gol A"},
-    {";defendgol b", "Defende Gol B"},
-    {";undefend", "Para defend"},
-    {";bringball", "Puxa a bola"},
-    {";unbringball", "Cancela bring"},
-    {";loopbring", "Puxa infinito"},
-    {";unloopbring", "Para loop bring"},
-    {";freezeball", "Congela bola"},
-    {";unfreezeball", "Para freeze"},
-    {";bugball", "Bola orbita"},
-    {";boostall", "Acelera bola"},
-    {";unboostall", "Para boost"},
-    {";boostmult 6", "Multiplicador 6x"},
-    {";skyball", "Bola pro céu"},
-    {";unskyball", "Para sky ball"},
-    {";touchgoal", "Chute ao encostar"},
-    {";untouchgoal", "Para touch"},
-    {";moveball", "Move Ball"},
-    {";unmoveball", "Para move ball"},
-    {";orbitball", "Bola orbita em curva"},
-    {";unorbitball", "Para orbit"},
-}
-
-do
-    local CmdsScreenGui = Instance.new("ScreenGui")
-    CmdsScreenGui.Name = "WillnzxCmdsGUI"
-    CmdsScreenGui.ResetOnSpawn = false
-    CmdsScreenGui.IgnoreGuiInset = true
-    CmdsScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    CmdsScreenGui.Enabled = false
-    pcall(function() CmdsScreenGui.Parent = CoreGui end)
-    if not CmdsScreenGui.Parent then CmdsScreenGui.Parent = LP:WaitForChild("PlayerGui") end
-    local CF = Instance.new("Frame")
-    CF.Size = UDim2.new(0, 360, 0, 420); CF.Position = UDim2.new(0.5, -180, 0.5, -210)
-    CF.BackgroundColor3 = Color3.fromRGB(15, 15, 25); CF.BackgroundTransparency = 0.15
-    CF.BorderSizePixel = 0; CF.Active = true; CF.Draggable = true
-    CF.ClipsDescendants = true; CF.Parent = CmdsScreenGui
-    local c1 = Instance.new("UICorner"); c1.CornerRadius = UDim.new(0, 12); c1.Parent = CF
-    local c2 = Instance.new("UIStroke")
-    c2.Thickness = 1.5; c2.Color = Color3.fromRGB(180, 0, 255); c2.Transparency = 0.2
-    c2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; c2.Parent = CF
-    local c3 = Instance.new("UIGradient")
-    c3.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 15, 40)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 15, 30)),
-    })
-    c3.Rotation = 45; c3.Parent = CF
-    local T = Instance.new("TextLabel")
-    T.Size = UDim2.new(1, -90, 0, 22); T.Position = UDim2.new(0, 12, 0, 8)
-    T.BackgroundTransparency = 1; T.Text = "📜 COMANDOS"
-    T.TextColor3 = Color3.fromRGB(180, 0, 255); T.TextScaled = true
-    T.Font = Enum.Font.GothamBold; T.TextXAlignment = Enum.TextXAlignment.Left; T.Parent = CF
-    local MN = Instance.new("TextButton")
-    MN.Size = UDim2.new(0, 26, 0, 26); MN.Position = UDim2.new(1, -62, 0, 8)
-    MN.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MN.BackgroundTransparency = 0.5
-    MN.Text = "■"; MN.TextSize = 16; MN.TextColor3 = Color3.fromRGB(0, 230, 255)
-    MN.Font = Enum.Font.GothamBold; MN.AutoButtonColor = false; MN.Parent = CF
-    local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 5); mc.Parent = MN
-    local CL = Instance.new("TextButton")
-    CL.Size = UDim2.new(0, 26, 0, 26); CL.Position = UDim2.new(1, -32, 0, 8)
-    CL.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CL.BackgroundTransparency = 0.5
-    CL.Text = "✕"; CL.TextSize = 16; CL.TextColor3 = Color3.fromRGB(255, 60, 60)
-    CL.Font = Enum.Font.GothamBold; CL.AutoButtonColor = false; CL.Parent = CF
-    local clc = Instance.new("UICorner"); clc.CornerRadius = UDim.new(0, 5); clc.Parent = CL
-    local CT = Instance.new("Frame")
-    CT.Size = UDim2.new(1, 0, 1, -38); CT.Position = UDim2.new(0, 0, 0, 38)
-    CT.BackgroundTransparency = 1; CT.Parent = CF
-    local HF = Instance.new("Frame")
-    HF.Size = UDim2.new(1, -20, 0, 16); HF.Position = UDim2.new(0, 10, 0, 0)
-    HF.BackgroundTransparency = 1; HF.Parent = CT
-    local H1 = Instance.new("TextLabel")
-    H1.Size = UDim2.new(0.42, 0, 1, 0); H1.Position = UDim2.new(0, 4, 0, 0)
-    H1.BackgroundTransparency = 1; H1.Text = "COMANDO"
-    H1.TextColor3 = Color3.fromRGB(150, 150, 180); H1.TextSize = 10
-    H1.Font = Enum.Font.GothamBold; H1.TextXAlignment = Enum.TextXAlignment.Left; H1.Parent = HF
-    local H2 = Instance.new("TextLabel")
-    H2.Size = UDim2.new(0.56, 0, 1, 0); H2.Position = UDim2.new(0.43, 0, 0, 0)
-    H2.BackgroundTransparency = 1; H2.Text = "CLIQUE PRA EXECUTAR"
-    H2.TextColor3 = Color3.fromRGB(150, 150, 180); H2.TextSize = 10
-    H2.Font = Enum.Font.GothamBold; H2.TextXAlignment = Enum.TextXAlignment.Left; H2.Parent = HF
-    local SCR = Instance.new("ScrollingFrame")
-    SCR.Size = UDim2.new(1, -20, 1, -26); SCR.Position = UDim2.new(0, 10, 0, 20)
-    SCR.BackgroundTransparency = 1; SCR.BorderSizePixel = 0
-    SCR.ScrollBarThickness = 4; SCR.ScrollBarImageColor3 = Color3.fromRGB(180, 0, 255)
-    SCR.CanvasSize = UDim2.new(0, 0, 0, 0); SCR.ScrollingDirection = Enum.ScrollingDirection.Y
-    SCR.ElasticBehavior = Enum.ElasticBehavior.Never; SCR.Parent = CT
-    local y = 0
-    for _, item in ipairs(cmdsList) do
-        local row = Instance.new("TextButton")
-        row.Size = UDim2.new(1, -5, 0, 28); row.Position = UDim2.new(0, 0, 0, y)
-        row.BackgroundColor3 = Color3.fromRGB(0, 0, 0); row.BackgroundTransparency = 0.6
-        row.BorderSizePixel = 0; row.Text = ""; row.AutoButtonColor = false
-        row.Active = true; row.Parent = SCR
-        local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0, 5); rc.Parent = row
-        local cmdL = Instance.new("TextLabel")
-        cmdL.Size = UDim2.new(0.42, 0, 1, 0); cmdL.Position = UDim2.new(0, 6, 0, 0)
-        cmdL.BackgroundTransparency = 1; cmdL.Text = item[1]
-        cmdL.TextColor3 = Color3.fromRGB(0, 230, 255); cmdL.TextSize = 11
-        cmdL.Font = Enum.Font.Code; cmdL.TextXAlignment = Enum.TextXAlignment.Left; cmdL.Parent = row
-        local ar = Instance.new("TextLabel")
-        ar.Size = UDim2.new(0, 12, 1, 0); ar.Position = UDim2.new(0.42, 0, 0, 0)
-        ar.BackgroundTransparency = 1; ar.Text = "»"; ar.TextColor3 = Color3.fromRGB(180, 0, 255)
-        ar.TextSize = 12; ar.Font = Enum.Font.GothamBold; ar.Parent = row
-        local dL = Instance.new("TextLabel")
-        dL.Size = UDim2.new(0.56, -10, 1, 0); dL.Position = UDim2.new(0.44, 0, 0, 0)
-        dL.BackgroundTransparency = 1; dL.Text = item[2]
-        dL.TextColor3 = Color3.fromRGB(220, 220, 240); dL.TextSize = 11
-        dL.Font = Enum.Font.Gotham; dL.TextXAlignment = Enum.TextXAlignment.Left; dL.Parent = row
-        addTap(row, function()
-            sendToChat(item[1])
-            local oc = row.BackgroundColor3
-            row.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-            TS:Create(row, TweenInfo.new(0.3), {BackgroundColor3 = oc}):Play()
-        end)
-        y = y + 32
-    end
-    SCR.CanvasSize = UDim2.new(0, 0, 0, y + 5)
-    local visible, min = false, false
-    local FULL = UDim2.new(0, 360, 0, 420)
-    local MIN = UDim2.new(0, 360, 0, 42)
-    function toggleCmds()
-        visible = not visible
-        if visible then
-            CmdsScreenGui.Enabled = true; min = false
-            MN.Text = "■"; CT.Visible = true
-            CF.Size = UDim2.new(0, 0, 0, 0); CF.Position = UDim2.new(0.5, 0, 0.5, 0)
-            CF.BackgroundTransparency = 1; c2.Transparency = 1
-            TS:Create(CF, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = FULL, Position = UDim2.new(0.5, -180, 0.5, -210), BackgroundTransparency = 0.15,
+        if i == index then
+            TS:Create(t, TweenInfo.new(0.15), {
+                BackgroundTransparency = 0.1,
+                BackgroundColor3 = Color3.fromRGB(100, 200, 255),
+                TextColor3 = Color3.fromRGB(10, 30, 60),
             }):Play()
-            TS:Create(c2, TweenInfo.new(0.35), {Transparency = 0.2}):Play()
         else
-            local tw = TS:Create(CF, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1,
-            })
-            tw:Play(); TS:Create(c2, TweenInfo.new(0.2), {Transparency = 1}):Play()
-            tw.Completed:Wait(); CmdsScreenGui.Enabled = false
+            TS:Create(t, TweenInfo.new(0.15), {
+                BackgroundTransparency = 0.5,
+                BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+            }):Play()
         end
     end
-    addTap(MN, function()
-        min = not min
-        if min then
-            CT.Visible = false; MN.Text = "▢"
-            TS:Create(CF, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = MIN}):Play()
-        else
-            CT.Visible = true; MN.Text = "■"
-            TS:Create(CF, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = FULL}):Play()
-        end
-    end)
-    addTap(CL, function()
-        if visible then toggleCmds() end
-    end)
+end
+for i, t in ipairs(tabButtons) do
+    W.addTap(t, function() W.switchTab(i) end)
+end
+W.switchTab(1)
+
+W.resetVis = function()
+    W.setBtnInactive(Button, "AUTO-GOL: DESATIVADO")
+    W.setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO")
+    W.setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO")
+    W.setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO")
+    W.setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO")
+    W.setBtnInactive(BringBtn, "BRING BALL: DESATIVADO")
+    W.setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO")
+    W.setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO")
+    W.setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO")
+    W.setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO")
+    W.setBtnInactive(BugBallBtn, "BUG BALL: DESATIVADO")
+    W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
+    W.setBtnInactive(FarmCoinsBtn, "FARM COINS: OFF")
 end
 
-local cmdBarProcessRef = nil
+W.stopAll = function()
+    W.states.isActive = false; W.states.isBringing = false; W.states.isLoopBringing = false
+    W.states.isFreezing = false; W.states.isBoostingAll = false
+    W.states.isSkying = false; W.states.isTouchGoal = false; W.states.isMoveBall = false
+    W.states.isOrbitBall = false; W.states.isBugBall = false
+    W.states.isTpGoal = false; W.states.isDefending = false
+    W.states.isFarming = false
+    if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
+    if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
+    if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
+    if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
+    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread = nil end
+    if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+    if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+    if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+    if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+    if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+    if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
+    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread = nil end
+    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
+    pcall(function()
+        local o = CoreGui:FindFirstChild("ArrowControlGUI")
+        if o then o:Destroy() end
+    end)
+    W.states.isControl = false
+    W.stopSpectating()
+    W.resetVis()
+end
+
+W.addTap(Button, function()
+    if W.states.isActive then
+        W.states.isActive = false; W.setBtnInactive(Button, "AUTO-GOL: DESATIVADO")
+        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
+    else
+        W.stopAll(); W.states.isActive = true
+        W.setBtnActive(Button, "AUTO-GOL: ATIVADO"); W.startAutoGoal()
+    end
+end)
+
+W.addTap(TpGoalBtn, function()
+    if W.states.isTpGoal then
+        W.states.isTpGoal = false
+        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
+        W.stopSpectating()
+        W.setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isTpGoal = true
+        W.setBtnActive(TpGoalBtn, "TP GOAL: ATIVADO")
+        W.startSpectating(); W.startTpGoal()
+    end
+end)
+
+W.addTap(BringBtn, function()
+    if W.states.isBringing then
+        W.states.isBringing = false
+        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
+        W.setBtnInactive(BringBtn, "BRING BALL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isBringing = true
+        W.setBtnActive(BringBtn, "BRING BALL: ATIVADO"); W.startBring()
+    end
+end)
+
+W.addTap(LoopBringBtn, function()
+    if W.states.isLoopBringing then
+        W.states.isLoopBringing = false
+        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
+        W.setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO")
+    else
+        W.stopAll(); W.states.isLoopBringing = true
+        W.setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); W.startLoopBring()
+    end
+end)
+
+W.addTap(FreezeAllBtn, function()
+    if W.states.isFreezing then
+        W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO")
+    else
+        W.stopAll(); W.setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); W.startFreeze()
+    end
+end)
+
+W.addTap(BoostAllBtn, function()
+    if W.states.isBoostingAll then
+        W.states.isBoostingAll = false
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+        W.setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isBoostingAll = true
+        W.setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. W.boostMultiplier .. "x)"); W.startBoostAll()
+    end
+end)
+
+W.addTap(SkyBtn, function()
+    if W.states.isSkying then
+        W.states.isSkying = false
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+        W.setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isSkying = true
+        W.setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); W.startSky()
+    end
+end)
+
+W.addTap(TouchGoalBtn, function()
+    if W.states.isTouchGoal then
+        W.states.isTouchGoal = false
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+        W.setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isTouchGoal = true
+        W.setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); W.startTouchGoal()
+    end
+end)
+
+W.addTap(MoveBallBtn, function()
+    if W.states.isMoveBall then
+        W.states.isMoveBall = false
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+        W.setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isMoveBall = true
+        W.setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); W.startMoveBall()
+    end
+end)
+
+W.addTap(OrbitBallBtn, function()
+    if W.states.isOrbitBall then
+        W.states.isOrbitBall = false
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+        W.setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO")
+    else
+        W.stopAll(); W.states.isOrbitBall = true
+        W.setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); W.startOrbitBall()
+    end
+end)
+
+W.addTap(BugBallBtn, function()
+    if W.states.isBugBall then return end
+    W.stopAll(); W.states.isBugBall = true
+    W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); W.startBugBall()
+end)
+
+W.addTap(DefendGoalBtn, function()
+    if W.states.isDefending then
+        W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
+    else
+        W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. W.defendSelectedGoal .. ")")
+        W.states.isDefending = true; W.startDefend()
+    end
+end)
+
+W.addTap(FarmCoinsBtn, function()
+    if W.states.isFarming then
+        W.stopFarmCoins()
+        W.setBtnInactive(FarmCoinsBtn, "FARM COINS: OFF")
+    else
+        W.startFarmCoins()
+        W.setBtnActive(FarmCoinsBtn, "FARM COINS: ON")
+    end
+end)
+
+local minimized = false
+local FULL = UDim2.new(0, 360, 0, 520)
+local MIN = UDim2.new(0, 360, 0, 42)
+
+W.addTap(MinBtn, function()
+    minimized = not minimized
+    if minimized then
+        TabBar.Visible = false; ContentArea.Visible = false
+        TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = MIN}):Play()
+        MinBtn.Text = "+"
+    else
+        TabBar.Visible = true; ContentArea.Visible = true
+        TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = FULL}):Play()
+        MinBtn.Text = "-"
+    end
+end)
+
+W.addTap(CloseBtn, function()
+    W.stopAll()
+    TabBar.Visible = false; ContentArea.Visible = false
+    local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1
+    })
+    tw:Play()
+    TS:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
+    tw.Completed:Wait()
+    ScreenGui:Destroy()
+    W.loaded_base = nil
+    _G.Willnzx = nil
+end)
+
+task.spawn(function()
+    task.wait(0.05)
+    TS:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = FULL, Position = UDim2.new(0.5, -180, 0.5, -260), BackgroundTransparency = 0.25
+    }):Play()
+    TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
+end)
 
 do
-    local CmdBarScreenGui = Instance.new("ScreenGui")
-    CmdBarScreenGui.Name = "WillnzxCmdBarGUI"
-    CmdBarScreenGui.ResetOnSpawn = false
-    CmdBarScreenGui.IgnoreGuiInset = true
-    CmdBarScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    CmdBarScreenGui.Enabled = false
-    pcall(function() CmdBarScreenGui.Parent = CoreGui end)
-    if not CmdBarScreenGui.Parent then CmdBarScreenGui.Parent = LP:WaitForChild("PlayerGui") end
-    local CBF = Instance.new("Frame")
-    CBF.Size = UDim2.new(0, 300, 0, 76)
-    CBF.Position = UDim2.new(0.5, -150, 0.82, 0)
-    CBF.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    CBF.BackgroundTransparency = 0.15
-    CBF.BorderSizePixel = 0
-    CBF.Active = true
-    CBF.ClipsDescendants = true
-    CBF.Parent = CmdBarScreenGui
-    local cbc = Instance.new("UICorner"); cbc.CornerRadius = UDim.new(0, 12); cbc.Parent = CBF
-    local cbs = Instance.new("UIStroke")
-    cbs.Thickness = 1.5; cbs.Color = Color3.fromRGB(0, 200, 255); cbs.Transparency = 0.2
-    cbs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; cbs.Parent = CBF
-    local cbsg = Instance.new("UIGradient")
-    cbsg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 0, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)),
-    })
-    cbsg.Parent = cbs
-    local cbbg = Instance.new("UIGradient")
-    cbbg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 35)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 5, 20)),
-    })
-    cbbg.Rotation = 45; cbbg.Parent = CBF
-    local HD = Instance.new("Frame")
-    HD.Size = UDim2.new(1, 0, 0, 32)
-    HD.BackgroundColor3 = Color3.fromRGB(20, 20, 35); HD.BackgroundTransparency = 0.2
-    HD.BorderSizePixel = 0; HD.Active = true; HD.Parent = CBF
-    local hdc = Instance.new("UICorner"); hdc.CornerRadius = UDim.new(0, 12); hdc.Parent = HD
-    local CBT = Instance.new("TextLabel")
-    CBT.Size = UDim2.new(1, -75, 1, 0); CBT.Position = UDim2.new(0, 10, 0, 0)
-    CBT.BackgroundTransparency = 1; CBT.Text = "CMDBAR2"
-    CBT.TextColor3 = Color3.fromRGB(0, 230, 255); CBT.TextSize = 14
-    CBT.Font = Enum.Font.GothamBold; CBT.TextXAlignment = Enum.TextXAlignment.Left
-    CBT.Active = false; CBT.Parent = HD
-    local cbtg = Instance.new("UIGradient")
-    cbtg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 255)),
-    })
-    cbtg.Parent = CBT
-    local MB2 = Instance.new("TextButton")
-    MB2.Size = UDim2.new(0, 24, 0, 24); MB2.Position = UDim2.new(1, -56, 0, 4)
-    MB2.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MB2.BackgroundTransparency = 0.5
-    MB2.Text = "−"; MB2.TextSize = 16; MB2.TextColor3 = Color3.fromRGB(0, 230, 255)
-    MB2.Font = Enum.Font.GothamBold; MB2.AutoButtonColor = false; MB2.Parent = HD
-    local mc2 = Instance.new("UICorner"); mc2.CornerRadius = UDim.new(0, 5); mc2.Parent = MB2
-    local CB2 = Instance.new("TextButton")
-    CB2.Size = UDim2.new(0, 24, 0, 24); CB2.Position = UDim2.new(1, -28, 0, 4)
-    CB2.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CB2.BackgroundTransparency = 0.5
-    CB2.Text = "✕"; CB2.TextSize = 14; CB2.TextColor3 = Color3.fromRGB(255, 60, 60)
-    CB2.Font = Enum.Font.GothamBold; CB2.AutoButtonColor = false; CB2.Parent = HD
-    local cc2 = Instance.new("UICorner"); cc2.CornerRadius = UDim.new(0, 5); cc2.Parent = CB2
-    local BD = Instance.new("Frame")
-    BD.Size = UDim2.new(1, 0, 0, 44); BD.Position = UDim2.new(0, 0, 0, 32)
-    BD.BackgroundColor3 = Color3.fromRGB(10, 10, 18); BD.BackgroundTransparency = 0.3
-    BD.BorderSizePixel = 0; BD.Parent = CBF
-    local bdc = Instance.new("UICorner"); bdc.CornerRadius = UDim.new(0, 12); bdc.Parent = BD
-    local CBI = Instance.new("TextBox")
-    CBI.Size = UDim2.new(1, -110, 0, 32); CBI.Position = UDim2.new(0, 8, 0.5, -16)
-    CBI.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CBI.BackgroundTransparency = 0.4
-    CBI.BorderSizePixel = 0; CBI.Text = ""
-    CBI.PlaceholderText = "Digite o comando..."
-    CBI.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
-    CBI.TextColor3 = Color3.fromRGB(0, 230, 255); CBI.TextSize = 13
-    CBI.Font = Enum.Font.Gotham; CBI.TextXAlignment = Enum.TextXAlignment.Left
-    CBI.ClearTextOnFocus = false; CBI.Parent = BD
-    local cbi1 = Instance.new("UICorner"); cbi1.CornerRadius = UDim.new(0, 6); cbi1.Parent = CBI
-    local cbi2 = Instance.new("UIStroke"); cbi2.Thickness = 1; cbi2.Color = Color3.fromRGB(0, 230, 255); cbi2.Transparency = 0.5; cbi2.Parent = CBI
-    local cbp = Instance.new("UIPadding"); cbp.PaddingLeft = UDim.new(0, 8); cbp.Parent = CBI
-    local EB = Instance.new("TextButton")
-    EB.Size = UDim2.new(0, 92, 0, 32); EB.Position = UDim2.new(1, -100, 0.5, -16)
-    EB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); EB.BackgroundTransparency = 0.4
-    EB.Text = "EXECUTE"; EB.TextSize = 12; EB.TextColor3 = Color3.fromRGB(255, 255, 255)
-    EB.TextStrokeTransparency = 0.4; EB.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    EB.Font = Enum.Font.GothamBold; EB.AutoButtonColor = false; EB.Parent = BD
-    local ebc = Instance.new("UICorner"); ebc.CornerRadius = UDim.new(0, 6); ebc.Parent = EB
-    local ebs = Instance.new("UIStroke"); ebs.Thickness = 1.5; ebs.Color = Color3.fromRGB(0, 200, 255); ebs.Transparency = 0.3; ebs.Parent = EB
-    local ebg = Instance.new("UIGradient")
-    ebg.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 180)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 0, 180)),
-    })
-    ebg.Rotation = 90
-    ebg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0.7)})
-    ebg.Parent = EB
-    EB.MouseEnter:Connect(function() TS:Create(EB, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play() end)
-    EB.MouseLeave:Connect(function() TS:Create(EB, TweenInfo.new(0.15), {BackgroundTransparency = 0.4}):Play() end)
-    local visible, min = false, false
-    local FULL = UDim2.new(0, 300, 0, 76)
-    local MIN = UDim2.new(0, 300, 0, 32)
-    function toggleCmdBar()
-        visible = not visible
-        CmdBarScreenGui.Enabled = visible
-        if visible then
-            min = false
-            BD.Visible = true
-            CBF.Size = FULL
-            MB2.Text = "−"
-            CBI.Text = ""
-            task.wait(0.1)
-            CBI:CaptureFocus()
-        end
-    end
-    local function runCmd()
-        local t = CBI.Text
-        if t and t:gsub("%s+", "") ~= "" then
-            local full = ";" .. t
-            if cmdBarProcessRef then cmdBarProcessRef(full) end
-            CBI.Text = ""
-        end
-    end
-    EB.MouseButton1Down:Connect(function()
-        runCmd()
-        task.wait(0.05)
-        if visible and not min then CBI:CaptureFocus() end
-    end)
-    CAS:BindAction("BlockEnterCmdBar2", function(name, state, input)
-        if state == Enum.UserInputState.Begin then
-            if visible and CBI:IsFocused() then
-                runCmd()
-                task.wait(0.05)
-                if visible and not min then CBI:CaptureFocus() end
-                return Enum.ContextActionResult.Sink
-            end
-        end
-        return Enum.ContextActionResult.Pass
-    end, false, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter)
-    CBI.FocusLost:Connect(function(ep)
-        if ep then runCmd() end
-    end)
-    MB2.MouseButton1Down:Connect(function()
-        min = not min
-        if min then
-            BD.Visible = false
-            CBF.Size = MIN
-            MB2.Text = "+"
-        else
-            BD.Visible = true
-            CBF.Size = FULL
-            MB2.Text = "−"
-            task.wait(0.05)
-            CBI:CaptureFocus()
+    local d, di, ds, sp
+    MainFrame.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            local okT, isBtn = pcall(function()
+                return i.Target and (i.Target:IsA("TextButton") or i.Target:IsA("TextBox") or i.Target:IsA("ScrollingFrame"))
+            end)
+            if okT and isBtn then return end
+            d = true
+            ds = i.Position
+            sp = MainFrame.Position
+            i.Changed:Connect(function()
+                if i.UserInputState == Enum.UserInputState.End then d = false end
+            end)
         end
     end)
-    CB2.MouseButton1Down:Connect(function()
-        if visible then visible = false; CmdBarScreenGui.Enabled = false end
+    MainFrame.InputChanged:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+            di = i
+        end
     end)
-    do
-        local da, ds, di = false, nil, nil
-        MB2.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then da = false end
-        end)
-        CB2.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then da = false end
-        end)
-        HD.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                da = true
-                ds = CBF.Position
-                di = input.Position
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.Change and da then
-                        local delta = input.Position - di
-                        CBF.Position = UDim2.new(ds.X.Scale, ds.X.Offset + delta.X, ds.Y.Scale, ds.Y.Offset + delta.Y)
-                    end
-                end)
-            end
-        end)
-        HD.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then da = false end
-        end)
-    end
+    UIS.InputChanged:Connect(function(i)
+        if i == di and d then
+            local delta = i.Position - ds
+            MainFrame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
+        end
+    end)
 end
 
-local function processCommand(msg)
+W.processCommand = function(msg)
     local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
-    if m == ";cmdbar2" then toggleCmdBar(); return end
-    if m == ";cmds" then toggleCmds(); return end
-    if m == ";loop goal a" then stopEverything(); selectedGoalIndex = 1; isActive = true; setBtnActive(Button, "AUTO-GOL: ATIVADO"); startAutoGoal(); return end
-    if m == ";loop goal b" then stopEverything(); selectedGoalIndex = 2; isActive = true; setBtnActive(Button, "AUTO-GOL: ATIVADO"); startAutoGoal(); return end
-    if m == ";unloop goal" or m == ";unloop goal a" or m == ";unloop goal b" then
-        isActive = false
-        if loopThread then task.cancel(loopThread); loopThread = nil end
-        setBtnInactive(Button, "AUTO-GOL: DESATIVADO"); return
-    end
-    if m == ";gol a" then fireSingle(1); return end
-    if m == ";gol b" then fireSingle(2); return end
-    if m == ";tpgoal" then
-        stopAll(); isTpGoal = true
-        setBtnActive(TpGoalBtn, "TP GOAL: ATIVADO")
-        startSpectating(); startTpGoal(); return
-    end
-    if m == ";untpgoal" then
-        isTpGoal = false
-        if tpGoalThread then task.cancel(tpGoalThread); tpGoalThread = nil end
-        stopSpectating(); setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO"); return
-    end
-    if m == ";control" then
-        if isControl then stopControl(); setBtnInactive(ControlBtn, "CONTROL: DESATIVADO")
-        else setBtnActive(ControlBtn, "CONTROL: ATIVADO"); startControl() end
+    if m:sub(1,1) == ";" then m = m:sub(2) end
+
+    if m == "cmds" then W.loadModule("cmds"); return end
+    if m == "cmdbar2" then W.loadModule("cmdbar2"); return end
+    if m == "control" then W.loadModule("control"); return end
+    if m == "update" then
+        _G.Willnzx = nil
+        W.loaded_base = nil
+        W.loaded = {}
+        pcall(function()
+            local o = CoreGui:FindFirstChild("WillnzxGUI")
+            if o then o:Destroy() end
+        end)
+        task.wait(0.3)
+        loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
         return
     end
-    if m == ";defendgoal" then
-        if isDefending then stopDefend(); setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
-        else setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. defendSelectedGoal .. ")"); isDefending = true; startDefend() end
+    if m == "resetgui" then
+        _G.Willnzx = nil
+        W.loaded_base = nil
+        W.loaded = {}
+        pcall(function()
+            local o = CoreGui:FindFirstChild("WillnzxGUI")
+            if o then o:Destroy() end
+            local o2 = CoreGui:FindFirstChild("WillnzxCmdsGUI")
+            if o2 then o2:Destroy() end
+            local o3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI")
+            if o3 then o3:Destroy() end
+            local o4 = CoreGui:FindFirstChild("ArrowControlGUI")
+            if o4 then o4:Destroy() end
+        end)
+        task.wait(0.3)
+        loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
         return
     end
-    if m == ";defendgol a" or m == ";defendgoal a" then
-        defendSelectedGoal = "A"
-        if not isDefending then setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL A)"); isDefending = true; startDefend() end
+    if m == "farmcoins" or m == "farm" then
+        if W.states.isFarming then
+            W.stopFarmCoins()
+            W.setBtnInactive(FarmCoinsBtn, "FARM COINS: OFF")
+        else
+            W.startFarmCoins()
+            W.setBtnActive(FarmCoinsBtn, "FARM COINS: ON")
+        end
         return
     end
-    if m == ";defendgol b" or m == ";defendgoal b" then
-        defendSelectedGoal = "B"
-        if not isDefending then setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL B)"); isDefending = true; startDefend() end
+
+    if m == "loop goal a" then
+        W.stopAll(); W.selectedGoalIndex = 1; W.updGoals()
+        W.states.isActive = true; W.setBtnActive(Button, "AUTO-GOL: ATIVADO"); W.startAutoGoal(); return
+    end
+    if m == "loop goal b" then
+        W.stopAll(); W.selectedGoalIndex = 2; W.updGoals()
+        W.states.isActive = true; W.setBtnActive(Button, "AUTO-GOL: ATIVADO"); W.startAutoGoal(); return
+    end
+    if m == "unloop goal" or m == "unloop goal a" or m == "unloop goal b" then
+        W.states.isActive = false
+        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
+        W.setBtnInactive(Button, "AUTO-GOL: DESATIVADO"); return
+    end
+    if m == "gol a" then W.fireSingle(1); return end
+    if m == "gol b" then W.fireSingle(2); return end
+    if m == "tpgoal" then
+        W.stopAll(); W.states.isTpGoal = true
+        W.setBtnActive(TpGoalBtn, "TP GOAL: ATIVADO")
+        W.startSpectating(); W.startTpGoal(); return
+    end
+    if m == "untpgoal" then
+        W.states.isTpGoal = false
+        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
+        W.stopSpectating(); W.setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO"); return
+    end
+    if m == "defendgoal" then
+        if W.states.isDefending then W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
+        else W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. W.defendSelectedGoal .. ")"); W.states.isDefending = true; W.startDefend() end
         return
     end
-    if m == ";undefend" or m == ";undefendgoal" then
-        stopDefend(); setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO"); return
+    if m == "defendgol a" or m == "defendgoal a" then
+        W.defendSelectedGoal = "A"
+        if not W.states.isDefending then W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL A)"); W.states.isDefending = true; W.startDefend() end
+        return
     end
-    if m == ";bringball" then stopAll(); isBringing = true; setBtnActive(BringBtn, "BRING BALL: ATIVADO"); startBring(); return end
-    if m == ";unbringball" then isBringing = false; if bringThread then task.cancel(bringThread); bringThread = nil end; setBtnInactive(BringBtn, "BRING BALL: DESATIVADO"); return end
-    if m == ";loopbring" then stopAll(); isLoopBringing = true; setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); startLoopBring(); return end
-    if m == ";unloopbring" then isLoopBringing = false; if loopBringThread then task.cancel(loopBringThread); loopBringThread = nil end; setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO"); return end
-    if m == ";skyball" then stopAll(); isSkying = true; setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); startSky(); return end
-    if m == ";unskyball" then isSkying = false; if skyThread then task.cancel(skyThread); skyThread = nil end; setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO"); return end
-    if m == ";freezeball" then stopAll(); setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); startFreeze(); return end
-    if m == ";unfreezeball" then stopFreeze(); setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO"); return end
-    if m == ";bugball" then
-        if isBugBall then return end
-        stopAll(); isBugBall = true; setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); startBugBall(); return
+    if m == "defendgol b" or m == "defendgoal b" then
+        W.defendSelectedGoal = "B"
+        if not W.states.isDefending then W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL B)"); W.states.isDefending = true; W.startDefend() end
+        return
     end
-    if m == ";boostall" then stopAll(); isBoostingAll = true; setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. boostMultiplier .. "x)"); startBoostAll(); return end
-    if m == ";unboostall" then isBoostingAll = false; if boostAllThread then task.cancel(boostAllThread); boostAllThread = nil end; setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO"); return end
-    if m == ";touchgoal" then stopAll(); isTouchGoal = true; setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); startTouchGoal(); return end
-    if m == ";untouchgoal" then isTouchGoal = false; if touchGoalThread then task.cancel(touchGoalThread); touchGoalThread = nil end; setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO"); return end
-    if m == ";moveball" then stopAll(); isMoveBall = true; setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); startMoveBall(); return end
-    if m == ";unmoveball" then isMoveBall = false; if moveBallThread then task.cancel(moveBallThread); moveBallThread = nil end; setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO"); return end
-    if m == ";orbitball" then stopAll(); isOrbitBall = true; setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); startOrbitBall(); return end
-    if m == ";unorbitball" then isOrbitBall = false; if orbitBallThread then task.cancel(orbitBallThread); orbitBallThread = nil end; setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO"); return end
-    local mult = m:match("^;boostmult%s+(%d+)$")
+    if m == "undefend" or m == "undefendgoal" then
+        W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO"); return
+    end
+    if m == "bringball" then W.stopAll(); W.states.isBringing = true; W.setBtnActive(BringBtn, "BRING BALL: ATIVADO"); W.startBring(); return end
+    if m == "unbringball" then W.states.isBringing = false; if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end; W.setBtnInactive(BringBtn, "BRING BALL: DESATIVADO"); return end
+    if m == "loopbring" then W.stopAll(); W.states.isLoopBringing = true; W.setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); W.startLoopBring(); return end
+    if m == "unloopbring" then W.states.isLoopBringing = false; if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end; W.setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO"); return end
+    if m == "skyball" then W.stopAll(); W.states.isSkying = true; W.setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); W.startSky(); return end
+    if m == "unskyball" then W.states.isSkying = false; if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end; W.setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO"); return end
+    if m == "freezeball" then W.stopAll(); W.setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); W.startFreeze(); return end
+    if m == "unfreezeball" then W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO"); return end
+    if m == "bugball" then
+        if W.states.isBugBall then return end
+        W.stopAll(); W.states.isBugBall = true; W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); W.startBugBall(); return
+    end
+    if m == "boostall" then W.stopAll(); W.states.isBoostingAll = true; W.setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. W.boostMultiplier .. "x)"); W.startBoostAll(); return end
+    if m == "unboostall" then W.states.isBoostingAll = false; if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end; W.setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO"); return end
+    if m == "touchgoal" then W.stopAll(); W.states.isTouchGoal = true; W.setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); W.startTouchGoal(); return end
+    if m == "untouchgoal" then W.states.isTouchGoal = false; if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end; W.setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO"); return end
+    if m == "moveball" then W.stopAll(); W.states.isMoveBall = true; W.setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); W.startMoveBall(); return end
+    if m == "unmoveball" then W.states.isMoveBall = false; if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end; W.setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO"); return end
+    if m == "orbitball" then W.stopAll(); W.states.isOrbitBall = true; W.setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); W.startOrbitBall(); return end
+    if m == "unorbitball" then W.states.isOrbitBall = false; if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end; W.setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO"); return end
+
+    local mult = m:match("^boostmult%s+(%d+)$")
     if mult then
         local v = math.clamp(tonumber(mult), 1, 6)
-        Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11); boostMultiplier = v; return
+        W.Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11); W.updDots(v); return
     end
 end
-cmdBarProcessRef = processCommand
-processCommandRef = processCommand
-LP.Chatted:Connect(processCommand)
 
-CFGV.autoGoalForce = 5000
-CFGV.autoGoalY = 50
-CFGV.bringForce = 120
-CFGV.bringY = 15
-CFGV.freezeDelay = 0.1
-CFGV.moveForce = 3000
-CFGV.moveY = 30
-CFGV.moveDelay = 0.03
-CFGV.orbitForce = 400
-CFGV.orbitStep = 0.06
-CFGV.orbitDelay = 0.015
-CFGV.orbitY = 30
-CFGV.skyForce = 5000
-CFGV.touchGoalDist = 3
-CFGV.boostMaxSpeed = 250
-CFGV.boostDelay = 0.15
-CFGV.bugRadius = 12
-CFGV.bugHeight = 5
-CFGV.bugSpeed = 4
-CFGV.bugMaxForce = 3000
-CFGV.bugForceMult = 150
-CFGV.bugDelay = 0.05
+LP.Chatted:Connect(W.processCommand)
+
+W.CFGV.autoGoalForce = 5000
+W.CFGV.autoGoalY = 50
+W.CFGV.bringForce = 120
+W.CFGV.bringY = 15
+W.CFGV.freezeDelay = 0.1
+W.CFGV.moveForce = 3000
+W.CFGV.moveY = 30
+W.CFGV.moveDelay = 0.03
+W.CFGV.orbitForce = 400
+W.CFGV.orbitStep = 0.06
+W.CFGV.orbitDelay = 0.015
+W.CFGV.orbitY = 30
+W.CFGV.skyForce = 5000
+W.CFGV.touchGoalDist = 3
+W.CFGV.boostMaxSpeed = 250
+W.CFGV.boostDelay = 0.15
+W.CFGV.bugRadius = 15
+W.CFGV.bugHeight = 6
+W.CFGV.bugSpeed = 6
+W.CFGV.bugMaxForce = 8000
+W.CFGV.bugForceMult = 400
+W.CFGV.bugDelay = 0.03
+
+print("[Willnzx] GUI base carregada")
