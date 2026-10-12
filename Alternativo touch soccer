@@ -6,7 +6,6 @@ local Players = game:GetService("Players")
 local GuiS = game:GetService("GuiService")
 local TPS = game:GetService("TeleportService")
 local CAS = game:GetService("ContextActionService")
-
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
@@ -24,9 +23,10 @@ pcall(function()
 end)
 
 W.urls = {
-    cmds    = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmds",
+    cmds = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmds",
     cmdbar2 = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmdbar2",
     control = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Control",
+    trackerga = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Tracker%20g-a",
 }
 
 W.CoreGui = CoreGui
@@ -78,7 +78,9 @@ W.sendToChat = function(t)
         end
         return false
     end)
-    if not ok then pcall(function() LP:Chat(t) end) end
+    if not ok then
+        pcall(function() LP:Chat(t) end)
+    end
 end
 
 W.addTap = function(btn, cb)
@@ -120,7 +122,9 @@ end
 W.getRandomPlayer = function()
     local l = {}
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then table.insert(l, p) end
+        if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then
+            table.insert(l, p)
+        end
     end
     if #l > 0 then return l[math.random(1, #l)] end
 end
@@ -165,12 +169,19 @@ _G.Willnzx = W
 local function rejoin()
     local jid = game.JobId
     pcall(function()
-        if jid and jid ~= "" then TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
-        else TPS:Teleport(game.PlaceId, LP) end
+        if jid and jid ~= "" then
+            TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
+        else
+            TPS:Teleport(game.PlaceId, LP)
+        end
     end)
 end
+
 GuiS.ErrorMessageChanged:Connect(function(e)
-    if e and e ~= "" then task.wait(0.01); rejoin() end
+    if e and e ~= "" then
+        task.wait(0.01)
+        rejoin()
+    end
 end)
 
 W.fireSingle = function(gi)
@@ -210,7 +221,10 @@ W.stopSpectating = function()
     local c = LP.Character
     if c then
         local h = c:FindFirstChildOfClass("Humanoid")
-        if h then workspace.CurrentCamera.CameraSubject = h; workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end
+        if h then
+            workspace.CurrentCamera.CameraSubject = h
+            workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+        end
     end
 end
 
@@ -259,10 +273,13 @@ W.startMoveBall = function()
             local b = W.getBall()
             if not b then task.wait(0.2) continue end
             local tg = uA and W.MOVEA or W.MOVEB
-            if (tg - b.Position).Magnitude < 5 then uA = not uA; tS = tick(); task.wait(0.05)
+            if (tg - b.Position).Magnitude < 5 then
+                uA = not uA; tS = tick(); task.wait(0.05)
             else
                 cnt = cnt + 1
-                if cnt % 3 == 0 then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
+                if cnt % 3 == 0 then
+                    W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
+                end
                 local d = (tg - b.Position).Unit
                 local f = (d * W.CFGV.moveForce) + Vector3.new(0, W.CFGV.moveY, 0)
                 W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
@@ -344,7 +361,9 @@ end
 W.startBring = function()
     W.states.bringThread = task.spawn(function()
         local st = tick()
-        while W.states.isBringing and (tick() - st) < 0.5 do W.stickBall(); task.wait(0.03) end
+        while W.states.isBringing and (tick() - st) < 0.5 do
+            W.stickBall(); task.wait(0.03)
+        end
         W.states.isBringing = false
         W.states.bringThread = nil
     end)
@@ -352,7 +371,9 @@ end
 
 W.startLoopBring = function()
     W.states.loopBringThread = task.spawn(function()
-        while W.states.isLoopBringing do W.stickBall(); task.wait(0.03) end
+        while W.states.isLoopBringing do
+            W.stickBall(); task.wait(0.03)
+        end
         W.states.loopBringThread = nil
     end)
 end
@@ -361,7 +382,9 @@ W.startSky = function()
     W.states.skyThread = task.spawn(function()
         while W.states.isSkying do
             local b = W.getBall()
-            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0, W.CFGV.skyForce, 0), Vector3.new(0,0,0)) end
+            if b then
+                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0, W.CFGV.skyForce, 0), Vector3.new(0,0,0))
+            end
             task.wait(0.05)
         end
     end)
@@ -372,7 +395,9 @@ W.startFreeze = function()
     W.states.freezeThread = task.spawn(function()
         while W.states.isFreezing do
             local b = W.getBall()
-            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
+            if b then
+                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
+            end
             task.wait(W.CFGV.freezeDelay)
         end
     end)
@@ -423,7 +448,10 @@ end
 
 W.startDefend = function()
     W.states.defendThread = task.spawn(function()
-        while W.states.isDefending do pcall(W.tryDefend); task.wait(W.DEFEND.delay) end
+        while W.states.isDefending do
+            pcall(W.tryDefend)
+            task.wait(W.DEFEND.delay)
+        end
         W.states.defendThread = nil
     end)
 end
@@ -508,9 +536,11 @@ MainFrame.Parent = ScreenGui
 W.MainFrame = MainFrame
 
 local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 12); mc.Parent = MainFrame
+
 local Stroke = Instance.new("UIStroke")
 Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(0, 200, 255); Stroke.Transparency = 1
 Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; Stroke.Parent = MainFrame
+
 local sg = Instance.new("UIGradient")
 sg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
@@ -518,6 +548,7 @@ sg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)),
 })
 sg.Parent = Stroke
+
 local bg = Instance.new("UIGradient")
 bg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 35)),
@@ -530,6 +561,7 @@ Title.Size = UDim2.new(1, -80, 0, 22); Title.Position = UDim2.new(0, 10, 0, 10)
 Title.BackgroundTransparency = 1; Title.Text = "By: @willnzx.mt + miguelestrellaaa"
 Title.TextColor3 = Color3.fromRGB(0, 230, 255); Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = MainFrame
+
 local tg = Instance.new("UIGradient")
 tg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
@@ -680,7 +712,6 @@ local function updGoals()
     end
 end
 W.updGoals = updGoals
-
 W.addTap(BtnGoalA, function() W.selectedGoalIndex = 1; updGoals() end)
 W.addTap(BtnGoalB, function() W.selectedGoalIndex = 2; updGoals() end)
 updGoals()
@@ -697,15 +728,18 @@ SliderFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SliderFrame.BackgroundTr
 SliderFrame.BorderSizePixel = 0; SliderFrame.Parent = Tab1
 local sfc = Instance.new("UICorner"); sfc.CornerRadius = UDim.new(0, 8); sfc.Parent = SliderFrame
 local sfs = Instance.new("UIStroke"); sfs.Thickness = 1.5; sfs.Color = Color3.fromRGB(255,200,0); sfs.Transparency = 0.3; sfs.Parent = SliderFrame
+
 local SL = Instance.new("TextLabel")
 SL.Size = UDim2.new(1, 0, 0, 14); SL.Position = UDim2.new(0, 0, 0, 2)
 SL.BackgroundTransparency = 1; SL.Text = "MULTIPLICADOR: 3x"
 SL.TextColor3 = Color3.fromRGB(255, 200, 0); SL.TextSize = 11
 SL.Font = Enum.Font.GothamBold; SL.Parent = SliderFrame
+
 local Track = Instance.new("Frame")
 Track.Size = UDim2.new(1, -20, 0, 4); Track.Position = UDim2.new(0, 10, 0, 30)
 Track.BackgroundColor3 = Color3.fromRGB(50, 50, 70); Track.BorderSizePixel = 0; Track.Parent = SliderFrame
 local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0, 2); tc.Parent = Track
+
 local dotButtons = {}
 for i = 1, 6 do
     local dot = Instance.new("TextButton")
@@ -715,6 +749,7 @@ for i = 1, 6 do
     local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(1, 0); dc.Parent = dot
     table.insert(dotButtons, dot)
 end
+
 local Knob = Instance.new("TextButton")
 Knob.Size = UDim2.new(0, 22, 0, 22); Knob.Position = UDim2.new(2/5, -11, 0.5, -11)
 Knob.BackgroundColor3 = Color3.fromRGB(255, 200, 0); Knob.Text = "3"
@@ -735,7 +770,9 @@ end
 
 local drag = false
 Knob.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = true end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        drag = true
+    end
 end)
 UIS.InputChanged:Connect(function(i)
     if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
@@ -746,7 +783,9 @@ UIS.InputChanged:Connect(function(i)
     end
 end)
 UIS.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        drag = false
+    end
 end)
 for i, d in ipairs(dotButtons) do
     W.addTap(d, function() Knob.Position = UDim2.new((i-1)/5, -11, 0.5, -11); W.updDots(i) end)
@@ -761,10 +800,13 @@ local FreezeAllBtn = makeButton(Tab2, "FREEZE BALL: DESATIVADO", 172, Color3.fro
 local BugBallBtn = makeButton(Tab2, "BUG BALL: DESATIVADO", 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100), "BugBallBtn")
 local DefendGoalBtn = makeButton(Tab2, "DEFEND GOAL: DESATIVADO", 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0), "DefendGoalBtn")
 
+-- ✅ Aba OUTROS: Farm Coins + Tracker G-A
 local FarmCoinsBtn = makeButton(Tab4, "FARM COINS: OFF", 4, Color3.fromRGB(200, 160, 0), Color3.fromRGB(255, 220, 0), "FarmCoinsBtn")
+local TrackerGABtn = makeButton(Tab4, "TRACKER G-A", 46, Color3.fromRGB(0, 200, 100), Color3.fromRGB(0, 255, 180), "TrackerGABtn")
 
 local currentTab = 1
 local tabContents = {Tab1, Tab2, Tab4}
+
 W.switchTab = function(index)
     currentTab = index
     for i, c in ipairs(tabContents) do c.Visible = (i == index) end
@@ -942,10 +984,18 @@ W.addTap(OrbitBallBtn, function()
     end
 end)
 
+-- ✅ BUG BALL: toggle liga/desliga no botão
 W.addTap(BugBallBtn, function()
-    if W.states.isBugBall then return end
-    W.stopAll(); W.states.isBugBall = true
-    W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); W.startBugBall()
+    if W.states.isBugBall then
+        W.states.isBugBall = false
+        if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
+        W.setBtnInactive(BugBallBtn, "BUG BALL: DESATIVADO")
+    else
+        W.stopAll()
+        W.states.isBugBall = true
+        W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO")
+        W.startBugBall()
+    end
 end)
 
 W.addTap(DefendGoalBtn, function()
@@ -965,6 +1015,11 @@ W.addTap(FarmCoinsBtn, function()
         W.startFarmCoins()
         W.setBtnActive(FarmCoinsBtn, "FARM COINS: ON")
     end
+end)
+
+-- ✅ TRACKER G-A: apenas executa o link
+W.addTap(TrackerGABtn, function()
+    W.loadModule("trackerga")
 end)
 
 local minimized = false
@@ -988,7 +1043,9 @@ W.addTap(CloseBtn, function()
     W.stopAll()
     TabBar.Visible = false; ContentArea.Visible = false
     local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundTransparency = 1
     })
     tw:Play()
     TS:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
@@ -1001,7 +1058,9 @@ end)
 task.spawn(function()
     task.wait(0.05)
     TS:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = FULL, Position = UDim2.new(0.5, -180, 0.5, -260), BackgroundTransparency = 0.25
+        Size = FULL,
+        Position = UDim2.new(0.5, -180, 0.5, -260),
+        BackgroundTransparency = 0.25
     }):Play()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
@@ -1042,6 +1101,8 @@ W.processCommand = function(msg)
     if m == "cmds" then W.loadModule("cmds"); return end
     if m == "cmdbar2" then W.loadModule("cmdbar2"); return end
     if m == "control" then W.loadModule("control"); return end
+    if m == "trackerga" or m == "tracker g-a" or m == "tracker" then W.loadModule("trackerga"); return end
+
     if m == "update" then
         _G.Willnzx = nil
         W.loaded_base = nil
@@ -1054,6 +1115,7 @@ W.processCommand = function(msg)
         loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
         return
     end
+
     if m == "resetgui" then
         _G.Willnzx = nil
         W.loaded_base = nil
@@ -1072,6 +1134,7 @@ W.processCommand = function(msg)
         loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
         return
     end
+
     if m == "farmcoins" or m == "farm" then
         if W.states.isFarming then
             W.stopFarmCoins()
@@ -1096,8 +1159,10 @@ W.processCommand = function(msg)
         if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
         W.setBtnInactive(Button, "AUTO-GOL: DESATIVADO"); return
     end
+
     if m == "gol a" then W.fireSingle(1); return end
     if m == "gol b" then W.fireSingle(2); return end
+
     if m == "tpgoal" then
         W.stopAll(); W.states.isTpGoal = true
         W.setBtnActive(TpGoalBtn, "TP GOAL: ATIVADO")
@@ -1108,49 +1173,127 @@ W.processCommand = function(msg)
         if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
         W.stopSpectating(); W.setBtnInactive(TpGoalBtn, "TP GOAL: DESATIVADO"); return
     end
+
     if m == "defendgoal" then
-        if W.states.isDefending then W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
-        else W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. W.defendSelectedGoal .. ")"); W.states.isDefending = true; W.startDefend() end
+        if W.states.isDefending then
+            W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO")
+        else
+            W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL " .. W.defendSelectedGoal .. ")")
+            W.states.isDefending = true; W.startDefend()
+        end
         return
     end
     if m == "defendgol a" or m == "defendgoal a" then
         W.defendSelectedGoal = "A"
-        if not W.states.isDefending then W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL A)"); W.states.isDefending = true; W.startDefend() end
+        if not W.states.isDefending then
+            W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL A)")
+            W.states.isDefending = true; W.startDefend()
+        end
         return
     end
     if m == "defendgol b" or m == "defendgoal b" then
         W.defendSelectedGoal = "B"
-        if not W.states.isDefending then W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL B)"); W.states.isDefending = true; W.startDefend() end
+        if not W.states.isDefending then
+            W.setBtnActive(DefendGoalBtn, "DEFEND GOAL: ATIVADO (GOL B)")
+            W.states.isDefending = true; W.startDefend()
+        end
         return
     end
     if m == "undefend" or m == "undefendgoal" then
         W.stopDefend(); W.setBtnInactive(DefendGoalBtn, "DEFEND GOAL: DESATIVADO"); return
     end
-    if m == "bringball" then W.stopAll(); W.states.isBringing = true; W.setBtnActive(BringBtn, "BRING BALL: ATIVADO"); W.startBring(); return end
-    if m == "unbringball" then W.states.isBringing = false; if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end; W.setBtnInactive(BringBtn, "BRING BALL: DESATIVADO"); return end
-    if m == "loopbring" then W.stopAll(); W.states.isLoopBringing = true; W.setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); W.startLoopBring(); return end
-    if m == "unloopbring" then W.states.isLoopBringing = false; if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end; W.setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO"); return end
-    if m == "skyball" then W.stopAll(); W.states.isSkying = true; W.setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); W.startSky(); return end
-    if m == "unskyball" then W.states.isSkying = false; if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end; W.setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO"); return end
-    if m == "freezeball" then W.stopAll(); W.setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); W.startFreeze(); return end
-    if m == "unfreezeball" then W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO"); return end
+
+    if m == "bringball" then
+        W.stopAll(); W.states.isBringing = true
+        W.setBtnActive(BringBtn, "BRING BALL: ATIVADO"); W.startBring(); return
+    end
+    if m == "unbringball" then
+        W.states.isBringing = false
+        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
+        W.setBtnInactive(BringBtn, "BRING BALL: DESATIVADO"); return
+    end
+
+    if m == "loopbring" then
+        W.stopAll(); W.states.isLoopBringing = true
+        W.setBtnActive(LoopBringBtn, "LOOP BRING: ATIVADO"); W.startLoopBring(); return
+    end
+    if m == "unloopbring" then
+        W.states.isLoopBringing = false
+        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
+        W.setBtnInactive(LoopBringBtn, "LOOP BRING: DESATIVADO"); return
+    end
+
+    if m == "skyball" then
+        W.stopAll(); W.states.isSkying = true
+        W.setBtnActive(SkyBtn, "SKY BALL: ATIVADO"); W.startSky(); return
+    end
+    if m == "unskyball" then
+        W.states.isSkying = false
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+        W.setBtnInactive(SkyBtn, "SKY BALL: DESATIVADO"); return
+    end
+
+    if m == "freezeball" then
+        W.stopAll(); W.setBtnActive(FreezeAllBtn, "FREEZE BALL: ATIVADO"); W.startFreeze(); return
+    end
+    if m == "unfreezeball" then
+        W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, "FREEZE BALL: DESATIVADO"); return
+    end
+
+    -- ✅ BUG BALL: só liga via comando. Para desligar, use o botão.
     if m == "bugball" then
         if W.states.isBugBall then return end
-        W.stopAll(); W.states.isBugBall = true; W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); W.startBugBall(); return
+        W.stopAll(); W.states.isBugBall = true
+        W.setBtnActive(BugBallBtn, "BUG BALL: ATIVADO"); W.startBugBall()
+        return
     end
-    if m == "boostall" then W.stopAll(); W.states.isBoostingAll = true; W.setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. W.boostMultiplier .. "x)"); W.startBoostAll(); return end
-    if m == "unboostall" then W.states.isBoostingAll = false; if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end; W.setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO"); return end
-    if m == "touchgoal" then W.stopAll(); W.states.isTouchGoal = true; W.setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); W.startTouchGoal(); return end
-    if m == "untouchgoal" then W.states.isTouchGoal = false; if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end; W.setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO"); return end
-    if m == "moveball" then W.stopAll(); W.states.isMoveBall = true; W.setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); W.startMoveBall(); return end
-    if m == "unmoveball" then W.states.isMoveBall = false; if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end; W.setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO"); return end
-    if m == "orbitball" then W.stopAll(); W.states.isOrbitBall = true; W.setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); W.startOrbitBall(); return end
-    if m == "unorbitball" then W.states.isOrbitBall = false; if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end; W.setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO"); return end
+
+    if m == "boostall" then
+        W.stopAll(); W.states.isBoostingAll = true
+        W.setBtnActive(BoostAllBtn, "BOOST ALL: ATIVADO (" .. W.boostMultiplier .. "x)"); W.startBoostAll(); return
+    end
+    if m == "unboostall" then
+        W.states.isBoostingAll = false
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+        W.setBtnInactive(BoostAllBtn, "BOOST ALL: DESATIVADO"); return
+    end
+
+    if m == "touchgoal" then
+        W.stopAll(); W.states.isTouchGoal = true
+        W.setBtnActive(TouchGoalBtn, "TOUCH GOAL: ATIVADO"); W.startTouchGoal(); return
+    end
+    if m == "untouchgoal" then
+        W.states.isTouchGoal = false
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+        W.setBtnInactive(TouchGoalBtn, "TOUCH GOAL: DESATIVADO"); return
+    end
+
+    if m == "moveball" then
+        W.stopAll(); W.states.isMoveBall = true
+        W.setBtnActive(MoveBallBtn, "MOVE BALL: ATIVADO"); W.startMoveBall(); return
+    end
+    if m == "unmoveball" then
+        W.states.isMoveBall = false
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+        W.setBtnInactive(MoveBallBtn, "MOVE BALL: DESATIVADO"); return
+    end
+
+    if m == "orbitball" then
+        W.stopAll(); W.states.isOrbitBall = true
+        W.setBtnActive(OrbitBallBtn, "ORBIT BALL: ATIVADO"); W.startOrbitBall(); return
+    end
+    if m == "unorbitball" then
+        W.states.isOrbitBall = false
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+        W.setBtnInactive(OrbitBallBtn, "ORBIT BALL: DESATIVADO"); return
+    end
 
     local mult = m:match("^boostmult%s+(%d+)$")
     if mult then
         local v = math.clamp(tonumber(mult), 1, 6)
-        W.Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11); W.updDots(v); return
+        W.Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11)
+        W.updDots(v)
+        return
     end
 end
 
