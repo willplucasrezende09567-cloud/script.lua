@@ -105,6 +105,11 @@ W.i18n = {
     },
 }
 
+-- ✅ Registro global de callbacks de mudança de idioma.
+-- Qualquer módulo externo (Cmds, Cmdbar2, Control...) pode fazer:
+--   table.insert(W.onLangChange, function() ... end)
+W.onLangChange = W.onLangChange or {}
+
 W.t = function(key)
     local lang = W.lang or "pt"
     local tbl = W.i18n[lang] or W.i18n.pt
@@ -930,6 +935,13 @@ W.langRefresh = function()
     else
         DefendGoalBtn.Text = W.t("defend_off")
     end
+
+    -- ✅ Avisa TODOS os módulos externos (Cmds, Cmdbar2, Control...) que o idioma mudou
+    if W.onLangChange then
+        for _, cb in ipairs(W.onLangChange) do
+            pcall(cb)
+        end
+    end
 end
 
 local currentTab = 1
@@ -1145,7 +1157,6 @@ W.addTap(FarmCoinsBtn, function()
 end)
 
 W.addTap(TrackerGABtn, function()
-    -- Move a GUI principal para PlayerGui temporariamente
     local savedParent = ScreenGui.Parent or CoreGui
     pcall(function() ScreenGui.Parent = LP:WaitForChild("PlayerGui") end)
 
@@ -1247,7 +1258,6 @@ end
 W.addTap(PtBtn, function() finishLang("pt") end)
 W.addTap(EnBtn, function() finishLang("en") end)
 
--- Mostra o overlay só depois da animação de abertura terminar
 task.delay(0.65, function()
     if LangOverlay and LangOverlay.Parent and not W.lang then
         LangOverlay.Visible = true
@@ -1343,10 +1353,14 @@ W.processCommand = function(msg)
 
     -- 🌐 Idioma via comando
     if m == "lang pt" or m == "lang portugues" or m == "lang pt-br" then
-        W.lang = "pt"; W.langRefresh(); return
+        W.lang = "pt"; W.langRefresh()
+        if W.sendToChat then W.sendToChat("[Willnzx] Idioma: Portugues") end
+        return
     end
     if m == "lang en" or m == "lang english" or m == "lang ingles" then
-        W.lang = "en"; W.langRefresh(); return
+        W.lang = "en"; W.langRefresh()
+        if W.sendToChat then W.sendToChat("[Willnzx] Language: English") end
+        return
     end
 
     if m == "update" then
@@ -1471,4 +1485,100 @@ W.processCommand = function(msg)
 
     if m == "skyball" then
         W.stopAll(); W.states.isSkying = true
-        W.setBtnActive(SkyBtn, W.t("sky_on")); W.startSky();
+        W.setBtnActive(SkyBtn, W.t("sky_on")); W.startSky(); return
+    end
+    if m == "unskyball" then
+        W.states.isSkying = false
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+        W.setBtnInactive(SkyBtn, W.t("sky_off")); return
+    end
+
+    if m == "freezeball" then
+        W.stopAll(); W.setBtnActive(FreezeAllBtn, W.t("freeze_on")); W.startFreeze(); return
+    end
+    if m == "unfreezeball" then
+        W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, W.t("freeze_off")); return
+    end
+
+    if m == "bugball" then
+        if W.states.isBugBall then return end
+        W.stopAll(); W.states.isBugBall = true
+        W.setBtnActive(BugBallBtn, W.t("bug_on")); W.startBugBall()
+        return
+    end
+
+    if m == "boostall" then
+        W.stopAll(); W.states.isBoostingAll = true
+        W.setBtnActive(BoostAllBtn, W.t("boost_on") .. " (" .. W.boostMultiplier .. "x)"); W.startBoostAll(); return
+    end
+    if m == "unboostall" then
+        W.states.isBoostingAll = false
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+        W.setBtnInactive(BoostAllBtn, W.t("boost_off")); return
+    end
+
+    if m == "touchgoal" then
+        W.stopAll(); W.states.isTouchGoal = true
+        W.setBtnActive(TouchGoalBtn, W.t("touch_goal_on")); W.startTouchGoal(); return
+    end
+    if m == "untouchgoal" then
+        W.states.isTouchGoal = false
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+        W.setBtnInactive(TouchGoalBtn, W.t("touch_goal_off")); return
+    end
+
+    if m == "moveball" then
+        W.stopAll(); W.states.isMoveBall = true
+        W.setBtnActive(MoveBallBtn, W.t("move_on")); W.startMoveBall(); return
+    end
+    if m == "unmoveball" then
+        W.states.isMoveBall = false
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+        W.setBtnInactive(MoveBallBtn, W.t("move_off")); return
+    end
+
+    if m == "orbitball" then
+        W.stopAll(); W.states.isOrbitBall = true
+        W.setBtnActive(OrbitBallBtn, W.t("orbit_on")); W.startOrbitBall(); return
+    end
+    if m == "unorbitball" then
+        W.states.isOrbitBall = false
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+        W.setBtnInactive(OrbitBallBtn, W.t("orbit_off")); return
+    end
+
+    local mult = m:match("^boostmult%s+(%d+)$")
+    if mult then
+        local v = math.clamp(tonumber(mult), 1, 6)
+        W.Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11)
+        W.updDots(v)
+        return
+    end
+end
+
+LP.Chatted:Connect(W.processCommand)
+
+W.CFGV.autoGoalForce = 5000
+W.CFGV.autoGoalY = 50
+W.CFGV.bringForce = 120
+W.CFGV.bringY = 15
+W.CFGV.freezeDelay = 0.1
+W.CFGV.moveForce = 3000
+W.CFGV.moveY = 30
+W.CFGV.moveDelay = 0.03
+W.CFGV.orbitForce = 400
+W.CFGV.orbitStep = 0.06
+W.CFGV.orbitDelay = 0.015
+W.CFGV.orbitY = 30
+W.CFGV.skyForce = 5000
+W.CFGV.touchGoalDist = 3
+W.CFGV.boostMaxSpeed = 250
+W.CFGV.boostDelay = 0.15
+W.CFGV.bugRadius = 30
+W.CFGV.bugHeight = 9
+W.CFGV.bugSpeed = 9
+W.CFGV.bugMaxForce = 9000
+W.CFGV.bugForceMult = 400
+W.CFGV.bugDelay = 0.01
+
+print("[Willnzx] GUI base carregada")
