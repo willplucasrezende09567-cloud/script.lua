@@ -104,30 +104,16 @@ W.defendSelectedGoal = "A"
 
 local hookSkip = false
 
--- ============================================================
---  ⚽ getBall REFORÇADO — tenta vários caminhos
--- ============================================================
 W.getBall = function()
-    -- 1) Caminho direto: FootballField.SoccerBall
     local ff = workspace:FindFirstChild("FootballField")
     if ff then
         local sb = ff:FindFirstChild("SoccerBall")
         if sb then return sb end
-        -- 2) Busca recursiva dentro de FootballField
         local found = ff:FindFirstChild("SoccerBall", true)
         if found then return found end
     end
-    -- 3) Busca recursiva global
     local global = workspace:FindFirstChild("SoccerBall", true)
     if global then return global end
-    -- 4) Última tentativa: procura qualquer coisa com "ball" no nome dentro de FootballField
-    if ff then
-        for _, d in ipairs(ff:GetDescendants()) do
-            if d.Name:lower():find("soccerball") or d.Name:lower():find("ball") then
-                if d:IsA("BasePart") then return d end
-            end
-        end
-    end
     return nil
 end
 
@@ -391,10 +377,10 @@ W.startOrbitBall = function()
 end
 
 -- ============================================================
---  🟡 PREDICT SYSTEM — dois predicts simultâneos
---   • Amarelo = trajetória atual da bola (onde cai)
---   • Ciano   = trajetória do chute (direção do personagem)
---  Os pontos SEMPRE começam em cima da bola (SoccerBall).
+--  🟡 PREDICT SYSTEM
+--   • Amarelo pequeno = pontos da trajetória
+--   • Amarelo grande  = target (onde a bola vai parar)
+--   • Direção         = CÂMERA (você mira com o mouse)
 -- ============================================================
 W.states.isPredict = false
 W.states.isPredictKick = false
@@ -422,13 +408,23 @@ local function buildDots(folder, count, size, color)
     return list
 end
 
-local function clearDots(list)
-    for _, d in ipairs(list) do
-        if d and d.Parent then d:Destroy() end
-    end
+local function makeTargetBall(folder, size, color)
+    local ball = Instance.new("Part")
+    ball.Shape = Enum.PartType.Ball
+    ball.Size = Vector3.new(size, size, size)
+    ball.Color = color
+    ball.Material = Enum.Material.Neon
+    ball.Anchored = true
+    ball.CanCollide = false
+    ball.CanQuery = false
+    ball.CanTouch = false
+    ball.CastShadow = false
+    ball.Transparency = 0.05
+    ball.Parent = folder
+    return ball
 end
 
-local function hideDots(list)
+local function hideList(list)
     for _, d in ipairs(list) do
         if d and d.Parent then d.Transparency = 1 end
     end
@@ -446,6 +442,12 @@ local function drawTrajectory(list, pos, vel, totalTime)
     end
 end
 
+-- Retorna a posição final da trajetória pra colocar o target ball
+local function calcFinalPos(pos, vel, totalTime)
+    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+    return pos + vel * totalTime + 0.5 * gravity * totalTime * totalTime
+end
+
 local function updatePredicts()
     local now = tick()
     if now - W.states.predictLastUpdate < 0.03 then return end
@@ -454,32 +456,28 @@ local function updatePredicts()
     local b = W.getBall()
     local totalTime = W.CFGV.predictTime or 2.5
 
-    -- Se não achou a bola, esconde tudo e avisa (só uma vez)
     if not b then
-        if W.states.predictDots then hideDots(W.states.predictDots) end
-        if W.states.predictKickDots then hideDots(W.states.predictKickDots) end
-        if not W.states.predictWarned then
-            W.states.predictWarned = true
-            warn("[Willnzx] PREDICT: nao achei a SoccerBall em FootballField!")
+        if W.states.predictDots then hideList(W.states.predictDots) end
+        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            W.states.predictKickTarget.Transparency = 1
         end
         return
     end
-    W.states.predictWarned = false
 
-    -- ---- PREDICT BALL (amarelo) ----
+    -- ---- PREDICT BALL (amarelo — onde a bola vai cair pela física atual) ----
     if W.states.isPredict and W.states.predictDots then
-        -- Trajetória futura da bola baseada na velocidade atual
         drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
     elseif W.states.predictDots then
-        hideDots(W.states.predictDots)
+        hideList(W.states.predictDots)
     end
 
-    -- ---- PREDICT KICK (ciano) ----
+    -- ---- PREDICT KICK (amarelo + target grande — direção da CÂMERA) ----
     if W.states.isPredictKick and W.states.predictKickDots then
-        local char = LP.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local lookDir = root and root.CFrame.LookVector or Vector3.new(0, 0, -1)
+        local cam = workspace.CurrentCamera
+        local lookDir = cam.CFrame.LookVector
 
+        -- Achata a componente vertical
         local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
         if flatDir.Magnitude > 0.001 then
             flatDir = flatDir.Unit
@@ -488,12 +486,23 @@ local function updatePredicts()
         end
 
         local force = W.CFGV.predictKickForce or 5000
-        local lift = W.CFGV.predictKickLift or 40
+        local lift = W.CFGV.predictKickLift or 60
         local kickVel = flatDir * force + Vector3.new(0, lift, 0)
 
+        -- Desenha os pontinhos
         drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
-    elseif W.states.predictKickDots then
-        hideDots(W.states.predictKickDots)
+
+        -- Coloca o target ball (bola amarela grande) no fim
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            local finalPos = calcFinalPos(b.Position, kickVel, totalTime)
+            W.states.predictKickTarget.Position = finalPos
+            W.states.predictKickTarget.Transparency = 0.05
+        end
+    else
+        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            W.states.predictKickTarget.Transparency = 1
+        end
     end
 
     -- Se nenhum dos dois está ativo, encerra
@@ -508,6 +517,7 @@ local function updatePredicts()
         W.states.predictFolder = nil
         W.states.predictDots = nil
         W.states.predictKickDots = nil
+        W.states.predictKickTarget = nil
     end
 end
 
@@ -521,12 +531,16 @@ W.ensurePredictSystem = function()
 
     local dotCount = W.CFGV.predictDotCount or 22
     local dotSize = W.CFGV.predictDotSize or 0.9
+    local targetSize = W.CFGV.predictTargetSize or 3
 
     if not W.states.predictDots or #W.states.predictDots == 0 then
         W.states.predictDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
     end
     if not W.states.predictKickDots or #W.states.predictKickDots == 0 then
-        W.states.predictKickDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(0, 220, 255))
+        W.states.predictKickDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
+    end
+    if not W.states.predictKickTarget or not W.states.predictKickTarget.Parent then
+        W.states.predictKickTarget = makeTargetBall(W.states.predictFolder, targetSize, Color3.fromRGB(255, 220, 0))
     end
 
     if not W.states.predictConn then
@@ -541,7 +555,7 @@ end
 
 W.stopPredictBall = function()
     W.states.isPredict = false
-    if W.states.predictDots then hideDots(W.states.predictDots) end
+    if W.states.predictDots then hideList(W.states.predictDots) end
 end
 
 W.startPredictKick = function()
@@ -551,7 +565,10 @@ end
 
 W.stopPredictKick = function()
     W.states.isPredictKick = false
-    if W.states.predictKickDots then hideDots(W.states.predictKickDots) end
+    if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+    if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+        W.states.predictKickTarget.Transparency = 1
+    end
 end
 
 W.stopPredictAll = function()
@@ -562,6 +579,7 @@ W.stopPredictAll = function()
     W.states.predictFolder = nil
     W.states.predictDots = nil
     W.states.predictKickDots = nil
+    W.states.predictKickTarget = nil
 end
 
 W.stopPredict = W.stopPredictAll
@@ -1057,11 +1075,10 @@ local FreezeAllBtn = makeButton(Tab2, W.btn("freeze", false), 172, Color3.fromRG
 local BugBallBtn = makeButton(Tab2, W.btn("bug", false), 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100), "BugBallBtn")
 local DefendGoalBtn = makeButton(Tab2, W.btn("defend", false), 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0), "DefendGoalBtn")
 
--- Aba OUTROS
 local FarmCoinsBtn = makeButton(Tab4, W.btn("farm", false), 4, Color3.fromRGB(200, 160, 0), Color3.fromRGB(255, 220, 0), "FarmCoinsBtn")
 local TrackerGABtn = makeButton(Tab4, W.fnNames.tracker, 46, Color3.fromRGB(0, 200, 100), Color3.fromRGB(0, 255, 180), "TrackerGABtn")
 local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.fromRGB(255, 220, 0), Color3.fromRGB(255, 100, 0), "PredictBallBtn")
-local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(0, 220, 255), Color3.fromRGB(0, 120, 200), "PredictKickBtn")
+local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(255, 220, 0), Color3.fromRGB(200, 120, 0), "PredictKickBtn")
 
 W.langRefresh = function()
     tabButtons[1].Text = W.t("tab_atq")
@@ -1785,10 +1802,11 @@ W.CFGV.bugAutoStopTime = 5
 -- ✅ PREDICT
 W.CFGV.predictTime = 2.5
 W.CFGV.predictDotCount = 22
-W.CFGV.predictDotSize = 0.9    -- ⬆️ aumentei pra ficar mais visível
+W.CFGV.predictDotSize = 0.9
+W.CFGV.predictTargetSize = 3     -- bola grande no fim da trajetória
 
--- ✅ PREDICT KICK (direção do personagem)
+-- ✅ PREDICT KICK (direção da CÂMERA)
 W.CFGV.predictKickForce = 5000
-W.CFGV.predictKickLift = 40
+W.CFGV.predictKickLift = 60      -- ⬆️ mais lift pra fazer curva bonita igual ao print
 
-print("[Willnzx] GUI base carregada — Predict pronto (path: FootballField.SoccerBall)")
+print("[Willnzx] GUI base carregada — Predict KICK usa direção da câmera + target ball")
