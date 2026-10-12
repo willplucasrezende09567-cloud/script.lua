@@ -1575,7 +1575,7 @@ W.CFGV.bugSpeed = 9
 W.CFGV.bugMaxForce = 9000
 W.CFGV.bugForceMult = 800
 W.CFGV.bugDelay = 0.01
-W.CFGV.bugKicksPerFrame = 100
+W.CFGV.bugKicksPerFrame = 50
 W.CFGV.bugAutoStopTime = 5   -- ⏱️ desliga sozinho depois de 5 segundos
 
 print("[Willnzx] GUI base carregada")
