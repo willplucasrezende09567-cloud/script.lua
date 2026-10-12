@@ -2,6 +2,7 @@ local CoreGui = game:GetService("CoreGui")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
 local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local GuiS = game:GetService("GuiService")
 local TPS = game:GetService("TeleportService")
@@ -24,7 +25,7 @@ pcall(function()
 end)
 
 -- ============================================================
---  🌐 SISTEMA DE IDIOMA (i18n)
+--  🌐 IDIOMA
 -- ============================================================
 W.lang = W.lang or nil
 
@@ -49,6 +50,7 @@ W.fnNames = {
     loop_bring = "LOOP BRING", move = "MOVE BALL", orbit = "ORBIT BALL",
     freeze = "FREEZE BALL", bug = "BUG BALL", defend = "DEFEND GOAL",
     farm = "FARM COINS", tracker = "TRACKER G-A",
+    predict = "PREDICT BALL", predict_kick = "PREDICT KICK",
 }
 
 W.btn = function(key, active, extra)
@@ -367,10 +369,174 @@ W.startOrbitBall = function()
 end
 
 -- ============================================================
---  ✅ BUG BALL — CHUTE DIRECIONAL (versão que funcionou)
---  Origem embaixo da bola + força vertical pra cima.
---  ~8 chutes/seg é o suficiente pra bugar instantâneo.
---  Auto-desliga em 5s.
+--  🟡 PREDICT SYSTEM — dois predicts ao mesmo tempo
+--   • Amarelo = trajetória atual da bola (onde cai)
+--   • Ciano   = trajetória do chute (direção do personagem)
+-- ============================================================
+W.states.isPredict = false
+W.states.isPredictKick = false
+W.states.predictConn = nil
+W.states.predictLastUpdate = 0
+
+local function buildDots(folder, count, size, color)
+    local list = {}
+    for i = 1, count do
+        local dot = Instance.new("Part")
+        dot.Shape = Enum.PartType.Ball
+        dot.Size = Vector3.new(size, size, size)
+        dot.Color = color
+        dot.Material = Enum.Material.Neon
+        dot.Anchored = true
+        dot.CanCollide = false
+        dot.CanQuery = false
+        dot.CanTouch = false
+        dot.CastShadow = false
+        dot.Transparency = 0.05
+        dot.Parent = folder
+        table.insert(list, dot)
+    end
+    return list
+end
+
+local function clearDots(list)
+    for _, d in ipairs(list) do
+        if d and d.Parent then d:Destroy() end
+    end
+end
+
+local function hideDots(list)
+    for _, d in ipairs(list) do
+        if d and d.Parent then d.Transparency = 1 end
+    end
+end
+
+local function drawTrajectory(list, pos, vel, totalTime)
+    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+    local dt = totalTime / #list
+    for i, dot in ipairs(list) do
+        if not dot or not dot.Parent then break end
+        local t = i * dt
+        local p = pos + vel * t + 0.5 * gravity * t * t
+        dot.Position = p
+        dot.Transparency = 0.05
+    end
+end
+
+-- Atualiza os dois predicts ao mesmo tempo
+local function updatePredicts()
+    local now = tick()
+    if now - W.states.predictLastUpdate < 0.03 then return end
+    W.states.predictLastUpdate = now
+
+    local b = W.getBall()
+    local totalTime = W.CFGV.predictTime or 2.5
+
+    -- ---- PREDICT BALL (amarelo) ----
+    if W.states.isPredict then
+        if b and W.states.predictDots then
+            drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
+        else
+            if W.states.predictDots then hideDots(W.states.predictDots) end
+        end
+    end
+
+    -- ---- PREDICT KICK (ciano) ----
+    if W.states.isPredictKick and b and W.states.predictKickDots then
+        -- Direção que o PERSONAGEM está virado
+        local char = LP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local lookDir = root and root.CFrame.LookVector or Vector3.new(0, 0, -1)
+
+        local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
+        if flatDir.Magnitude > 0.001 then
+            flatDir = flatDir.Unit
+        else
+            flatDir = Vector3.new(0, 0, -1)
+        end
+
+        local force = W.CFGV.predictKickForce or 5000
+        local lift = W.CFGV.predictKickLift or 40
+        local kickVel = flatDir * force + Vector3.new(0, lift, 0)
+
+        drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
+    elseif W.states.predictKickDots then
+        hideDots(W.states.predictKickDots)
+    end
+
+    -- Se nenhum dos dois está ativo, encerra a conexão
+    if not W.states.isPredict and not W.states.isPredictKick then
+        if W.states.predictConn then
+            W.states.predictConn:Disconnect()
+            W.states.predictConn = nil
+        end
+        if W.states.predictFolder and W.states.predictFolder.Parent then
+            W.states.predictFolder:Destroy()
+        end
+        W.states.predictFolder = nil
+        W.states.predictDots = nil
+        W.states.predictKickDots = nil
+    end
+end
+
+W.ensurePredictSystem = function()
+    -- Cria pasta e dots se ainda não existem
+    if not W.states.predictFolder or not W.states.predictFolder.Parent then
+        local folder = Instance.new("Folder")
+        folder.Name = "WillnzxPredictDots"
+        folder.Parent = workspace
+        W.states.predictFolder = folder
+    end
+
+    local dotCount = W.CFGV.predictDotCount or 22
+    local dotSize = W.CFGV.predictDotSize or 0.6
+
+    if not W.states.predictDots or #W.states.predictDots == 0 then
+        W.states.predictDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
+    end
+    if not W.states.predictKickDots or #W.states.predictKickDots == 0 then
+        W.states.predictKickDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(0, 220, 255))
+    end
+
+    if not W.states.predictConn then
+        W.states.predictConn = RunService.RenderStepped:Connect(updatePredicts)
+    end
+end
+
+W.startPredictBall = function()
+    W.states.isPredict = true
+    W.ensurePredictSystem()
+end
+
+W.stopPredictBall = function()
+    W.states.isPredict = false
+    if W.states.predictDots then hideDots(W.states.predictDots) end
+end
+
+W.startPredictKick = function()
+    W.states.isPredictKick = true
+    W.ensurePredictSystem()
+end
+
+W.stopPredictKick = function()
+    W.states.isPredictKick = false
+    if W.states.predictKickDots then hideDots(W.states.predictKickDots) end
+end
+
+W.stopPredictAll = function()
+    W.states.isPredict = false
+    W.states.isPredictKick = false
+    if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
+    if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
+    W.states.predictFolder = nil
+    W.states.predictDots = nil
+    W.states.predictKickDots = nil
+end
+
+-- Compatibilidade com o código antigo
+W.stopPredict = W.stopPredictAll
+
+-- ============================================================
+--  BUG BALL
 -- ============================================================
 W.startBugBall = function()
     if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
@@ -860,8 +1026,11 @@ local FreezeAllBtn = makeButton(Tab2, W.btn("freeze", false), 172, Color3.fromRG
 local BugBallBtn = makeButton(Tab2, W.btn("bug", false), 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100), "BugBallBtn")
 local DefendGoalBtn = makeButton(Tab2, W.btn("defend", false), 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0), "DefendGoalBtn")
 
+-- Aba OUTROS: Farm + Tracker + Predict Ball + Predict Kick
 local FarmCoinsBtn = makeButton(Tab4, W.btn("farm", false), 4, Color3.fromRGB(200, 160, 0), Color3.fromRGB(255, 220, 0), "FarmCoinsBtn")
 local TrackerGABtn = makeButton(Tab4, W.fnNames.tracker, 46, Color3.fromRGB(0, 200, 100), Color3.fromRGB(0, 255, 180), "TrackerGABtn")
+local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.fromRGB(255, 220, 0), Color3.fromRGB(255, 100, 0), "PredictBallBtn")
+local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(0, 220, 255), Color3.fromRGB(0, 120, 200), "PredictKickBtn")
 
 W.langRefresh = function()
     tabButtons[1].Text = W.t("tab_atq")
@@ -888,6 +1057,8 @@ W.langRefresh = function()
     upd(FreezeAllBtn, "freeze")
     upd(BugBallBtn, "bug")
     upd(FarmCoinsBtn, "farm")
+    upd(PredictBallBtn, "predict")
+    upd(PredictKickBtn, "predict_kick")
     TrackerGABtn.Text = W.fnNames.tracker
 
     if DefendGoalBtn:GetAttribute("IsActive") then
@@ -944,6 +1115,8 @@ W.resetVis = function()
     W.setBtnInactive(BugBallBtn, W.btn("bug", false))
     W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
     W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
+    W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
+    W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
 end
 
 W.stopAll = function()
@@ -967,6 +1140,7 @@ W.stopAll = function()
     if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
     if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread = nil end
     if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
+    pcall(function() W.stopPredictAll() end)
     pcall(function()
         local o = CoreGui:FindFirstChild("ArrowControlGUI")
         if o then o:Destroy() end
@@ -1113,6 +1287,28 @@ W.addTap(FarmCoinsBtn, function()
     else
         W.startFarmCoins()
         W.setBtnActive(FarmCoinsBtn, W.btn("farm", true))
+    end
+end)
+
+-- ✅ PREDICT BALL (amarelo — onde a bola vai cair)
+W.addTap(PredictBallBtn, function()
+    if W.states.isPredict then
+        W.stopPredictBall()
+        W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
+    else
+        W.startPredictBall()
+        W.setBtnActive(PredictBallBtn, W.btn("predict", true))
+    end
+end)
+
+-- ✅ PREDICT KICK (ciano — onde vai se você chutar)
+W.addTap(PredictKickBtn, function()
+    if W.states.isPredictKick then
+        W.stopPredictKick()
+        W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
+    else
+        W.startPredictKick()
+        W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true))
     end
 end)
 
@@ -1349,6 +1545,27 @@ W.processCommand = function(msg)
         return
     end
 
+    if m == "predictball" or m == "predict" then
+        if W.states.isPredict then
+            W.stopPredictBall()
+            W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
+        else
+            W.startPredictBall()
+            W.setBtnActive(PredictBallBtn, W.btn("predict", true))
+        end
+        return
+    end
+    if m == "predictkick" or m == "predict kick" then
+        if W.states.isPredictKick then
+            W.stopPredictKick()
+            W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
+        else
+            W.startPredictKick()
+            W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true))
+        end
+        return
+    end
+
     if m == "farmcoins" or m == "farm" then
         if W.states.isFarming then
             W.stopFarmCoins()
@@ -1530,10 +1747,19 @@ W.CFGV.touchGoalDist = 3
 W.CFGV.boostMaxSpeed = 250
 W.CFGV.boostDelay = 0.15
 
--- ✅ BUG BALL — versão direcional que funciona instantâneo
-W.CFGV.bugOffsetY = 5              -- chute nasce X studs abaixo da bola
-W.CFGV.bugForceY = 8000            -- força vertical do chute (pra cima)
-W.CFGV.bugKicksPerSecond = 8       -- 8/s já é suficiente
-W.CFGV.bugAutoStopTime = 5         -- auto-desliga em 5s
+-- Bug Ball
+W.CFGV.bugOffsetY = 5
+W.CFGV.bugForceY = 8000
+W.CFGV.bugKicksPerSecond = 8
+W.CFGV.bugAutoStopTime = 5
+
+-- ✅ PREDICT
+W.CFGV.predictTime = 2.5
+W.CFGV.predictDotCount = 22
+W.CFGV.predictDotSize = 0.6
+
+-- ✅ PREDICT KICK (direção do personagem)
+W.CFGV.predictKickForce = 5000   -- força do chute simulado
+W.CFGV.predictKickLift = 40      -- levantada (curva pra cima)
 
 print("[Willnzx] GUI base carregada")
