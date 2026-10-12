@@ -30,54 +30,31 @@ W.lang = W.lang or nil
 
 W.i18n = {
     pt = {
-        tab_atq = "ATQ",
-        tab_bola = "BOLA",
-        tab_outros = "OUTROS",
-        goal_a = "GOL A",
-        goal_b = "GOL B",
-        state_on = "ATIVADO",
-        state_off = "DESATIVADO",
+        tab_atq = "ATQ", tab_bola = "BOLA", tab_outros = "OUTROS",
+        goal_a = "GOL A", goal_b = "GOL B",
+        state_on = "ATIVADO", state_off = "DESATIVADO",
         multiplier = "MULTIPLICADOR: ",
-        picker_title = "Escolha o idioma",
-        picker_sub = "Troque depois com ;lang pt / ;lang en",
     },
     en = {
-        tab_atq = "ATK",
-        tab_bola = "BALL",
-        tab_outros = "OTHER",
-        goal_a = "GOAL A",
-        goal_b = "GOAL B",
-        state_on = "ON",
-        state_off = "OFF",
+        tab_atq = "ATK", tab_bola = "BALL", tab_outros = "OTHER",
+        goal_a = "GOAL A", goal_b = "GOAL B",
+        state_on = "ON", state_off = "OFF",
         multiplier = "MULTIPLIER: ",
-        picker_title = "Choose your language",
-        picker_sub = "Change later with ;lang pt / ;lang en",
     },
 }
 
 W.fnNames = {
-    auto_gol = "AUTO-GOAL",
-    tp_goal = "TP GOAL",
-    touch_goal = "TOUCH GOAL",
-    sky = "SKY BALL",
-    boost = "BOOST ALL",
-    bring = "BRING BALL",
-    loop_bring = "LOOP BRING",
-    move = "MOVE BALL",
-    orbit = "ORBIT BALL",
-    freeze = "FREEZE BALL",
-    bug = "BUG BALL",
-    defend = "DEFEND GOAL",
-    farm = "FARM COINS",
-    tracker = "TRACKER G-A",
+    auto_gol = "AUTO-GOAL", tp_goal = "TP GOAL", touch_goal = "TOUCH GOAL",
+    sky = "SKY BALL", boost = "BOOST ALL", bring = "BRING BALL",
+    loop_bring = "LOOP BRING", move = "MOVE BALL", orbit = "ORBIT BALL",
+    freeze = "FREEZE BALL", bug = "BUG BALL", defend = "DEFEND GOAL",
+    farm = "FARM COINS", tracker = "TRACKER G-A",
 }
 
 W.btn = function(key, active, extra)
     local nome = W.fnNames[key] or key
     local estado = active and W.t("state_on") or W.t("state_off")
-    if extra and extra ~= "" then
-        return nome .. ": " .. estado .. " (" .. extra .. ")"
-    end
+    if extra and extra ~= "" then return nome .. ": " .. estado .. " (" .. extra .. ")" end
     return nome .. ": " .. estado
 end
 
@@ -145,9 +122,7 @@ W.sendToChat = function(t)
         end
         return false
     end)
-    if not ok then
-        pcall(function() LP:Chat(t) end)
-    end
+    if not ok then pcall(function() LP:Chat(t) end) end
 end
 
 W.addTap = function(btn, cb)
@@ -391,34 +366,48 @@ W.startOrbitBall = function()
     end)
 end
 
--- ✅ BUG BALL MELHORADO — spam de chutes por frame + auto-stop em 5s
+-- ============================================================
+--  ✅ BUG BALL NOVO
+--  1) Chute embaixo da bola → força pra cima (gatilho)
+--  2) Depois ativa o spam de 50 kicks/frame por 5s
+-- ============================================================
 W.startBugBall = function()
-    -- Cancela timer/thread antigos se existirem
     if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
     if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
 
     W.states.isBugBall = true
 
-    -- Thread que envia chutes
     W.states.bugBallThread = task.spawn(function()
+        -- PASSO 1: chute único embaixo da bola pra ir pra cima (gatilho)
+        local b = W.getBall()
+        if b then
+            local originPos = b.Position + Vector3.new(0, -W.CFGV.bugOffsetY, 0)
+            local f = Vector3.new(0, W.CFGV.bugForceY, 0)
+            W.safeFire(W.TKN, W.UID, "", originPos, f, Vector3.new(0, 0, 0))
+        end
+
+        -- Espera a bola subir um pouco antes de spammar
+        task.wait(W.CFGV.bugTriggerDelay or 0.12)
+
+        -- PASSO 2: spam de 50 chutes/frame enquanto a bola sobe/cai
         local t = 0
-        local kicksPerFrame = W.CFGV.bugKicksPerFrame or 40
+        local kicksPerFrame = W.CFGV.bugKicksPerFrame or 50
         while W.states.isBugBall do
-            local b = W.getBall()
+            local b2 = W.getBall()
             local c = LP.Character
             local h = c and c:FindFirstChild("HumanoidRootPart")
-            if b and h then
+            if b2 and h then
                 t = t + 0.1
                 local tg = h.Position + Vector3.new(
                     math.cos(t * W.CFGV.bugSpeed) * W.CFGV.bugRadius,
                     W.CFGV.bugHeight,
                     math.sin(t * W.CFGV.bugSpeed) * W.CFGV.bugRadius
                 )
-                local dir = tg - b.Position
+                local dir = tg - b2.Position
                 local f = dir.Unit * math.min(dir.Magnitude * W.CFGV.bugForceMult, W.CFGV.bugMaxForce)
 
                 for i = 1, kicksPerFrame do
-                    W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0, 0, 0))
+                    W.safeFire(W.TKN, W.UID, "", b2.Position, f, Vector3.new(0, 0, 0))
                 end
             end
             task.wait()
@@ -426,12 +415,10 @@ W.startBugBall = function()
         W.states.bugBallThread = nil
     end)
 
-    -- Thread que desliga sozinho depois de X segundos
     W.states.bugStopThread = task.delay(W.CFGV.bugAutoStopTime or 5, function()
         if W.states.isBugBall then
             W.states.isBugBall = false
             if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
-            -- Atualiza o botão visualmente (se ainda existir)
             if BugBallBtn and BugBallBtn.Parent then
                 W.setBtnInactive(BugBallBtn, W.btn("bug", false))
             end
@@ -1120,10 +1107,8 @@ W.addTap(OrbitBallBtn, function()
     end
 end)
 
--- ✅ BUG BALL: liga e desliga automático em 5s
 W.addTap(BugBallBtn, function()
     if W.states.isBugBall then
-        -- Se já está ativo, cancela tudo
         W.states.isBugBall = false
         if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
         if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
@@ -1568,14 +1553,16 @@ W.CFGV.touchGoalDist = 3
 W.CFGV.boostMaxSpeed = 250
 W.CFGV.boostDelay = 0.15
 
--- ✅ BUG BALL
+-- ✅ BUG BALL (gatilho + spam)
+W.CFGV.bugOffsetY = 5              -- chute nasce X studs abaixo da bola
+W.CFGV.bugForceY = 8000            -- força do chute pra cima (gatilho)
+W.CFGV.bugTriggerDelay = 0.12      -- espera entre gatilho e spam
+W.CFGV.bugKicksPerFrame = 50       -- chutes por frame no spam
+W.CFGV.bugAutoStopTime = 5         -- auto-desliga em 5s
 W.CFGV.bugRadius = 30
 W.CFGV.bugHeight = 9
 W.CFGV.bugSpeed = 9
 W.CFGV.bugMaxForce = 9000
 W.CFGV.bugForceMult = 800
-W.CFGV.bugDelay = 0.01
-W.CFGV.bugKicksPerFrame = 50
-W.CFGV.bugAutoStopTime = 5   -- ⏱️ desliga sozinho depois de 5 segundos
 
 print("[Willnzx] GUI base carregada")
