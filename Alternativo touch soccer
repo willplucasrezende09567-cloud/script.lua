@@ -76,10 +76,11 @@ W.kp = {
     FloatTopFrontOffset=14.0, FloatRisingOffset=13, FloatRisingThreshold=5,
     MoveVelocityThreshold=16, StopVelocityThreshold=3, DirectionChangeThreshold=60,
     VoidY=-80, SpikeThreshold=320, AirMinFrames=8, SafeLandOffset=5, SafeFlyDuration=0.4,
+    wasActive=false,
 }
 
 -- ============================================================
---  💀 RESET PARTIDA (void fling - versão que funcionou)
+--  💀 RESET PARTIDA — técnica do CF Helper (BodyPosition + desativar estados)
 -- ============================================================
 W.voidFlingLoop = false
 W.voidFlingThread = nil
@@ -93,29 +94,60 @@ W.voidFlingOnce = function()
 
     local before = c
 
+    -- ✅ Desabilita estados (mesma técnica do CF Helper)
+    pcall(function()
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+    end)
     pcall(function() hum.PlatformStand = true end)
 
+    -- ✅ BodyPosition segurando Y bem baixo
+    local bp = Instance.new("BodyPosition")
+    bp.Name = "__VoidBP"
+    bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bp.P = 100000
+    bp.D = 10000
+    bp.Position = Vector3.new(hrp.Position.X, -5000, hrp.Position.Z)
+    bp.Parent = hrp
+
+    -- ✅ BodyVelocity ajudando
     local bv = Instance.new("BodyVelocity")
-    bv.Name = "__VoidFlingBV"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Name = "__VoidBV"
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.new(0, -8000, 0)
     bv.Parent = hrp
 
+    -- ✅ Loop: teleporta via CFrame (mesma técnica do CF Helper)
     local endTime = tick() + 3
     while LP.Character == before and tick() < endTime do
         if hrp and hrp.Parent then
-            hrp.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 30, hrp.Position.Z)
+            local rot = hrp.CFrame - hrp.CFrame.Position
+            hrp.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 30, hrp.Position.Z) * rot
             pcall(function()
                 hrp.Velocity = Vector3.new(0, -8000, 0)
                 hrp.AssemblyLinearVelocity = Vector3.new(0, -8000, 0)
                 hrp.RotVelocity = Vector3.new(9999, 9999, 9999)
                 hrp.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
             end)
+            if bp and bp.Parent then
+                bp.Position = Vector3.new(hrp.Position.X, hrp.Position.Y - 5000, hrp.Position.Z)
+            end
         end
         task.wait(0.03)
     end
 
     if bv and bv.Parent then bv:Destroy() end
+    if bp and bp.Parent then bp:Destroy() end
+
+    -- Restaura estados
+    pcall(function()
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+    end)
 
     local t1 = tick() + 4
     while LP.Character == before and tick() < t1 do task.wait(0.05) end
@@ -155,7 +187,15 @@ W.stopVoidFling = function()
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
     local c = LP.Character
     local hum = c and c:FindFirstChildOfClass("Humanoid")
-    if hum then pcall(function() hum.PlatformStand = false end) end
+    if hum then
+        pcall(function() hum.PlatformStand = false end)
+        pcall(function()
+            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+        end)
+    end
 end
 
 local hookSkip = false
@@ -865,7 +905,8 @@ local function kpSafeLand()
 end
 
 W.kpCleanup = function()
-    kpKillFlingVel(); kpRemoveNoclip()
+    kpKillFlingVel()
+    kpRemoveNoclip()
     local c = LP.Character
     local h = c and c:FindFirstChild("HumanoidRootPart")
     local hum = c and c:FindFirstChildOfClass("Humanoid")
@@ -875,8 +916,17 @@ W.kpCleanup = function()
             h.AssemblyLinearVelocity = Vector3.zero
             h.AssemblyAngularVelocity = Vector3.zero
         end)
+        pcall(function()
+            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+        end)
     end
-    kpSafeLand()
+    if W.kp.wasActive then
+        kpSafeLand()
+        W.kp.wasActive = false
+    end
     W.kp.spikePaused = false; W.kp.spikeStartTime = 0
     kpRestoreCamera()
 end
@@ -907,6 +957,7 @@ end
 
 W.kpStart = function(target)
     if not target or kpIsDead(target) then return end
+    W.kp.wasActive = true
     W.kp.active=true; W.kp.moving=false; W.kp.dir=nil
     W.kp.targetStartY=nil; W.kp.airFrames=0
     W.kp.spikePaused=false; W.kp.spikeStartTime=0
@@ -1191,7 +1242,49 @@ task.spawn(function()
     end
 end)
 
-LP.CharacterAdded:Connect(function()
+-- Failsafe anti-travamento
+task.spawn(function()
+    while task.wait(0.5) do
+        local c = LP.Character
+        local hum = c and c:FindFirstChildOfClass("Humanoid")
+        if hum and hum.PlatformStand then
+            if not W.kp.active and not W.voidFlingLoop then
+                pcall(function() hum.PlatformStand = false end)
+                pcall(function()
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+                end)
+                local h = c:FindFirstChild("HumanoidRootPart")
+                if h then
+                    pcall(function()
+                        h.AssemblyLinearVelocity = Vector3.zero
+                        h.AssemblyAngularVelocity = Vector3.zero
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+LP.CharacterAdded:Connect(function(newChar)
+    task.wait(0.3)
+    W.kp.active = false
+    W.kp.wasActive = false
+    W.kp.spikePaused = false
+    if newChar then
+        local h = newChar:FindFirstChildOfClass("Humanoid")
+        if h then
+            pcall(function() h.PlatformStand = false end)
+            pcall(function()
+                h:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                h:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                h:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+                h:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+            end)
+        end
+    end
     if W.kp.toolObj then
         task.wait(0.5)
         if not W.kpHasTool() then W.kp.toolObj = nil end
@@ -2242,4 +2335,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — Reset Partida (versão original -8000)")
+print("[Willnzx] GUI base carregada — Reset Partida com técnica do CF Helper")
