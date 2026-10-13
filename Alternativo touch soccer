@@ -51,6 +51,7 @@ W.fnNames = {
     freeze = "FREEZE BALL", bug = "BUG BALL", defend = "DEFEND GOAL",
     farm = "FARM COINS", tracker = "TRACKER G-A",
     predict = "PREDICT BALL", predict_kick = "PREDICT KICK",
+    kick_player = "KICK PLAYER", kick_player_tool = "KICK PLAYER TOOL",
 }
 
 W.btn = function(key, active, extra)
@@ -101,6 +102,30 @@ W.states = {}
 W.boostMultiplier = 3
 W.selectedGoalIndex = 1
 W.defendSelectedGoal = "A"
+
+-- ============ KICK PLAYER (Float Top) ============
+W.kp = {
+    active = false, moving = false, dir = nil,
+    targetStartY = nil, airFrames = 0,
+    spikePaused = false, spikeStartTime = 0,
+    activeTarget = nil, noclipActive = false, spectating = false,
+    toolObj = nil, myOriginalCFrame = nil,
+    FloatTopStopVelocity = 35,
+    FloatTopOffset = 1.0,
+    FloatTopVelocity = -250,
+    FloatTopStepDown = 1.0,
+    FloatTopFrontOffset = 14.0,
+    FloatRisingOffset = 13,
+    FloatRisingThreshold = 5,
+    MoveVelocityThreshold = 16,
+    StopVelocityThreshold = 3,
+    DirectionChangeThreshold = 60,
+    VoidY = -80,
+    SpikeThreshold = 320,
+    AirMinFrames = 8,
+    SafeLandOffset = 5,
+    SafeFlyDuration = 0.4,
+}
 
 local hookSkip = false
 
@@ -376,212 +401,10 @@ W.startOrbitBall = function()
     end)
 end
 
--- ============================================================
---  🟡 PREDICT SYSTEM
--- ============================================================
-W.states.isPredict = false
-W.states.isPredictKick = false
-W.states.predictConn = nil
-W.states.predictLastUpdate = 0
-W.states.predictWarned = false
-
-local function buildDots(folder, count, size, color)
-    local list = {}
-    for i = 1, count do
-        local dot = Instance.new("Part")
-        dot.Shape = Enum.PartType.Ball
-        dot.Size = Vector3.new(size, size, size)
-        dot.Color = color
-        dot.Material = Enum.Material.Neon
-        dot.Anchored = true
-        dot.CanCollide = false
-        dot.CanQuery = false
-        dot.CanTouch = false
-        dot.CastShadow = false
-        dot.Transparency = 0.05
-        dot.Parent = folder
-        table.insert(list, dot)
-    end
-    return list
-end
-
-local function makeTargetBall(folder, size, color)
-    local ball = Instance.new("Part")
-    ball.Shape = Enum.PartType.Ball
-    ball.Size = Vector3.new(size, size, size)
-    ball.Color = color
-    ball.Material = Enum.Material.Neon
-    ball.Anchored = true
-    ball.CanCollide = false
-    ball.CanQuery = false
-    ball.CanTouch = false
-    ball.CastShadow = false
-    ball.Transparency = 0.05
-    ball.Parent = folder
-    return ball
-end
-
-local function hideList(list)
-    for _, d in ipairs(list) do
-        if d and d.Parent then d.Transparency = 1 end
-    end
-end
-
-local function drawTrajectory(list, pos, vel, totalTime)
-    local gravity = Vector3.new(0, -workspace.Gravity, 0)
-    local dt = totalTime / #list
-    for i, dot in ipairs(list) do
-        if not dot or not dot.Parent then break end
-        local t = i * dt
-        local p = pos + vel * t + 0.5 * gravity * t * t
-        dot.Position = p
-        dot.Transparency = 0.05
-    end
-end
-
-local function calcFinalPos(pos, vel, totalTime)
-    local gravity = Vector3.new(0, -workspace.Gravity, 0)
-    return pos + vel * totalTime + 0.5 * gravity * totalTime * totalTime
-end
-
-local function updatePredicts()
-    local now = tick()
-    if now - W.states.predictLastUpdate < 0.03 then return end
-    W.states.predictLastUpdate = now
-
-    local b = W.getBall()
-    local totalTime = W.CFGV.predictTime or 1.2
-
-    if not b then
-        if W.states.predictDots then hideList(W.states.predictDots) end
-        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
-        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
-            W.states.predictKickTarget.Transparency = 1
-        end
-        return
-    end
-
-    if W.states.isPredict and W.states.predictDots then
-        drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
-    elseif W.states.predictDots then
-        hideList(W.states.predictDots)
-    end
-
-    if W.states.isPredictKick and W.states.predictKickDots then
-        local cam = workspace.CurrentCamera
-        local lookDir = cam.CFrame.LookVector
-        local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
-        if flatDir.Magnitude > 0.001 then flatDir = flatDir.Unit
-        else flatDir = Vector3.new(0, 0, -1) end
-
-        local force = W.CFGV.predictKickForce or 250
-        local lift = W.CFGV.predictKickLift or 45
-        local kickVel = flatDir * force + Vector3.new(0, lift, 0)
-
-        drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
-
-        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
-            local finalPos = calcFinalPos(b.Position, kickVel, totalTime)
-            W.states.predictKickTarget.Position = finalPos
-            W.states.predictKickTarget.Transparency = 0.05
-        end
-    else
-        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
-        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
-            W.states.predictKickTarget.Transparency = 1
-        end
-    end
-
-    if not W.states.isPredict and not W.states.isPredictKick then
-        if W.states.predictConn then
-            W.states.predictConn:Disconnect()
-            W.states.predictConn = nil
-        end
-        if W.states.predictFolder and W.states.predictFolder.Parent then
-            W.states.predictFolder:Destroy()
-        end
-        W.states.predictFolder = nil
-        W.states.predictDots = nil
-        W.states.predictKickDots = nil
-        W.states.predictKickTarget = nil
-    end
-end
-
-W.ensurePredictSystem = function()
-    if not W.states.predictFolder or not W.states.predictFolder.Parent then
-        local folder = Instance.new("Folder")
-        folder.Name = "WillnzxPredictDots"
-        folder.Parent = workspace
-        W.states.predictFolder = folder
-    end
-
-    local dotCount = W.CFGV.predictDotCount or 35
-    local dotSize = W.CFGV.predictDotSize or 0.7
-    local targetSize = W.CFGV.predictTargetSize or 2
-
-    if not W.states.predictDots or #W.states.predictDots == 0 then
-        W.states.predictDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
-    end
-    if not W.states.predictKickDots or #W.states.predictKickDots == 0 then
-        W.states.predictKickDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
-    end
-    if not W.states.predictKickTarget or not W.states.predictKickTarget.Parent then
-        W.states.predictKickTarget = makeTargetBall(W.states.predictFolder, targetSize, Color3.fromRGB(255, 220, 0))
-    end
-
-    if not W.states.predictConn then
-        W.states.predictConn = RunService.RenderStepped:Connect(updatePredicts)
-    end
-end
-
-W.startPredictBall = function()
-    W.states.isPredict = true
-    W.ensurePredictSystem()
-    W.states.predictLastUpdate = 0
-end
-
-W.stopPredictBall = function()
-    W.states.isPredict = false
-    if W.states.predictDots then hideList(W.states.predictDots) end
-end
-
-W.startPredictKick = function()
-    W.states.isPredictKick = true
-    W.ensurePredictSystem()
-    W.states.predictLastUpdate = 0
-    pcall(function() updatePredicts() end)
-end
-
-W.stopPredictKick = function()
-    W.states.isPredictKick = false
-    if W.states.predictKickDots then hideList(W.states.predictKickDots) end
-    if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
-        W.states.predictKickTarget.Transparency = 1
-    end
-end
-
-W.stopPredictAll = function()
-    W.states.isPredict = false
-    W.states.isPredictKick = false
-    if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
-    if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
-    W.states.predictFolder = nil
-    W.states.predictDots = nil
-    W.states.predictKickDots = nil
-    W.states.predictKickTarget = nil
-end
-
-W.stopPredict = W.stopPredictAll
-
--- ============================================================
---  BUG BALL
--- ============================================================
 W.startBugBall = function()
     if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
     if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
-
     W.states.isBugBall = true
-
     W.states.bugBallThread = task.spawn(function()
         local delay = 1 / (W.CFGV.bugKicksPerSecond or 8)
         while W.states.isBugBall do
@@ -595,7 +418,6 @@ W.startBugBall = function()
         end
         W.states.bugBallThread = nil
     end)
-
     W.states.bugStopThread = task.delay(W.CFGV.bugAutoStopTime or 5, function()
         if W.states.isBugBall then
             W.states.isBugBall = false
@@ -776,6 +598,744 @@ W.stopFarmCoins = function()
     if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
 end
 
+-- ============================================================
+--  🟡 PREDICT SYSTEM
+-- ============================================================
+W.states.isPredict = false
+W.states.isPredictKick = false
+W.states.predictConn = nil
+W.states.predictLastUpdate = 0
+W.states.predictWarned = false
+
+local function buildDots(folder, count, size, color)
+    local list = {}
+    for i = 1, count do
+        local dot = Instance.new("Part")
+        dot.Shape = Enum.PartType.Ball
+        dot.Size = Vector3.new(size, size, size)
+        dot.Color = color
+        dot.Material = Enum.Material.Neon
+        dot.Anchored = true
+        dot.CanCollide = false
+        dot.CanQuery = false
+        dot.CanTouch = false
+        dot.CastShadow = false
+        dot.Transparency = 0.05
+        dot.Parent = folder
+        table.insert(list, dot)
+    end
+    return list
+end
+
+local function makeTargetBall(folder, size, color)
+    local ball = Instance.new("Part")
+    ball.Shape = Enum.PartType.Ball
+    ball.Size = Vector3.new(size, size, size)
+    ball.Color = color
+    ball.Material = Enum.Material.Neon
+    ball.Anchored = true
+    ball.CanCollide = false
+    ball.CanQuery = false
+    ball.CanTouch = false
+    ball.CastShadow = false
+    ball.Transparency = 0.05
+    ball.Parent = folder
+    return ball
+end
+
+local function hideList(list)
+    for _, d in ipairs(list) do
+        if d and d.Parent then d.Transparency = 1 end
+    end
+end
+
+local function drawTrajectory(list, pos, vel, totalTime)
+    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+    local dt = totalTime / #list
+    for i, dot in ipairs(list) do
+        if not dot or not dot.Parent then break end
+        local t = i * dt
+        local p = pos + vel * t + 0.5 * gravity * t * t
+        dot.Position = p
+        dot.Transparency = 0.05
+    end
+end
+
+local function calcFinalPos(pos, vel, totalTime)
+    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+    return pos + vel * totalTime + 0.5 * gravity * totalTime * totalTime
+end
+
+local function updatePredicts()
+    local now = tick()
+    if now - W.states.predictLastUpdate < 0.03 then return end
+    W.states.predictLastUpdate = now
+    local b = W.getBall()
+    local totalTime = W.CFGV.predictTime or 1.2
+    if not b then
+        if W.states.predictDots then hideList(W.states.predictDots) end
+        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            W.states.predictKickTarget.Transparency = 1
+        end
+        return
+    end
+    if W.states.isPredict and W.states.predictDots then
+        drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
+    elseif W.states.predictDots then
+        hideList(W.states.predictDots)
+    end
+    if W.states.isPredictKick and W.states.predictKickDots then
+        local cam = workspace.CurrentCamera
+        local lookDir = cam.CFrame.LookVector
+        local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
+        if flatDir.Magnitude > 0.001 then flatDir = flatDir.Unit
+        else flatDir = Vector3.new(0, 0, -1) end
+        local force = W.CFGV.predictKickForce or 250
+        local lift = W.CFGV.predictKickLift or 45
+        local kickVel = flatDir * force + Vector3.new(0, lift, 0)
+        drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            local finalPos = calcFinalPos(b.Position, kickVel, totalTime)
+            W.states.predictKickTarget.Position = finalPos
+            W.states.predictKickTarget.Transparency = 0.05
+        end
+    else
+        if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+        if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+            W.states.predictKickTarget.Transparency = 1
+        end
+    end
+    if not W.states.isPredict and not W.states.isPredictKick then
+        if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
+        if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
+        W.states.predictFolder = nil
+        W.states.predictDots = nil
+        W.states.predictKickDots = nil
+        W.states.predictKickTarget = nil
+    end
+end
+
+W.ensurePredictSystem = function()
+    if not W.states.predictFolder or not W.states.predictFolder.Parent then
+        local folder = Instance.new("Folder")
+        folder.Name = "WillnzxPredictDots"
+        folder.Parent = workspace
+        W.states.predictFolder = folder
+    end
+    local dotCount = W.CFGV.predictDotCount or 35
+    local dotSize = W.CFGV.predictDotSize or 0.7
+    local targetSize = W.CFGV.predictTargetSize or 2
+    if not W.states.predictDots or #W.states.predictDots == 0 then
+        W.states.predictDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
+    end
+    if not W.states.predictKickDots or #W.states.predictKickDots == 0 then
+        W.states.predictKickDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
+    end
+    if not W.states.predictKickTarget or not W.states.predictKickTarget.Parent then
+        W.states.predictKickTarget = makeTargetBall(W.states.predictFolder, targetSize, Color3.fromRGB(255, 220, 0))
+    end
+    if not W.states.predictConn then
+        W.states.predictConn = RunService.RenderStepped:Connect(updatePredicts)
+    end
+end
+
+W.startPredictBall = function()
+    W.states.isPredict = true
+    W.ensurePredictSystem()
+    W.states.predictLastUpdate = 0
+end
+
+W.stopPredictBall = function()
+    W.states.isPredict = false
+    if W.states.predictDots then hideList(W.states.predictDots) end
+end
+
+W.startPredictKick = function()
+    W.states.isPredictKick = true
+    W.ensurePredictSystem()
+    W.states.predictLastUpdate = 0
+    pcall(function() updatePredicts() end)
+end
+
+W.stopPredictKick = function()
+    W.states.isPredictKick = false
+    if W.states.predictKickDots then hideList(W.states.predictKickDots) end
+    if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
+        W.states.predictKickTarget.Transparency = 1
+    end
+end
+
+W.stopPredictAll = function()
+    W.states.isPredict = false
+    W.states.isPredictKick = false
+    if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
+    if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
+    W.states.predictFolder = nil
+    W.states.predictDots = nil
+    W.states.predictKickDots = nil
+    W.states.predictKickTarget = nil
+end
+
+W.stopPredict = W.stopPredictAll
+
+-- ============================================================
+--  🎯 KICK PLAYER (Float Top)
+-- ============================================================
+W.kpFindPlayer = function(q)
+    if not q or q == "" then return nil end
+    q = tostring(q):lower():gsub("%s", "")
+    local matches = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local n = p.Name:lower():gsub("%s", "")
+            local d = (p.DisplayName or ""):lower():gsub("%s", "")
+            if n:find(q, 1, true) or d:find(q, 1, true) then
+                table.insert(matches, p)
+            end
+        end
+    end
+    local best, bs
+    for _, p in ipairs(matches) do
+        local n = p.Name:lower():gsub("%s", "")
+        local d = (p.DisplayName or ""):lower():gsub("%s", "")
+        local s = math.min(n:len(), d:len() > 0 and d:len() or 9999)
+        if not best or s < bs then best = p; bs = s end
+    end
+    return best
+end
+
+local function kpGetRoot(p)
+    local c = p and p.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function kpGetTorso(p)
+    local c = p and p.Character
+    if not c then return nil end
+    return c:FindFirstChild("UpperTorso") or c:FindFirstChild("Torso")
+end
+
+local function kpGetHumanoid(p)
+    local c = p and p.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function kpIsDead(p)
+    if not p then return true end
+    local c = p.Character
+    if not c then return true end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if not h then return true end
+    return h.Health <= 0
+end
+
+local function kpIsGone(p)
+    if not p then return true end
+    local ok, parent = pcall(function() return p.Parent end)
+    if not ok or parent ~= Players then return true end
+    return not Players:FindFirstChild(p.Name)
+end
+
+local function kpSaveMyPosition()
+    local c = LP.Character
+    local h = c and c:FindFirstChild("HumanoidRootPart")
+    if h then W.kp.myOriginalCFrame = h.CFrame end
+end
+
+local function kpRestoreCamera()
+    local c = LP.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h then
+        pcall(function()
+            workspace.CurrentCamera.CameraSubject = h
+            workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+        end)
+    end
+end
+
+local function kpStopSpectate()
+    if not W.kp.spectating then return end
+    kpRestoreCamera()
+    W.kp.spectating = false
+end
+
+local function kpSpectate(target)
+    if W.kp.spectating then return end
+    local c = target and target.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    workspace.CurrentCamera.CameraSubject = h
+    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    W.kp.spectating = true
+end
+
+local function kpApplyNoclip()
+    local c = LP.Character
+    if not c then return end
+    for _, d in ipairs(c:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
+            if d:GetAttribute("__KPNoclipOrig") == nil then
+                d:SetAttribute("__KPNoclipOrig", d.CanCollide)
+            end
+            local isTorso = (d.Name == "UpperTorso" or d.Name == "Torso")
+            d.CanCollide = isTorso
+        end
+    end
+    W.kp.noclipActive = true
+end
+
+local function kpRemoveNoclip()
+    if not W.kp.noclipActive then return end
+    local c = LP.Character
+    if c then
+        for _, d in ipairs(c:GetDescendants()) do
+            if d:IsA("BasePart") then
+                local orig = d:GetAttribute("__KPNoclipOrig")
+                if orig ~= nil then
+                    d.CanCollide = orig
+                    d:SetAttribute("__KPNoclipOrig", nil)
+                end
+            end
+        end
+    end
+    W.kp.noclipActive = false
+end
+
+local function kpKillFlingVel()
+    local c = LP.Character
+    local h = c and c:FindFirstChild("HumanoidRootPart")
+    if not h then return end
+    local bv = h:FindFirstChild("FlingVelocity")
+    if bv then bv:Destroy() end
+end
+
+local _kpLastSafeLand = 0
+local function kpSafeLand()
+    if tick() - _kpLastSafeLand < 1.0 then return end
+    _kpLastSafeLand = tick()
+    local c = LP.Character
+    local h = c and c:FindFirstChild("HumanoidRootPart")
+    local hum = c and c:FindFirstChildOfClass("Humanoid")
+    if not h or not hum or hum.Health <= 0 then return end
+    local refPos = W.kp.myOriginalCFrame and W.kp.myOriginalCFrame.Position or h.Position
+    local rp = RaycastParams.new()
+    rp.FilterDescendantsInstances = {c}
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    local res = workspace:Raycast(Vector3.new(refPos.X, refPos.Y + 50, refPos.Z), Vector3.new(0, -1000, 0), rp)
+    local groundY = res and res.Position.Y or refPos.Y
+    local finalCF = CFrame.new(refPos.X, groundY + W.kp.SafeLandOffset, refPos.Z)
+    pcall(function() h.CFrame = finalCF end)
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.zero
+    bv.Parent = h
+    local bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 3000; bg.D = 500
+    bg.CFrame = finalCF
+    bg.Parent = h
+    pcall(function() hum.PlatformStand = true end)
+    task.wait(W.kp.SafeFlyDuration)
+    if bv.Parent then bv:Destroy() end
+    if bg.Parent then bg:Destroy() end
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+    pcall(function() hum.PlatformStand = false end)
+    W.kp.myOriginalCFrame = nil
+end
+
+W.kpCleanup = function()
+    kpKillFlingVel()
+    kpRemoveNoclip()
+    local c = LP.Character
+    local h = c and c:FindFirstChild("HumanoidRootPart")
+    local hum = c and c:FindFirstChildOfClass("Humanoid")
+    if h and hum then
+        pcall(function() hum.PlatformStand = false end)
+        pcall(function()
+            h.AssemblyLinearVelocity = Vector3.zero
+            h.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    kpSafeLand()
+    W.kp.spikePaused = false
+    W.kp.spikeStartTime = 0
+    kpRestoreCamera()
+end
+
+local function kpMoveDir(tRoot, tHum)
+    local v = tRoot.AssemblyLinearVelocity
+    local flat = Vector3.new(v.X, 0, v.Z)
+    if flat.Magnitude > 0.1 then return flat.Unit
+    elseif tHum and tHum.MoveDirection.Magnitude > 0.1 then return tHum.MoveDirection.Unit end
+    return Vector3.zero
+end
+
+local function kpUpdateDir(cur, new)
+    if new.Magnitude < 0.1 then return cur end
+    if not cur or cur.Magnitude < 0.1 then return new end
+    local dot = math.clamp(cur:Dot(new), -1, 1)
+    local angle = math.deg(math.acos(dot))
+    if angle > W.kp.DirectionChangeThreshold then return new end
+    return cur
+end
+
+W.kpStop = function()
+    W.kp.active = false
+    W.kp.moving = false
+    W.kp.dir = nil
+    W.kp.targetStartY = nil
+    W.kp.airFrames = 0
+    W.kp.spikePaused = false
+    W.kp.spikeStartTime = 0
+    W.kp.activeTarget = nil
+    kpStopSpectate()
+    W.kpCleanup()
+end
+
+W.kpStart = function(target)
+    if not target or kpIsDead(target) then return end
+    W.kp.active = true
+    W.kp.moving = false
+    W.kp.dir = nil
+    W.kp.targetStartY = nil
+    W.kp.airFrames = 0
+    W.kp.spikePaused = false
+    W.kp.spikeStartTime = 0
+    kpSaveMyPosition()
+    kpApplyNoclip()
+    kpSpectate(target)
+
+    task.spawn(function()
+        local stepDown = false
+        while W.kp.active do
+            local c = LP.Character
+            if not c then
+                LP.CharacterAdded:Wait()
+                task.wait(0.2)
+                c = LP.Character
+            end
+            if c then
+                local hrp = c:FindFirstChild("HumanoidRootPart")
+                local hum = c:FindFirstChildOfClass("Humanoid")
+                if hrp and hum then
+                    hum.PlatformStand = true
+                    if hrp.Position.Y < W.kp.VoidY + 15 then
+                        if W.kp.myOriginalCFrame then
+                            pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
+                        end
+                        kpKillFlingVel()
+                        RunService.Heartbeat:Wait()
+                        continue
+                    end
+                    for _, d in ipairs(c:GetDescendants()) do
+                        if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
+                            local isTorso = (d.Name == "UpperTorso" or d.Name == "Torso")
+                            if d.CanCollide ~= isTorso then d.CanCollide = isTorso end
+                        end
+                    end
+                    local t = W.kp.activeTarget
+                    if not t or kpIsDead(t) or kpIsGone(t) then
+                        kpKillFlingVel()
+                        pcall(function()
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            hrp.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                        W.kp.active = false
+                        break
+                    end
+                    local tRoot = kpGetRoot(t)
+                    local tHum = kpGetHumanoid(t)
+                    local tTorso = kpGetTorso(t)
+                    if tRoot and tRoot.Parent then
+                        local spd = tRoot.AssemblyLinearVelocity.Magnitude
+                        if spd > W.kp.SpikeThreshold then
+                            if not W.kp.spikePaused then
+                                W.kp.spikePaused = true
+                                W.kp.spikeStartTime = tick()
+                                kpKillFlingVel()
+                                pcall(function()
+                                    hrp.AssemblyLinearVelocity = Vector3.zero
+                                    hrp.AssemblyAngularVelocity = Vector3.zero
+                                end)
+                            end
+                            if W.kp.myOriginalCFrame then
+                                pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
+                            end
+                            hum.PlatformStand = true
+                            if not W.kp.spectating then kpSpectate(t) end
+                            RunService.Heartbeat:Wait()
+                            continue
+                        else
+                            W.kp.spikePaused = false
+                        end
+                        if spd > W.kp.FloatTopStopVelocity then
+                            W.kp.active = false
+                            break
+                        end
+                        if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
+                        if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
+                            W.kp.airFrames = W.kp.airFrames + 1
+                        else
+                            W.kp.airFrames = 0
+                        end
+                        if W.kp.airFrames >= W.kp.AirMinFrames then
+                            W.kp.active = false
+                            break
+                        end
+                        stepDown = not stepDown
+                        local yOff = stepDown and -W.kp.FloatTopStepDown or 0
+                        local refPos = (tTorso and tTorso.Position) or tRoot.Position
+                        local tVel = tRoot.AssemblyLinearVelocity.Magnitude
+                        if tVel >= W.kp.MoveVelocityThreshold then W.kp.moving = true
+                        elseif tVel < W.kp.StopVelocityThreshold then W.kp.moving = false; W.kp.dir = nil end
+                        local isMoving = W.kp.moving
+                        if isMoving then
+                            local newDir = kpMoveDir(tRoot, tHum)
+                            W.kp.dir = kpUpdateDir(W.kp.dir, newDir)
+                        end
+                        local moveDir = W.kp.dir or Vector3.zero
+                        local hasDir = moveDir.Magnitude > 0.1
+                        local velY = tRoot.AssemblyLinearVelocity.Y
+                        local isRising = velY > W.kp.FloatRisingThreshold
+                        local basePos
+                        if isRising and isMoving and hasDir then
+                            basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatRisingOffset, 0)
+                        elseif isRising then
+                            basePos = refPos + Vector3.new(0, W.kp.FloatRisingOffset, 0)
+                        elseif isMoving and hasDir then
+                            basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatTopOffset, 0)
+                        else
+                            basePos = refPos + Vector3.new(0, W.kp.FloatTopOffset, 0)
+                        end
+                        local posDest = basePos + Vector3.new(0, yOff, 0)
+                        hrp.CFrame = CFrame.lookAt(posDest, posDest + Vector3.new(0, -1, 0))
+                        hrp.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
+                        hrp.RotVelocity = Vector3.zero
+                        local bv = hrp:FindFirstChild("FlingVelocity")
+                        if not bv then
+                            bv = Instance.new("BodyVelocity")
+                            bv.Name = "FlingVelocity"
+                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                            bv.Parent = hrp
+                        end
+                        bv.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
+                    end
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+        W.kpStop()
+    end)
+end
+
+W.kpHasTool = function()
+    local n = "ClickFloatTopTool"
+    local c = LP.Character
+    if c then
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and t.Name == n then return true end
+        end
+    end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    if bp then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") and t.Name == n then return true end
+        end
+    end
+    return false
+end
+
+W.kpRemoveTool = function()
+    local n = "ClickFloatTopTool"
+    local c = LP.Character
+    if c then
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and t.Name == n then pcall(function() t:Destroy() end) end
+        end
+    end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    if bp then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") and t.Name == n then pcall(function() t:Destroy() end) end
+        end
+    end
+end
+
+W.kpClickLoopRunning = false
+local function kpClickLoop()
+    while true do
+        if not W.kp.toolObj or not W.kp.toolObj.Parent then break end
+        if W.kp.active and W.kp.activeTarget then
+            local c = LP.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            local t = W.kp.activeTarget
+            if hrp and hum then
+                hum.PlatformStand = true
+                if not t or kpIsDead(t) or kpIsGone(t) then W.kp.active = false end
+                if hrp.Position.Y < W.kp.VoidY + 15 then
+                    if W.kp.myOriginalCFrame then
+                        pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
+                    end
+                    kpKillFlingVel()
+                    RunService.Heartbeat:Wait()
+                    continue
+                end
+                for _, d in ipairs(c:GetDescendants()) do
+                    if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
+                        local isTorso = (d.Name == "UpperTorso" or d.Name == "Torso")
+                        if d.CanCollide ~= isTorso then d.CanCollide = isTorso end
+                    end
+                end
+                local tRoot = kpGetRoot(t)
+                local tHum = kpGetHumanoid(t)
+                local tTorso = kpGetTorso(t)
+                if tRoot and tRoot.Parent then
+                    local spd = tRoot.AssemblyLinearVelocity.Magnitude
+                    if spd > W.kp.SpikeThreshold then
+                        if not W.kp.spikePaused then
+                            W.kp.spikePaused = true
+                            W.kp.spikeStartTime = tick()
+                            kpKillFlingVel()
+                            pcall(function()
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                                hrp.AssemblyAngularVelocity = Vector3.zero
+                            end)
+                        end
+                        if W.kp.myOriginalCFrame then
+                            pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
+                        end
+                        if not W.kp.spectating then kpSpectate(t) end
+                        RunService.Heartbeat:Wait()
+                        continue
+                    else
+                        W.kp.spikePaused = false
+                    end
+                    if spd > W.kp.FloatTopStopVelocity then
+                        W.kp.active = false
+                    else
+                        if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
+                        if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
+                            W.kp.airFrames = W.kp.airFrames + 1
+                        else
+                            W.kp.airFrames = 0
+                        end
+                        if W.kp.airFrames >= W.kp.AirMinFrames then
+                            W.kp.active = false
+                        else
+                            local stepDown = (tick() * 10) % 2 < 1
+                            local yOff = stepDown and -W.kp.FloatTopStepDown or 0
+                            local refPos = (tTorso and tTorso.Position) or tRoot.Position
+                            local tVel = tRoot.AssemblyLinearVelocity.Magnitude
+                            if tVel >= W.kp.MoveVelocityThreshold then W.kp.moving = true
+                            elseif tVel < W.kp.StopVelocityThreshold then W.kp.moving = false; W.kp.dir = nil end
+                            local isMoving = W.kp.moving
+                            if isMoving then
+                                local newDir = kpMoveDir(tRoot, tHum)
+                                W.kp.dir = kpUpdateDir(W.kp.dir, newDir)
+                            end
+                            local moveDir = W.kp.dir or Vector3.zero
+                            local hasDir = moveDir.Magnitude > 0.1
+                            local velY = tRoot.AssemblyLinearVelocity.Y
+                            local isRising = velY > W.kp.FloatRisingThreshold
+                            local basePos
+                            if isRising and isMoving and hasDir then
+                                basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatRisingOffset, 0)
+                            elseif isRising then
+                                basePos = refPos + Vector3.new(0, W.kp.FloatRisingOffset, 0)
+                            elseif isMoving and hasDir then
+                                basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatTopOffset, 0)
+                            else
+                                basePos = refPos + Vector3.new(0, W.kp.FloatTopOffset, 0)
+                            end
+                            local posDest = basePos + Vector3.new(0, yOff, 0)
+                            hrp.CFrame = CFrame.lookAt(posDest, posDest + Vector3.new(0, -1, 0))
+                            hrp.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
+                            hrp.RotVelocity = Vector3.zero
+                            local bv = hrp:FindFirstChild("FlingVelocity")
+                            if not bv then
+                                bv = Instance.new("BodyVelocity")
+                                bv.Name = "FlingVelocity"
+                                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                bv.Parent = hrp
+                            end
+                            bv.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
+                        end
+                    end
+                end
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+W.kpGiveTool = function()
+    if W.kpHasTool() then return false end
+    W.kpRemoveTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "ClickFloatTopTool"
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+    tool.ToolTip = "Clique num player — Float Top"
+    tool.Activated:Connect(function()
+        local m = LP:GetMouse()
+        if not m or not m.Target then return end
+        local model = m.Target:FindFirstAncestorOfClass("Model")
+        if not model then return end
+        local plr = Players:GetPlayerFromCharacter(model)
+        if plr and plr ~= LP then
+            if W.kp.active and W.kp.activeTarget == plr then
+                W.kpStop()
+            else
+                if W.kp.active then W.kpStop() end
+                W.kp.activeTarget = plr
+                W.kpStart(plr)
+            end
+        end
+    end)
+    tool.Destroying:Connect(function()
+        if W.kp.toolObj == tool then
+            W.kp.toolObj = nil
+            if W.kp.active then W.kpStop() end
+        end
+    end)
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    tool.Parent = bp or LP.Character or LP
+    W.kp.toolObj = tool
+    if not W.kpClickLoopRunning then
+        W.kpClickLoopRunning = true
+        task.spawn(function()
+            kpClickLoop()
+            W.kpClickLoopRunning = false
+        end)
+    end
+    return true
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if W.kp.toolObj and W.kp.toolObj.Name == "ClickFloatTopTool" then
+            if not W.kpHasTool() then W.kp.toolObj = nil end
+        end
+    end
+end)
+
+LP.CharacterAdded:Connect(function()
+    if W.kp.toolObj then
+        task.wait(0.5)
+        if not W.kpHasTool() then W.kp.toolObj = nil end
+    end
+end)
+
 pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -913,7 +1473,7 @@ Tab4.Size = UDim2.new(1, 0, 1, 0)
 Tab4.BackgroundTransparency = 1; Tab4.BorderSizePixel = 0
 Tab4.ScrollBarThickness = 5; Tab4.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
 Tab4.ScrollBarImageTransparency = 0.3
-Tab4.CanvasSize = UDim2.new(0, 0, 0, 320)
+Tab4.CanvasSize = UDim2.new(0, 0, 0, 480)
 Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
 Tab4.Visible = false
@@ -1069,6 +1629,106 @@ local TrackerGABtn = makeButton(Tab4, W.fnNames.tracker, 46, Color3.fromRGB(0, 2
 local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.fromRGB(255, 220, 0), Color3.fromRGB(255, 100, 0), "PredictBallBtn")
 local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(255, 220, 0), Color3.fromRGB(200, 120, 0), "PredictKickBtn")
 
+-- ============ ABA OUTROS: KICK PLAYER ============
+local KPTitle = Instance.new("TextLabel")
+KPTitle.Size = UDim2.new(1, -4, 0, 18)
+KPTitle.Position = UDim2.new(0, 2, 0, 172)
+KPTitle.BackgroundTransparency = 1
+KPTitle.Text = "🎯 KICK PLAYER (Float Top)"
+KPTitle.TextColor3 = Color3.fromRGB(255, 180, 120)
+KPTitle.TextSize = 12
+KPTitle.Font = Enum.Font.GothamBold
+KPTitle.TextXAlignment = Enum.TextXAlignment.Left
+KPTitle.Parent = Tab4
+
+local KickNameBox = Instance.new("TextBox")
+KickNameBox.Name = "KickNameBox"
+KickNameBox.Size = UDim2.new(1, -4, 0, 32)
+KickNameBox.Position = UDim2.new(0, 2, 0, 194)
+KickNameBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+KickNameBox.BackgroundTransparency = 0.45
+KickNameBox.PlaceholderText = "Digite o nome (qualquer letra)..."
+KickNameBox.PlaceholderColor3 = Color3.fromRGB(120, 130, 160)
+KickNameBox.Text = ""
+KickNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+KickNameBox.TextSize = 13
+KickNameBox.Font = Enum.Font.Gotham
+KickNameBox.ClearTextOnFocus = false
+KickNameBox.Parent = Tab4
+Instance.new("UICorner", KickNameBox).CornerRadius = UDim.new(0, 8)
+local KNBS = Instance.new("UIStroke", KickNameBox)
+KNBS.Thickness = 1.2; KNBS.Color = Color3.fromRGB(255, 100, 0); KNBS.Transparency = 0.3
+
+local KickStatus = Instance.new("TextLabel")
+KickStatus.Name = "KickStatus"
+KickStatus.Size = UDim2.new(1, -4, 0, 16)
+KickStatus.Position = UDim2.new(0, 2, 0, 230)
+KickStatus.BackgroundTransparency = 1
+KickStatus.Text = "Status: aguardando..."
+KickStatus.TextColor3 = Color3.fromRGB(120, 220, 255)
+KickStatus.TextSize = 11
+KickStatus.Font = Enum.Font.Gotham
+KickStatus.TextXAlignment = Enum.TextXAlignment.Left
+KickStatus.Parent = Tab4
+
+local KickPlayerBtn = makeButton(Tab4, "🎯 KICK PLAYER", 252, Color3.fromRGB(255, 60, 60), Color3.fromRGB(120, 0, 0), "KickPlayerBtn")
+local KickPlayerToolBtn = makeButton(Tab4, "🎒 KICK PLAYER TOOL", 294, Color3.fromRGB(200, 60, 255), Color3.fromRGB(80, 0, 120), "KickPlayerToolBtn")
+
+KickPlayerBtn.TextSize = 13
+KickPlayerToolBtn.TextSize = 13
+
+local function updateKickStatus(text, color)
+    KickStatus.Text = "Status: " .. text
+    KickStatus.TextColor3 = color or Color3.fromRGB(120, 220, 255)
+end
+
+KickNameBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local q = KickNameBox.Text
+    if q == "" then
+        updateKickStatus("aguardando...", Color3.fromRGB(120, 220, 255))
+        return
+    end
+    local p = W.kpFindPlayer(q)
+    if p then
+        updateKickStatus("alvo: " .. p.Name, Color3.fromRGB(100, 255, 150))
+    else
+        updateKickStatus("nenhum jogador encontrado", Color3.fromRGB(255, 120, 120))
+    end
+end)
+
+W.addTap(KickPlayerBtn, function()
+    local q = KickNameBox.Text
+    if not q or q == "" then
+        updateKickStatus("digite um nome primeiro!", Color3.fromRGB(255, 120, 120))
+        return
+    end
+    local p = W.kpFindPlayer(q)
+    if not p then
+        updateKickStatus("jogador '" .. q .. "' nao encontrado", Color3.fromRGB(255, 120, 120))
+        return
+    end
+    if W.stopAll then W.stopAll() end
+    if W.kp.active then W.kpStop() end
+    task.wait(0.1)
+    W.kp.activeTarget = p
+    W.kp.FloatTopStopVelocity = 35
+    W.kpStart(p)
+    updateKickStatus("KICK: float top em " .. p.Name .. " (detecção 35)", Color3.fromRGB(255, 100, 100))
+end)
+
+W.addTap(KickPlayerToolBtn, function()
+    if W.kpHasTool() then
+        updateKickStatus("Você já tem a Tool do Float Top!", Color3.fromRGB(255, 200, 100))
+        return
+    end
+    local ok = W.kpGiveTool()
+    if ok then
+        updateKickStatus("Tool recebida! Equipe e clique num player", Color3.fromRGB(120, 255, 150))
+    else
+        updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120))
+    end
+end)
+
 W.langRefresh = function()
     tabButtons[1].Text = W.t("tab_atq")
     tabButtons[2].Text = W.t("tab_bola")
@@ -1155,6 +1815,7 @@ W.resetVis = function()
 end
 
 W.stopAll = function()
+    pcall(function() if W.kpStop then W.kpStop() end end)
     W.states.isActive = false; W.states.isBringing = false; W.states.isLoopBringing = false
     W.states.isFreezing = false; W.states.isBoostingAll = false
     W.states.isSkying = false; W.states.isTouchGoal = false; W.states.isMoveBall = false
@@ -1359,9 +2020,7 @@ W.addTap(TrackerGABtn, function()
     end
 end)
 
--- ============================================================
---  🌐 SELETOR DE IDIOMA
--- ============================================================
+-- SELETOR DE IDIOMA
 local LangOverlay = Instance.new("Frame")
 LangOverlay.Name = "LangOverlay"
 LangOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -1448,9 +2107,7 @@ task.delay(0.65, function()
     end
 end)
 
--- ============================================================
---  ❓ OVERLAY DE CONFIRMAÇÃO DE FECHAR
--- ============================================================
+-- CONFIRMAÇÃO DE FECHAR
 local ConfirmOverlay = Instance.new("Frame")
 ConfirmOverlay.Name = "ConfirmOverlay"
 ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -1540,6 +2197,7 @@ W.hideConfirm = function()
 end
 
 W.closeGUI = function()
+    pcall(function() W.kpStop() end)
     W.stopAll()
     TabBar.Visible = false; ContentArea.Visible = false
     local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
@@ -1556,9 +2214,6 @@ W.closeGUI = function()
     _G.Willnzx = nil
 end
 
--- ============================================================
---  MINIMIZAR / FECHAR
--- ============================================================
 local minimized = false
 local FULL = UDim2.new(0, 360, 0, 420)
 local MIN = UDim2.new(0, 360, 0, 42)
@@ -1579,20 +2234,17 @@ W.addTap(MinBtn, function()
     end
 end)
 
--- ✅ CloseBtn agora abre a confirmação
 W.addTap(CloseBtn, function()
     if ConfirmOverlay.Visible then return end
     W.showConfirm()
 end)
 
--- ✅ Botão SIM: fecha a GUI
 W.addTap(SimBtn, function()
     W.hideConfirm()
     task.wait(0.15)
     W.closeGUI()
 end)
 
--- ✅ Botão NÃO: só fecha a mensagem
 W.addTap(NaoBtn, function()
     W.hideConfirm()
 end)
@@ -1607,9 +2259,7 @@ task.spawn(function()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
--- ============================================================
---  ✅ SISTEMA DE DRAG
--- ============================================================
+-- DRAG
 do
     local dragging = false
     local dragStart, startPos
@@ -1617,45 +2267,43 @@ do
     local function isUIButton(target)
         if not target then return false end
         local ok, res = pcall(function()
-            return target:IsA("TextButton") or target:IsA("TextBox") or target:IsA("ScrollingFrame")
+            return target:IsA("TextButton") or target:IsA("TextBox") or target:IsA("ScrollingFrame") or target:IsA("ImageButton")
         end)
         return ok and res
     end
 
     MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if isUIButton(input.Target) then return end
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
         end
     end)
 
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-            if dragging then
-                local delta = input.Position - dragStart
-                MainFrame.Position = UDim2.new(
-                    startPos.X.Scale, startPos.X.Offset + delta.X,
-                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                )
-            end
+    UIS.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 
     UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
 
     local lastTitleClick = 0
     Title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local now = tick()
             if now - lastTitleClick < 0.4 then
                 TS:Create(MainFrame, TweenInfo.new(0.25), {Position = W.HOME_POS}):Play()
@@ -1665,9 +2313,7 @@ do
     end)
 end
 
--- ============================================================
---  COMANDOS
--- ============================================================
+-- COMANDOS
 W.processCommand = function(msg)
     local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
     if m:sub(1,1) == ";" then m = m:sub(2) end
@@ -1927,13 +2573,11 @@ W.CFGV.touchGoalDist = 3
 W.CFGV.boostMaxSpeed = 250
 W.CFGV.boostDelay = 0.15
 
--- Bug Ball
 W.CFGV.bugOffsetY = 5
 W.CFGV.bugForceY = 8000
 W.CFGV.bugKicksPerSecond = 8
 W.CFGV.bugAutoStopTime = 5
 
--- Predict
 W.CFGV.predictTime = 1.2
 W.CFGV.predictDotCount = 35
 W.CFGV.predictDotSize = 0.7
@@ -1941,4 +2585,4 @@ W.CFGV.predictTargetSize = 2
 W.CFGV.predictKickForce = 250
 W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — altura 420 + drag + confirmar fechar")
+print("[Willnzx] GUI base carregada — Kick Player + Tool adicionados")
