@@ -6,15 +6,11 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local GuiS = game:GetService("GuiService")
 local TPS = game:GetService("TeleportService")
-local CAS = game:GetService("ContextActionService")
 local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
-if W.loaded_base then
-    warn("[Willnzx] GUI ja carregada.")
-    return
-end
+if W.loaded_base then warn("[Willnzx] GUI ja carregada."); return end
 W.loaded_base = true
 
 pcall(function()
@@ -25,41 +21,26 @@ pcall(function()
 end)
 
 W.lang = W.lang or nil
-
 W.i18n = {
-    pt = {
-        tab_atq = "ATQ", tab_bola = "BOLA", tab_outros = "OUTROS",
-        goal_a = "GOL A", goal_b = "GOL B",
-        state_on = "ATIVADO", state_off = "DESATIVADO",
-        multiplier = "MULTIPLICADOR: ",
-    },
-    en = {
-        tab_atq = "ATK", tab_bola = "BALL", tab_outros = "OTHER",
-        goal_a = "GOAL A", goal_b = "GOAL B",
-        state_on = "ON", state_off = "OFF",
-        multiplier = "MULTIPLIER: ",
-    },
+    pt = { tab_atq="ATQ", tab_bola="BOLA", tab_outros="OUTROS", goal_a="GOL A", goal_b="GOL B",
+           state_on="ATIVADO", state_off="DESATIVADO", multiplier="MULTIPLICADOR: " },
+    en = { tab_atq="ATK", tab_bola="BALL", tab_outros="OTHER", goal_a="GOAL A", goal_b="GOAL B",
+           state_on="ON", state_off="OFF", multiplier="MULTIPLIER: " },
 }
-
 W.fnNames = {
-    auto_gol = "AUTO-GOAL", tp_goal = "TP GOAL", touch_goal = "TOUCH GOAL",
-    sky = "SKY BALL", boost = "BOOST ALL", bring = "BRING BALL",
-    loop_bring = "LOOP BRING", move = "MOVE BALL", orbit = "ORBIT BALL",
-    freeze = "FREEZE BALL", bug = "BUG BALL", defend = "DEFEND GOAL",
-    farm = "FARM COINS", tracker = "TRACKER G-A",
-    predict = "PREDICT BALL", predict_kick = "PREDICT KICK",
-    kick_player = "KICK PLAYER", kick_player_tool = "KICK PLAYER TOOL",
+    auto_gol="AUTO-GOAL", tp_goal="TP GOAL", touch_goal="TOUCH GOAL", sky="SKY BALL",
+    boost="BOOST ALL", bring="BRING BALL", loop_bring="LOOP BRING", move="MOVE BALL",
+    orbit="ORBIT BALL", freeze="FREEZE BALL", bug="BUG BALL", defend="DEFEND GOAL",
+    farm="FARM COINS", tracker="TRACKER G-A", predict="PREDICT BALL", predict_kick="PREDICT KICK",
+    kick_player="KICK PLAYER", kick_player_tool="KICK PLAYER TOOL",
 }
-
 W.btn = function(key, active, extra)
     local nome = W.fnNames[key] or key
     local estado = active and W.t("state_on") or W.t("state_off")
     if extra and extra ~= "" then return nome .. ": " .. estado .. " (" .. extra .. ")" end
     return nome .. ": " .. estado
 end
-
 W.onLangChange = W.onLangChange or {}
-
 W.t = function(key)
     local lang = W.lang or "pt"
     local tbl = W.i18n[lang] or W.i18n.pt
@@ -73,54 +54,28 @@ W.urls = {
     trackerga = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Tracker%20g-a",
 }
 
-W.CoreGui = CoreGui
-W.UIS = UIS
-W.TS = TS
-W.RS = RS
-W.Players = Players
-W.LP = LP
-W.UID = LP.UserId
-W.TKN = LP.Name
+W.CoreGui=CoreGui; W.UIS=UIS; W.TS=TS; W.RS=RS; W.Players=Players; W.LP=LP
+W.UID=LP.UserId; W.TKN=LP.Name
 W.KBE = RS:WaitForChild("KickBall")
 W.TPPOS = Vector3.new(-186.25, 6.29, -28.13)
 W.GOALS = {[1]={pos=Vector3.new(-316.8,12.7,92.8)}, [2]={pos=Vector3.new(-112.2,12.7,92.6)}}
 W.MOVEA = Vector3.new(-213.81, 6.32, 26.87)
 W.MOVEB = Vector3.new(-215.15, 6.32, 160.50)
 W.ORB = {
-    Vector3.new(-214.45, 6.32, 115.19),
-    Vector3.new(-235.27, 6.32, 91.72),
-    Vector3.new(-214.60, 6.32, 70.07),
-    Vector3.new(-193.58, 6.32, 93.71)
+    Vector3.new(-214.45, 6.32, 115.19), Vector3.new(-235.27, 6.32, 91.72),
+    Vector3.new(-214.60, 6.32, 70.07), Vector3.new(-193.58, 6.32, 93.71)
 }
-W.CFGV = {}
-W.loaded = {}
-W.toggles = {}
-W.states = {}
-W.boostMultiplier = 3
-W.selectedGoalIndex = 1
-W.defendSelectedGoal = "A"
+W.CFGV={}; W.loaded={}; W.toggles={}; W.states={}
+W.boostMultiplier=3; W.selectedGoalIndex=1; W.defendSelectedGoal="A"
 
 W.kp = {
-    active = false, moving = false, dir = nil,
-    targetStartY = nil, airFrames = 0,
-    spikePaused = false, spikeStartTime = 0,
-    activeTarget = nil, noclipActive = false, spectating = false,
-    toolObj = nil, myOriginalCFrame = nil,
-    FloatTopStopVelocity = 35,
-    FloatTopOffset = 1.0,
-    FloatTopVelocity = -250,
-    FloatTopStepDown = 1.0,
-    FloatTopFrontOffset = 14.0,
-    FloatRisingOffset = 13,
-    FloatRisingThreshold = 5,
-    MoveVelocityThreshold = 16,
-    StopVelocityThreshold = 3,
-    DirectionChangeThreshold = 60,
-    VoidY = -80,
-    SpikeThreshold = 320,
-    AirMinFrames = 8,
-    SafeLandOffset = 5,
-    SafeFlyDuration = 0.4,
+    active=false, moving=false, dir=nil, targetStartY=nil, airFrames=0,
+    spikePaused=false, spikeStartTime=0, activeTarget=nil, noclipActive=false, spectating=false,
+    toolObj=nil, myOriginalCFrame=nil,
+    FloatTopStopVelocity=35, FloatTopOffset=1.0, FloatTopVelocity=-250, FloatTopStepDown=1.0,
+    FloatTopFrontOffset=14.0, FloatRisingOffset=13, FloatRisingThreshold=5,
+    MoveVelocityThreshold=16, StopVelocityThreshold=3, DirectionChangeThreshold=60,
+    VoidY=-80, SpikeThreshold=320, AirMinFrames=8, SafeLandOffset=5, SafeFlyDuration=0.4,
 }
 
 local hookSkip = false
@@ -195,9 +150,7 @@ end
 W.getRandomPlayer = function()
     local l = {}
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then
-            table.insert(l, p)
-        end
+        if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then table.insert(l, p) end
     end
     if #l > 0 then return l[math.random(1, #l)] end
 end
@@ -207,7 +160,6 @@ W.setBtnActive = function(btn, text)
     btn.BackgroundColor3 = Color3.fromRGB(100, 200, 255); btn.BackgroundTransparency = 0.05
     btn.TextColor3 = Color3.fromRGB(10, 30, 60); btn.TextStrokeTransparency = 1
 end
-
 W.setBtnInactive = function(btn, text)
     btn:SetAttribute("IsActive", false); btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextStrokeTransparency = 0.4
@@ -216,25 +168,13 @@ end
 
 W.loadModule = function(name)
     if W.loaded[name] then
-        local tg = W.toggles[name]
-        if tg then tg() end
-        return
+        local tg = W.toggles[name]; if tg then tg() end; return
     end
     W.loaded[name] = true
     local url = W.urls[name]
-    if not url then
-        warn("[Willnzx] URL nao configurada para: " .. name)
-        W.loaded[name] = false
-        return
-    end
-    local ok, err = pcall(function()
-        local code = game:HttpGet(url)
-        loadstring(code)()
-    end)
-    if not ok then
-        W.loaded[name] = false
-        warn("[Willnzx] Erro ao carregar " .. name .. ": " .. tostring(err))
-    end
+    if not url then warn("[Willnzx] URL nao configurada: " .. name); W.loaded[name]=false; return end
+    local ok, err = pcall(function() local code = game:HttpGet(url); loadstring(code)() end)
+    if not ok then W.loaded[name]=false; warn("[Willnzx] Erro " .. name .. ": " .. tostring(err)) end
 end
 
 _G.Willnzx = W
@@ -242,19 +182,13 @@ _G.Willnzx = W
 local function rejoin()
     local jid = game.JobId
     pcall(function()
-        if jid and jid ~= "" then
-            TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
-        else
-            TPS:Teleport(game.PlaceId, LP)
-        end
+        if jid and jid ~= "" then TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
+        else TPS:Teleport(game.PlaceId, LP) end
     end)
 end
 
 GuiS.ErrorMessageChanged:Connect(function(e)
-    if e and e ~= "" then
-        task.wait(0.01)
-        rejoin()
-    end
+    if e and e ~= "" then task.wait(0.01); rejoin() end
 end)
 
 W.fireSingle = function(gi)
@@ -350,9 +284,7 @@ W.startMoveBall = function()
                 uA = not uA; tS = tick(); task.wait(0.05)
             else
                 cnt = cnt + 1
-                if cnt % 3 == 0 then
-                    W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
-                end
+                if cnt % 3 == 0 then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
                 local d = (tg - b.Position).Unit
                 local f = (d * W.CFGV.moveForce) + Vector3.new(0, W.CFGV.moveY, 0)
                 W.safeFire(W.TKN, W.UID, "", b.Position, f, Vector3.new(0,0,0))
@@ -398,8 +330,8 @@ W.startOrbitBall = function()
 end
 
 W.startBugBall = function()
-    if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
-    if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
+    if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread=nil end
+    if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
     W.states.isBugBall = true
     W.states.bugBallThread = task.spawn(function()
         local delay = 1 / (W.CFGV.bugKicksPerSecond or 8)
@@ -417,10 +349,8 @@ W.startBugBall = function()
     W.states.bugStopThread = task.delay(W.CFGV.bugAutoStopTime or 5, function()
         if W.states.isBugBall then
             W.states.isBugBall = false
-            if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
-            if BugBallBtn and BugBallBtn.Parent then
-                W.setBtnInactive(BugBallBtn, W.btn("bug", false))
-            end
+            if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
+            if BugBallBtn and BugBallBtn.Parent then W.setBtnInactive(BugBallBtn, W.btn("bug", false)) end
         end
         W.states.bugStopThread = nil
     end)
@@ -443,9 +373,7 @@ end
 W.startBring = function()
     W.states.bringThread = task.spawn(function()
         local st = tick()
-        while W.states.isBringing and (tick() - st) < 0.5 do
-            W.stickBall(); task.wait(0.03)
-        end
+        while W.states.isBringing and (tick() - st) < 0.5 do W.stickBall(); task.wait(0.03) end
         W.states.isBringing = false
         W.states.bringThread = nil
     end)
@@ -453,9 +381,7 @@ end
 
 W.startLoopBring = function()
     W.states.loopBringThread = task.spawn(function()
-        while W.states.isLoopBringing do
-            W.stickBall(); task.wait(0.03)
-        end
+        while W.states.isLoopBringing do W.stickBall(); task.wait(0.03) end
         W.states.loopBringThread = nil
     end)
 end
@@ -464,9 +390,7 @@ W.startSky = function()
     W.states.skyThread = task.spawn(function()
         while W.states.isSkying do
             local b = W.getBall()
-            if b then
-                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0, W.CFGV.skyForce, 0), Vector3.new(0,0,0))
-            end
+            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0, W.CFGV.skyForce, 0), Vector3.new(0,0,0)) end
             task.wait(0.05)
         end
     end)
@@ -477,9 +401,7 @@ W.startFreeze = function()
     W.states.freezeThread = task.spawn(function()
         while W.states.isFreezing do
             local b = W.getBall()
-            if b then
-                W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0))
-            end
+            if b then W.safeFire(W.TKN, W.UID, "", b.Position, Vector3.new(0,0,0), Vector3.new(0,0,0)) end
             task.wait(W.CFGV.freezeDelay)
         end
     end)
@@ -487,7 +409,7 @@ end
 
 W.stopFreeze = function()
     W.states.isFreezing = false
-    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread = nil end
+    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread=nil end
 end
 
 W.startBoostAll = function()
@@ -508,8 +430,7 @@ W.startBoostAll = function()
 end
 
 W.DEFEND = {radius=5, force=5000, lift=50, delay=0.08, cooldown=0.15}
-W.states.defendLastFire = 0
-W.states.defendLastKick = 0
+W.states.defendLastFire=0; W.states.defendLastKick=0
 
 W.tryDefend = function()
     local b = W.getBall()
@@ -530,24 +451,18 @@ end
 
 W.startDefend = function()
     W.states.defendThread = task.spawn(function()
-        while W.states.isDefending do
-            pcall(W.tryDefend)
-            task.wait(W.DEFEND.delay)
-        end
+        while W.states.isDefending do pcall(W.tryDefend); task.wait(W.DEFEND.delay) end
         W.states.defendThread = nil
     end)
 end
 
 W.stopDefend = function()
     W.states.isDefending = false
-    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread = nil end
+    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread=nil end
 end
 
-W.states.isFarming = false
-W.states.farmThread = nil
-W.states.farmSeen = {}
-W.states.farmSeenTime = {}
-W.states.farmTotal = 0
+W.states.isFarming=false; W.states.farmThread=nil
+W.states.farmSeen={}; W.states.farmSeenTime={}; W.states.farmTotal=0
 
 W.collectNewCoins = function()
     local c = LP.Character
@@ -557,10 +472,7 @@ W.collectNewCoins = function()
     if not folder then return end
     local now = tick()
     for k, t in pairs(W.states.farmSeenTime) do
-        if now - t > 3 then
-            W.states.farmSeenTime[k] = nil
-            W.states.farmSeen[k] = nil
-        end
+        if now - t > 3 then W.states.farmSeenTime[k]=nil; W.states.farmSeen[k]=nil end
     end
     for _, obj in ipairs(folder:GetChildren()) do
         if obj.Parent and not W.states.farmSeen[obj] then
@@ -582,24 +494,18 @@ W.startFarmCoins = function()
     if W.states.farmThread then task.cancel(W.states.farmThread) end
     W.states.isFarming = true
     W.states.farmThread = task.spawn(function()
-        while W.states.isFarming do
-            W.collectNewCoins()
-            task.wait(0.1)
-        end
+        while W.states.isFarming do W.collectNewCoins(); task.wait(0.1) end
     end)
 end
 
 W.stopFarmCoins = function()
     W.states.isFarming = false
-    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
+    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread=nil end
 end
 
--- PREDICT SYSTEM
-W.states.isPredict = false
-W.states.isPredictKick = false
-W.states.predictConn = nil
-W.states.predictLastUpdate = 0
-W.states.predictWarned = false
+-- PREDICT
+W.states.isPredict=false; W.states.isPredictKick=false
+W.states.predictConn=nil; W.states.predictLastUpdate=0; W.states.predictWarned=false
 
 local function buildDots(folder, count, size, color)
     local list = {}
@@ -607,16 +513,10 @@ local function buildDots(folder, count, size, color)
         local dot = Instance.new("Part")
         dot.Shape = Enum.PartType.Ball
         dot.Size = Vector3.new(size, size, size)
-        dot.Color = color
-        dot.Material = Enum.Material.Neon
-        dot.Anchored = true
-        dot.CanCollide = false
-        dot.CanQuery = false
-        dot.CanTouch = false
-        dot.CastShadow = false
-        dot.Transparency = 0.05
-        dot.Parent = folder
-        table.insert(list, dot)
+        dot.Color = color; dot.Material = Enum.Material.Neon
+        dot.Anchored = true; dot.CanCollide = false; dot.CanQuery = false
+        dot.CanTouch = false; dot.CastShadow = false; dot.Transparency = 0.05
+        dot.Parent = folder; table.insert(list, dot)
     end
     return list
 end
@@ -625,22 +525,15 @@ local function makeTargetBall(folder, size, color)
     local ball = Instance.new("Part")
     ball.Shape = Enum.PartType.Ball
     ball.Size = Vector3.new(size, size, size)
-    ball.Color = color
-    ball.Material = Enum.Material.Neon
-    ball.Anchored = true
-    ball.CanCollide = false
-    ball.CanQuery = false
-    ball.CanTouch = false
-    ball.CastShadow = false
-    ball.Transparency = 0.05
+    ball.Color = color; ball.Material = Enum.Material.Neon
+    ball.Anchored = true; ball.CanCollide = false; ball.CanQuery = false
+    ball.CanTouch = false; ball.CastShadow = false; ball.Transparency = 0.05
     ball.Parent = folder
     return ball
 end
 
 local function hideList(list)
-    for _, d in ipairs(list) do
-        if d and d.Parent then d.Transparency = 1 end
-    end
+    for _, d in ipairs(list) do if d and d.Parent then d.Transparency = 1 end end
 end
 
 local function drawTrajectory(list, pos, vel, totalTime)
@@ -649,15 +542,13 @@ local function drawTrajectory(list, pos, vel, totalTime)
     for i, dot in ipairs(list) do
         if not dot or not dot.Parent then break end
         local t = i * dt
-        local p = pos + vel * t + 0.5 * gravity * t * t
-        dot.Position = p
+        dot.Position = pos + vel * t + 0.5 * gravity * t * t
         dot.Transparency = 0.05
     end
 end
 
 local function calcFinalPos(pos, vel, totalTime)
-    local gravity = Vector3.new(0, -workspace.Gravity, 0)
-    return pos + vel * totalTime + 0.5 * gravity * totalTime * totalTime
+    return pos + vel * totalTime + 0.5 * Vector3.new(0, -workspace.Gravity, 0) * totalTime * totalTime
 end
 
 local function updatePredicts()
@@ -676,22 +567,18 @@ local function updatePredicts()
     end
     if W.states.isPredict and W.states.predictDots then
         drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
-    elseif W.states.predictDots then
-        hideList(W.states.predictDots)
-    end
+    elseif W.states.predictDots then hideList(W.states.predictDots) end
     if W.states.isPredictKick and W.states.predictKickDots then
         local cam = workspace.CurrentCamera
         local lookDir = cam.CFrame.LookVector
         local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
-        if flatDir.Magnitude > 0.001 then flatDir = flatDir.Unit
-        else flatDir = Vector3.new(0, 0, -1) end
+        if flatDir.Magnitude > 0.001 then flatDir = flatDir.Unit else flatDir = Vector3.new(0,0,-1) end
         local force = W.CFGV.predictKickForce or 250
         local lift = W.CFGV.predictKickLift or 45
         local kickVel = flatDir * force + Vector3.new(0, lift, 0)
         drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
         if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
-            local finalPos = calcFinalPos(b.Position, kickVel, totalTime)
-            W.states.predictKickTarget.Position = finalPos
+            W.states.predictKickTarget.Position = calcFinalPos(b.Position, kickVel, totalTime)
             W.states.predictKickTarget.Transparency = 0.05
         end
     else
@@ -701,20 +588,17 @@ local function updatePredicts()
         end
     end
     if not W.states.isPredict and not W.states.isPredictKick then
-        if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
+        if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn=nil end
         if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
-        W.states.predictFolder = nil
-        W.states.predictDots = nil
-        W.states.predictKickDots = nil
-        W.states.predictKickTarget = nil
+        W.states.predictFolder=nil; W.states.predictDots=nil
+        W.states.predictKickDots=nil; W.states.predictKickTarget=nil
     end
 end
 
 W.ensurePredictSystem = function()
     if not W.states.predictFolder or not W.states.predictFolder.Parent then
         local folder = Instance.new("Folder")
-        folder.Name = "WillnzxPredictDots"
-        folder.Parent = workspace
+        folder.Name = "WillnzxPredictDots"; folder.Parent = workspace
         W.states.predictFolder = folder
     end
     local dotCount = W.CFGV.predictDotCount or 35
@@ -739,19 +623,16 @@ W.startPredictBall = function()
     W.ensurePredictSystem()
     W.states.predictLastUpdate = 0
 end
-
 W.stopPredictBall = function()
     W.states.isPredict = false
     if W.states.predictDots then hideList(W.states.predictDots) end
 end
-
 W.startPredictKick = function()
     W.states.isPredictKick = true
     W.ensurePredictSystem()
     W.states.predictLastUpdate = 0
     pcall(function() updatePredicts() end)
 end
-
 W.stopPredictKick = function()
     W.states.isPredictKick = false
     if W.states.predictKickDots then hideList(W.states.predictKickDots) end
@@ -759,18 +640,13 @@ W.stopPredictKick = function()
         W.states.predictKickTarget.Transparency = 1
     end
 end
-
 W.stopPredictAll = function()
-    W.states.isPredict = false
-    W.states.isPredictKick = false
-    if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn = nil end
+    W.states.isPredict=false; W.states.isPredictKick=false
+    if W.states.predictConn then W.states.predictConn:Disconnect(); W.states.predictConn=nil end
     if W.states.predictFolder and W.states.predictFolder.Parent then W.states.predictFolder:Destroy() end
-    W.states.predictFolder = nil
-    W.states.predictDots = nil
-    W.states.predictKickDots = nil
-    W.states.predictKickTarget = nil
+    W.states.predictFolder=nil; W.states.predictDots=nil
+    W.states.predictKickDots=nil; W.states.predictKickTarget=nil
 end
-
 W.stopPredict = W.stopPredictAll
 
 -- KICK PLAYER (Float Top)
@@ -782,9 +658,7 @@ W.kpFindPlayer = function(q)
         if p ~= LP and p.Character then
             local n = p.Name:lower():gsub("%s", "")
             local d = (p.DisplayName or ""):lower():gsub("%s", "")
-            if n:find(q, 1, true) or d:find(q, 1, true) then
-                table.insert(matches, p)
-            end
+            if n:find(q, 1, true) or d:find(q, 1, true) then table.insert(matches, p) end
         end
     end
     local best, bs
@@ -797,31 +671,18 @@ W.kpFindPlayer = function(q)
     return best
 end
 
-local function kpGetRoot(p)
-    local c = p and p.Character
-    return c and c:FindFirstChild("HumanoidRootPart")
-end
-
+local function kpGetRoot(p) local c = p and p.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function kpGetTorso(p)
-    local c = p and p.Character
-    if not c then return nil end
+    local c = p and p.Character; if not c then return nil end
     return c:FindFirstChild("UpperTorso") or c:FindFirstChild("Torso")
 end
-
-local function kpGetHumanoid(p)
-    local c = p and p.Character
-    return c and c:FindFirstChildOfClass("Humanoid")
-end
-
+local function kpGetHumanoid(p) local c = p and p.Character; return c and c:FindFirstChildOfClass("Humanoid") end
 local function kpIsDead(p)
     if not p then return true end
-    local c = p.Character
-    if not c then return true end
-    local h = c:FindFirstChildOfClass("Humanoid")
-    if not h then return true end
+    local c = p.Character; if not c then return true end
+    local h = c:FindFirstChildOfClass("Humanoid"); if not h then return true end
     return h.Health <= 0
 end
-
 local function kpIsGone(p)
     if not p then return true end
     local ok, parent = pcall(function() return p.Parent end)
@@ -830,28 +691,20 @@ local function kpIsGone(p)
 end
 
 local function kpSaveMyPosition()
-    local c = LP.Character
-    local h = c and c:FindFirstChild("HumanoidRootPart")
+    local c = LP.Character; local h = c and c:FindFirstChild("HumanoidRootPart")
     if h then W.kp.myOriginalCFrame = h.CFrame end
 end
-
 local function kpRestoreCamera()
-    local c = LP.Character
-    local h = c and c:FindFirstChildOfClass("Humanoid")
-    if h then
-        pcall(function()
-            workspace.CurrentCamera.CameraSubject = h
-            workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-        end)
-    end
+    local c = LP.Character; local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h then pcall(function()
+        workspace.CurrentCamera.CameraSubject = h
+        workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    end) end
 end
-
 local function kpStopSpectate()
     if not W.kp.spectating then return end
-    kpRestoreCamera()
-    W.kp.spectating = false
+    kpRestoreCamera(); W.kp.spectating = false
 end
-
 local function kpSpectate(target)
     if W.kp.spectating then return end
     local c = target and target.Character
@@ -861,10 +714,8 @@ local function kpSpectate(target)
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
     W.kp.spectating = true
 end
-
 local function kpApplyNoclip()
-    local c = LP.Character
-    if not c then return end
+    local c = LP.Character; if not c then return end
     for _, d in ipairs(c:GetDescendants()) do
         if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
             if d:GetAttribute("__KPNoclipOrig") == nil then
@@ -876,7 +727,6 @@ local function kpApplyNoclip()
     end
     W.kp.noclipActive = true
 end
-
 local function kpRemoveNoclip()
     if not W.kp.noclipActive then return end
     local c = LP.Character
@@ -884,22 +734,16 @@ local function kpRemoveNoclip()
         for _, d in ipairs(c:GetDescendants()) do
             if d:IsA("BasePart") then
                 local orig = d:GetAttribute("__KPNoclipOrig")
-                if orig ~= nil then
-                    d.CanCollide = orig
-                    d:SetAttribute("__KPNoclipOrig", nil)
-                end
+                if orig ~= nil then d.CanCollide = orig; d:SetAttribute("__KPNoclipOrig", nil) end
             end
         end
     end
     W.kp.noclipActive = false
 end
-
 local function kpKillFlingVel()
-    local c = LP.Character
-    local h = c and c:FindFirstChild("HumanoidRootPart")
+    local c = LP.Character; local h = c and c:FindFirstChild("HumanoidRootPart")
     if not h then return end
-    local bv = h:FindFirstChild("FlingVelocity")
-    if bv then bv:Destroy() end
+    local bv = h:FindFirstChild("FlingVelocity"); if bv then bv:Destroy() end
 end
 
 local _kpLastSafeLand = 0
@@ -924,13 +768,10 @@ local function kpSafeLand()
     end)
     local bv = Instance.new("BodyVelocity")
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.zero
-    bv.Parent = h
+    bv.Velocity = Vector3.zero; bv.Parent = h
     local bg = Instance.new("BodyGyro")
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bg.P = 3000; bg.D = 500
-    bg.CFrame = finalCF
-    bg.Parent = h
+    bg.P = 3000; bg.D = 500; bg.CFrame = finalCF; bg.Parent = h
     pcall(function() hum.PlatformStand = true end)
     task.wait(W.kp.SafeFlyDuration)
     if bv.Parent then bv:Destroy() end
@@ -944,8 +785,7 @@ local function kpSafeLand()
 end
 
 W.kpCleanup = function()
-    kpKillFlingVel()
-    kpRemoveNoclip()
+    kpKillFlingVel(); kpRemoveNoclip()
     local c = LP.Character
     local h = c and c:FindFirstChild("HumanoidRootPart")
     local hum = c and c:FindFirstChildOfClass("Humanoid")
@@ -957,8 +797,7 @@ W.kpCleanup = function()
         end)
     end
     kpSafeLand()
-    W.kp.spikePaused = false
-    W.kp.spikeStartTime = 0
+    W.kp.spikePaused = false; W.kp.spikeStartTime = 0
     kpRestoreCamera()
 end
 
@@ -969,7 +808,6 @@ local function kpMoveDir(tRoot, tHum)
     elseif tHum and tHum.MoveDirection.Magnitude > 0.1 then return tHum.MoveDirection.Unit end
     return Vector3.zero
 end
-
 local function kpUpdateDir(cur, new)
     if new.Magnitude < 0.1 then return cur end
     if not cur or cur.Magnitude < 0.1 then return new end
@@ -980,52 +818,32 @@ local function kpUpdateDir(cur, new)
 end
 
 W.kpStop = function()
-    W.kp.active = false
-    W.kp.moving = false
-    W.kp.dir = nil
-    W.kp.targetStartY = nil
-    W.kp.airFrames = 0
-    W.kp.spikePaused = false
-    W.kp.spikeStartTime = 0
-    W.kp.activeTarget = nil
-    kpStopSpectate()
-    W.kpCleanup()
+    W.kp.active=false; W.kp.moving=false; W.kp.dir=nil
+    W.kp.targetStartY=nil; W.kp.airFrames=0
+    W.kp.spikePaused=false; W.kp.spikeStartTime=0
+    W.kp.activeTarget=nil
+    kpStopSpectate(); W.kpCleanup()
 end
 
 W.kpStart = function(target)
     if not target or kpIsDead(target) then return end
-    W.kp.active = true
-    W.kp.moving = false
-    W.kp.dir = nil
-    W.kp.targetStartY = nil
-    W.kp.airFrames = 0
-    W.kp.spikePaused = false
-    W.kp.spikeStartTime = 0
-    kpSaveMyPosition()
-    kpApplyNoclip()
-    kpSpectate(target)
-
+    W.kp.active=true; W.kp.moving=false; W.kp.dir=nil
+    W.kp.targetStartY=nil; W.kp.airFrames=0
+    W.kp.spikePaused=false; W.kp.spikeStartTime=0
+    kpSaveMyPosition(); kpApplyNoclip(); kpSpectate(target)
     task.spawn(function()
         local stepDown = false
         while W.kp.active do
             local c = LP.Character
-            if not c then
-                LP.CharacterAdded:Wait()
-                task.wait(0.2)
-                c = LP.Character
-            end
+            if not c then LP.CharacterAdded:Wait(); task.wait(0.2); c = LP.Character end
             if c then
                 local hrp = c:FindFirstChild("HumanoidRootPart")
                 local hum = c:FindFirstChildOfClass("Humanoid")
                 if hrp and hum then
                     hum.PlatformStand = true
                     if hrp.Position.Y < W.kp.VoidY + 15 then
-                        if W.kp.myOriginalCFrame then
-                            pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
-                        end
-                        kpKillFlingVel()
-                        RunService.Heartbeat:Wait()
-                        continue
+                        if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
+                        kpKillFlingVel(); RunService.Heartbeat:Wait(); continue
                     end
                     for _, d in ipairs(c:GetDescendants()) do
                         if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
@@ -1040,8 +858,7 @@ W.kpStart = function(target)
                             hrp.AssemblyLinearVelocity = Vector3.zero
                             hrp.AssemblyAngularVelocity = Vector3.zero
                         end)
-                        W.kp.active = false
-                        break
+                        W.kp.active = false; break
                     end
                     local tRoot = kpGetRoot(t)
                     local tHum = kpGetHumanoid(t)
@@ -1050,38 +867,24 @@ W.kpStart = function(target)
                         local spd = tRoot.AssemblyLinearVelocity.Magnitude
                         if spd > W.kp.SpikeThreshold then
                             if not W.kp.spikePaused then
-                                W.kp.spikePaused = true
-                                W.kp.spikeStartTime = tick()
+                                W.kp.spikePaused = true; W.kp.spikeStartTime = tick()
                                 kpKillFlingVel()
                                 pcall(function()
                                     hrp.AssemblyLinearVelocity = Vector3.zero
                                     hrp.AssemblyAngularVelocity = Vector3.zero
                                 end)
                             end
-                            if W.kp.myOriginalCFrame then
-                                pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
-                            end
+                            if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
                             hum.PlatformStand = true
                             if not W.kp.spectating then kpSpectate(t) end
-                            RunService.Heartbeat:Wait()
-                            continue
-                        else
-                            W.kp.spikePaused = false
-                        end
-                        if spd > W.kp.FloatTopStopVelocity then
-                            W.kp.active = false
-                            break
-                        end
+                            RunService.Heartbeat:Wait(); continue
+                        else W.kp.spikePaused = false end
+                        if spd > W.kp.FloatTopStopVelocity then W.kp.active = false; break end
                         if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
                         if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
                             W.kp.airFrames = W.kp.airFrames + 1
-                        else
-                            W.kp.airFrames = 0
-                        end
-                        if W.kp.airFrames >= W.kp.AirMinFrames then
-                            W.kp.active = false
-                            break
-                        end
+                        else W.kp.airFrames = 0 end
+                        if W.kp.airFrames >= W.kp.AirMinFrames then W.kp.active = false; break end
                         stepDown = not stepDown
                         local yOff = stepDown and -W.kp.FloatTopStepDown or 0
                         local refPos = (tTorso and tTorso.Position) or tRoot.Position
@@ -1174,12 +977,8 @@ local function kpClickLoop()
                 hum.PlatformStand = true
                 if not t or kpIsDead(t) or kpIsGone(t) then W.kp.active = false end
                 if hrp.Position.Y < W.kp.VoidY + 15 then
-                    if W.kp.myOriginalCFrame then
-                        pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
-                    end
-                    kpKillFlingVel()
-                    RunService.Heartbeat:Wait()
-                    continue
+                    if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
+                    kpKillFlingVel(); RunService.Heartbeat:Wait(); continue
                 end
                 for _, d in ipairs(c:GetDescendants()) do
                     if d:IsA("BasePart") and d.Name ~= "__BigHitbox" then
@@ -1194,34 +993,24 @@ local function kpClickLoop()
                     local spd = tRoot.AssemblyLinearVelocity.Magnitude
                     if spd > W.kp.SpikeThreshold then
                         if not W.kp.spikePaused then
-                            W.kp.spikePaused = true
-                            W.kp.spikeStartTime = tick()
+                            W.kp.spikePaused = true; W.kp.spikeStartTime = tick()
                             kpKillFlingVel()
                             pcall(function()
                                 hrp.AssemblyLinearVelocity = Vector3.zero
                                 hrp.AssemblyAngularVelocity = Vector3.zero
                             end)
                         end
-                        if W.kp.myOriginalCFrame then
-                            pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end)
-                        end
+                        if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
                         if not W.kp.spectating then kpSpectate(t) end
-                        RunService.Heartbeat:Wait()
-                        continue
-                    else
-                        W.kp.spikePaused = false
-                    end
-                    if spd > W.kp.FloatTopStopVelocity then
-                        W.kp.active = false
+                        RunService.Heartbeat:Wait(); continue
+                    else W.kp.spikePaused = false end
+                    if spd > W.kp.FloatTopStopVelocity then W.kp.active = false
                     else
                         if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
                         if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
                             W.kp.airFrames = W.kp.airFrames + 1
-                        else
-                            W.kp.airFrames = 0
-                        end
-                        if W.kp.airFrames >= W.kp.AirMinFrames then
-                            W.kp.active = false
+                        else W.kp.airFrames = 0 end
+                        if W.kp.airFrames >= W.kp.AirMinFrames then W.kp.active = false
                         else
                             local stepDown = (tick() * 10) % 2 < 1
                             local yOff = stepDown and -W.kp.FloatTopStepDown or 0
@@ -1269,7 +1058,7 @@ local function kpClickLoop()
     end
 end
 
--- ✅ TOOL MOBILE-FRIENDLY
+-- ✅ TOOL IDÊNTICA À DO FLING (que funciona)
 W.kpGiveTool = function()
     if W.kpHasTool() then return false end
     W.kpRemoveTool()
@@ -1277,38 +1066,15 @@ W.kpGiveTool = function()
     tool.Name = "ClickFloatTopTool"
     tool.RequiresHandle = false
     tool.CanBeDropped = false
-    tool.ToolTip = "Clique/toca num player — Float Top"
+    tool.ToolTip = "Clique num player"
 
-    local function tryTarget()
-        local m = LP:GetMouse()
-        if not m then return nil end
-        local target = m.Target
-        if target then
-            local model = target:FindFirstAncestorOfClass("Model")
-            if model then
-                local plr = Players:GetPlayerFromCharacter(model)
-                if plr and plr ~= LP then return plr end
-            end
-        end
-        local cam = workspace.CurrentCamera
-        local ray = cam:ViewportPointToRay(m.X, m.Y)
-        local rp = RaycastParams.new()
-        rp.FilterDescendantsInstances = {LP.Character}
-        rp.FilterType = Enum.RaycastFilterType.Exclude
-        local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, rp)
-        if result and result.Instance then
-            local model = result.Instance:FindFirstAncestorOfClass("Model")
-            if model then
-                local plr = Players:GetPlayerFromCharacter(model)
-                if plr and plr ~= LP then return plr end
-            end
-        end
-        return nil
-    end
-
-    local function applyTarget()
-        local plr = tryTarget()
-        if plr then
+    tool.Activated:Connect(function()
+        local mouse = LP:GetMouse()
+        if not mouse or not mouse.Target then return end
+        local model = mouse.Target:FindFirstAncestorOfClass("Model")
+        if not model then return end
+        local plr = Players:GetPlayerFromCharacter(model)
+        if plr and plr ~= LP then
             if W.kp.active and W.kp.activeTarget == plr then
                 W.kpStop()
             else
@@ -1316,19 +1082,6 @@ W.kpGiveTool = function()
                 W.kp.activeTarget = plr
                 W.kpStart(plr)
             end
-        end
-    end
-
-    tool.Activated:Connect(applyTarget)
-
-    tool.Equipped:Connect(function(mouse)
-        if mouse then
-            mouse.Button1Down:Connect(function()
-                task.wait(0.05)
-                if not W.kp.active then
-                    applyTarget()
-                end
-            end)
         end
     end)
 
@@ -1342,22 +1095,10 @@ W.kpGiveTool = function()
     local bp = LP:FindFirstChildOfClass("Backpack")
     tool.Parent = bp or LP.Character or LP
 
-    task.spawn(function()
-        task.wait(0.1)
-        local char = LP.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum and tool.Parent ~= char then
-            pcall(function() hum:EquipTool(tool) end)
-        end
-    end)
-
     W.kp.toolObj = tool
     if not W.kpClickLoopRunning then
         W.kpClickLoopRunning = true
-        task.spawn(function()
-            kpClickLoop()
-            W.kpClickLoopRunning = false
-        end)
+        task.spawn(function() kpClickLoop(); W.kpClickLoopRunning = false end)
     end
     return true
 end
@@ -1396,17 +1137,15 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 MainFrame.BackgroundTransparency = 1
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = false
+MainFrame.Draggable = true
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 W.MainFrame = MainFrame
 
 local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 12); mc.Parent = MainFrame
-
 local Stroke = Instance.new("UIStroke")
 Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(0, 200, 255); Stroke.Transparency = 1
 Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; Stroke.Parent = MainFrame
-
 local sg = Instance.new("UIGradient")
 sg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
@@ -1414,7 +1153,6 @@ sg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)),
 })
 sg.Parent = Stroke
-
 local bg = Instance.new("UIGradient")
 bg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 35)),
@@ -1427,7 +1165,6 @@ Title.Size = UDim2.new(1, -80, 0, 22); Title.Position = UDim2.new(0, 10, 0, 10)
 Title.BackgroundTransparency = 1; Title.Text = "By: @willnzx.mt + miguelestrellaaa"
 Title.TextColor3 = Color3.fromRGB(0, 230, 255); Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = MainFrame
-
 local tg = Instance.new("UIGradient")
 tg.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
@@ -1453,15 +1190,13 @@ local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -30, 0, 28); TabBar.Position = UDim2.new(0, 15, 0, 36)
 TabBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 TabBar.BackgroundTransparency = 0.5
-TabBar.BorderSizePixel = 0
-TabBar.Parent = MainFrame
+TabBar.BorderSizePixel = 0; TabBar.Parent = MainFrame
 local tbc = Instance.new("UICorner"); tbc.CornerRadius = UDim.new(0, 8); tbc.Parent = TabBar
 local tbs = Instance.new("UIStroke"); tbs.Thickness = 1; tbs.Color = Color3.fromRGB(0, 200, 255); tbs.Transparency = 0.5; tbs.Parent = TabBar
 
 local TabContainer = Instance.new("Frame")
 TabContainer.Size = UDim2.new(1, 0, 1, 0)
-TabContainer.BackgroundTransparency = 1
-TabContainer.Parent = TabBar
+TabContainer.BackgroundTransparency = 1; TabContainer.Parent = TabBar
 
 local tabButtons = {}
 local tabKeys = {"tab_atq", "tab_bola", "tab_outros"}
@@ -1471,12 +1206,10 @@ for i, key in ipairs(tabKeys) do
     tab.Position = UDim2.new((i-1)/3, 1.5, 0, 4)
     tab.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     tab.BackgroundTransparency = 0.5
-    tab.Text = W.t(key)
-    tab.TextSize = 12
+    tab.Text = W.t(key); tab.TextSize = 12
     tab.Font = Enum.Font.GothamBold
     tab.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tab.AutoButtonColor = false
-    tab.Parent = TabContainer
+    tab.AutoButtonColor = false; tab.Parent = TabContainer
     local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 6); c.Parent = tab
     local s = Instance.new("UIStroke"); s.Thickness = 1; s.Color = Color3.fromRGB(80, 80, 80); s.Transparency = 0.5; s.Parent = tab
     tabButtons[i] = tab
@@ -1486,8 +1219,7 @@ local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -30, 1, -100)
 ContentArea.Position = UDim2.new(0, 15, 0, 72)
 ContentArea.BackgroundTransparency = 1
-ContentArea.ClipsDescendants = true
-ContentArea.Parent = MainFrame
+ContentArea.ClipsDescendants = true; ContentArea.Parent = MainFrame
 
 local Tab1 = Instance.new("ScrollingFrame")
 Tab1.Size = UDim2.new(1, 0, 1, 0)
@@ -1507,8 +1239,7 @@ Tab2.ScrollBarImageTransparency = 0.3
 Tab2.CanvasSize = UDim2.new(0, 0, 0, 320)
 Tab2.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab2.ElasticBehavior = Enum.ElasticBehavior.Never
-Tab2.Visible = false
-Tab2.Parent = ContentArea
+Tab2.Visible = false; Tab2.Parent = ContentArea
 
 local Tab4 = Instance.new("ScrollingFrame")
 Tab4.Size = UDim2.new(1, 0, 1, 0)
@@ -1518,8 +1249,7 @@ Tab4.ScrollBarImageTransparency = 0.3
 Tab4.CanvasSize = UDim2.new(0, 0, 0, 480)
 Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
-Tab4.Visible = false
-Tab4.Parent = ContentArea
+Tab4.Visible = false; Tab4.Parent = ContentArea
 
 local function makeButton(parent, text, y, color1, color2, name)
     local btn = Instance.new("TextButton")
@@ -1566,14 +1296,18 @@ local bS = Instance.new("UIStroke"); bS.Thickness = 1; bS.Color = Color3.fromRGB
 
 local function updGoals()
     if W.selectedGoalIndex == 1 then
-        BtnGoalA.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalA.BackgroundTransparency = 0.1; BtnGoalA.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalA.TextStrokeTransparency = 1
+        BtnGoalA.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalA.BackgroundTransparency = 0.1
+        BtnGoalA.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalA.TextStrokeTransparency = 1
         aS.Color = Color3.fromRGB(200, 240, 255); aS.Transparency = 0
-        BtnGoalB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalB.BackgroundTransparency = 0.4; BtnGoalB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalB.TextStrokeTransparency = 0.4
+        BtnGoalB.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalB.BackgroundTransparency = 0.4
+        BtnGoalB.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalB.TextStrokeTransparency = 0.4
         bS.Color = Color3.fromRGB(80, 80, 80); bS.Transparency = 0.5
     else
-        BtnGoalB.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalB.BackgroundTransparency = 0.1; BtnGoalB.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalB.TextStrokeTransparency = 1
+        BtnGoalB.BackgroundColor3 = Color3.fromRGB(100, 200, 255); BtnGoalB.BackgroundTransparency = 0.1
+        BtnGoalB.TextColor3 = Color3.fromRGB(10, 30, 60); BtnGoalB.TextStrokeTransparency = 1
         bS.Color = Color3.fromRGB(200, 240, 255); bS.Transparency = 0
-        BtnGoalA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalA.BackgroundTransparency = 0.4; BtnGoalA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalA.TextStrokeTransparency = 0.4
+        BtnGoalA.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BtnGoalA.BackgroundTransparency = 0.4
+        BtnGoalA.TextColor3 = Color3.fromRGB(255, 255, 255); BtnGoalA.TextStrokeTransparency = 0.4
         aS.Color = Color3.fromRGB(80, 80, 80); aS.Transparency = 0.5
     end
 end
@@ -1636,9 +1370,7 @@ end
 
 local drag = false
 Knob.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        drag = true
-    end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = true end
 end)
 UIS.InputChanged:Connect(function(i)
     if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
@@ -1649,9 +1381,7 @@ UIS.InputChanged:Connect(function(i)
     end
 end)
 UIS.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        drag = false
-    end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
 end)
 for i, d in ipairs(dotButtons) do
     W.addTap(d, function() Knob.Position = UDim2.new((i-1)/5, -11, 0.5, -11); W.updDots(i) end)
@@ -1672,42 +1402,33 @@ local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.from
 local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(255, 220, 0), Color3.fromRGB(200, 120, 0), "PredictKickBtn")
 
 local KPTitle = Instance.new("TextLabel")
-KPTitle.Size = UDim2.new(1, -4, 0, 18)
-KPTitle.Position = UDim2.new(0, 2, 0, 172)
+KPTitle.Size = UDim2.new(1, -4, 0, 18); KPTitle.Position = UDim2.new(0, 2, 0, 172)
 KPTitle.BackgroundTransparency = 1
 KPTitle.Text = "🎯 KICK PLAYER (Float Top)"
-KPTitle.TextColor3 = Color3.fromRGB(255, 180, 120)
-KPTitle.TextSize = 12
+KPTitle.TextColor3 = Color3.fromRGB(255, 180, 120); KPTitle.TextSize = 12
 KPTitle.Font = Enum.Font.GothamBold
 KPTitle.TextXAlignment = Enum.TextXAlignment.Left
 KPTitle.Parent = Tab4
 
 local KickNameBox = Instance.new("TextBox")
 KickNameBox.Name = "KickNameBox"
-KickNameBox.Size = UDim2.new(1, -4, 0, 32)
-KickNameBox.Position = UDim2.new(0, 2, 0, 194)
-KickNameBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-KickNameBox.BackgroundTransparency = 0.45
+KickNameBox.Size = UDim2.new(1, -4, 0, 32); KickNameBox.Position = UDim2.new(0, 2, 0, 194)
+KickNameBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0); KickNameBox.BackgroundTransparency = 0.45
 KickNameBox.PlaceholderText = "Digite o nome (qualquer letra)..."
 KickNameBox.PlaceholderColor3 = Color3.fromRGB(120, 130, 160)
-KickNameBox.Text = ""
-KickNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-KickNameBox.TextSize = 13
-KickNameBox.Font = Enum.Font.Gotham
-KickNameBox.ClearTextOnFocus = false
-KickNameBox.Parent = Tab4
+KickNameBox.Text = ""; KickNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+KickNameBox.TextSize = 13; KickNameBox.Font = Enum.Font.Gotham
+KickNameBox.ClearTextOnFocus = false; KickNameBox.Parent = Tab4
 Instance.new("UICorner", KickNameBox).CornerRadius = UDim.new(0, 8)
 local KNBS = Instance.new("UIStroke", KickNameBox)
 KNBS.Thickness = 1.2; KNBS.Color = Color3.fromRGB(255, 100, 0); KNBS.Transparency = 0.3
 
 local KickStatus = Instance.new("TextLabel")
 KickStatus.Name = "KickStatus"
-KickStatus.Size = UDim2.new(1, -4, 0, 16)
-KickStatus.Position = UDim2.new(0, 2, 0, 230)
+KickStatus.Size = UDim2.new(1, -4, 0, 16); KickStatus.Position = UDim2.new(0, 2, 0, 230)
 KickStatus.BackgroundTransparency = 1
 KickStatus.Text = "Status: aguardando..."
-KickStatus.TextColor3 = Color3.fromRGB(120, 220, 255)
-KickStatus.TextSize = 11
+KickStatus.TextColor3 = Color3.fromRGB(120, 220, 255); KickStatus.TextSize = 11
 KickStatus.Font = Enum.Font.Gotham
 KickStatus.TextXAlignment = Enum.TextXAlignment.Left
 KickStatus.Parent = Tab4
@@ -1725,29 +1446,17 @@ end
 
 KickNameBox:GetPropertyChangedSignal("Text"):Connect(function()
     local q = KickNameBox.Text
-    if q == "" then
-        updateKickStatus("aguardando...", Color3.fromRGB(120, 220, 255))
-        return
-    end
+    if q == "" then updateKickStatus("aguardando...", Color3.fromRGB(120, 220, 255)); return end
     local p = W.kpFindPlayer(q)
-    if p then
-        updateKickStatus("alvo: " .. p.Name, Color3.fromRGB(100, 255, 150))
-    else
-        updateKickStatus("nenhum jogador encontrado", Color3.fromRGB(255, 120, 120))
-    end
+    if p then updateKickStatus("alvo: " .. p.Name, Color3.fromRGB(100, 255, 150))
+    else updateKickStatus("nenhum jogador encontrado", Color3.fromRGB(255, 120, 120)) end
 end)
 
 W.addTap(KickPlayerBtn, function()
     local q = KickNameBox.Text
-    if not q or q == "" then
-        updateKickStatus("digite um nome primeiro!", Color3.fromRGB(255, 120, 120))
-        return
-    end
+    if not q or q == "" then updateKickStatus("digite um nome primeiro!", Color3.fromRGB(255, 120, 120)); return end
     local p = W.kpFindPlayer(q)
-    if not p then
-        updateKickStatus("jogador '" .. q .. "' nao encontrado", Color3.fromRGB(255, 120, 120))
-        return
-    end
+    if not p then updateKickStatus("jogador '" .. q .. "' nao encontrado", Color3.fromRGB(255, 120, 120)); return end
     if W.stopAll then W.stopAll() end
     if W.kp.active then W.kpStop() end
     task.wait(0.1)
@@ -1763,11 +1472,8 @@ W.addTap(KickPlayerToolBtn, function()
         return
     end
     local ok = W.kpGiveTool()
-    if ok then
-        updateKickStatus("Tool recebida! Equipe e clique num player", Color3.fromRGB(120, 255, 150))
-    else
-        updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120))
-    end
+    if ok then updateKickStatus("Tool recebida! Equipe e clique num player", Color3.fromRGB(120, 255, 150))
+    else updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120)) end
 end)
 
 W.langRefresh = function()
@@ -1777,37 +1483,21 @@ W.langRefresh = function()
     BtnGoalA.Text = W.t("goal_a")
     BtnGoalB.Text = W.t("goal_b")
     SL.Text = W.t("multiplier") .. W.boostMultiplier .. "x"
-
     local function upd(btn, fnKey, extra)
         local active = btn:GetAttribute("IsActive")
         btn.Text = W.btn(fnKey, active, extra)
     end
-
-    upd(Button, "auto_gol")
-    upd(TpGoalBtn, "tp_goal")
-    upd(TouchGoalBtn, "touch_goal")
+    upd(Button, "auto_gol"); upd(TpGoalBtn, "tp_goal"); upd(TouchGoalBtn, "touch_goal")
     upd(SkyBtn, "sky")
     upd(BoostAllBtn, "boost", (BoostAllBtn:GetAttribute("IsActive") and (W.boostMultiplier .. "x") or nil))
-    upd(BringBtn, "bring")
-    upd(LoopBringBtn, "loop_bring")
-    upd(MoveBallBtn, "move")
-    upd(OrbitBallBtn, "orbit")
-    upd(FreezeAllBtn, "freeze")
-    upd(BugBallBtn, "bug")
-    upd(FarmCoinsBtn, "farm")
-    upd(PredictBallBtn, "predict")
-    upd(PredictKickBtn, "predict_kick")
+    upd(BringBtn, "bring"); upd(LoopBringBtn, "loop_bring"); upd(MoveBallBtn, "move")
+    upd(OrbitBallBtn, "orbit"); upd(FreezeAllBtn, "freeze"); upd(BugBallBtn, "bug")
+    upd(FarmCoinsBtn, "farm"); upd(PredictBallBtn, "predict"); upd(PredictKickBtn, "predict_kick")
     TrackerGABtn.Text = W.fnNames.tracker
-
     if DefendGoalBtn:GetAttribute("IsActive") then
         DefendGoalBtn.Text = W.btn("defend", true, W.t("goal_" .. string.lower(W.defendSelectedGoal)))
-    else
-        DefendGoalBtn.Text = W.btn("defend", false)
-    end
-
-    if W.onLangChange then
-        for _, cb in ipairs(W.onLangChange) do pcall(cb) end
-    end
+    else DefendGoalBtn.Text = W.btn("defend", false) end
+    if W.onLangChange then for _, cb in ipairs(W.onLangChange) do pcall(cb) end end
 end
 
 local currentTab = 1
@@ -1832,9 +1522,7 @@ W.switchTab = function(index)
         end
     end
 end
-for i, t in ipairs(tabButtons) do
-    W.addTap(t, function() W.switchTab(i) end)
-end
+for i, t in ipairs(tabButtons) do W.addTap(t, function() W.switchTab(i) end) end
 W.switchTab(1)
 
 W.resetVis = function()
@@ -1857,26 +1545,25 @@ end
 
 W.stopAll = function()
     pcall(function() if W.kpStop then W.kpStop() end end)
-    W.states.isActive = false; W.states.isBringing = false; W.states.isLoopBringing = false
-    W.states.isFreezing = false; W.states.isBoostingAll = false
-    W.states.isSkying = false; W.states.isTouchGoal = false; W.states.isMoveBall = false
-    W.states.isOrbitBall = false; W.states.isBugBall = false
-    W.states.isTpGoal = false; W.states.isDefending = false
-    W.states.isFarming = false
-    if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
-    if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
-    if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
-    if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
-    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread = nil end
-    if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
-    if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
-    if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
-    if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
-    if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
-    if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
-    if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
-    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread = nil end
-    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
+    W.states.isActive=false; W.states.isBringing=false; W.states.isLoopBringing=false
+    W.states.isFreezing=false; W.states.isBoostingAll=false
+    W.states.isSkying=false; W.states.isTouchGoal=false; W.states.isMoveBall=false
+    W.states.isOrbitBall=false; W.states.isBugBall=false
+    W.states.isTpGoal=false; W.states.isDefending=false; W.states.isFarming=false
+    if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread=nil end
+    if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread=nil end
+    if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread=nil end
+    if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread=nil end
+    if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread=nil end
+    if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread=nil end
+    if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread=nil end
+    if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread=nil end
+    if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread=nil end
+    if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread=nil end
+    if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
+    if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread=nil end
+    if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread=nil end
+    if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread=nil end
     pcall(function() W.stopPredictAll() end)
     pcall(function()
         local o = CoreGui:FindFirstChild("ArrowControlGUI")
@@ -1890,7 +1577,7 @@ end
 W.addTap(Button, function()
     if W.states.isActive then
         W.states.isActive = false; W.setBtnInactive(Button, W.btn("auto_gol", false))
-        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
+        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread=nil end
     else
         W.stopAll(); W.states.isActive = true
         W.setBtnActive(Button, W.btn("auto_gol", true)); W.startAutoGoal()
@@ -1900,9 +1587,8 @@ end)
 W.addTap(TpGoalBtn, function()
     if W.states.isTpGoal then
         W.states.isTpGoal = false
-        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
-        W.stopSpectating()
-        W.setBtnInactive(TpGoalBtn, W.btn("tp_goal", false))
+        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread=nil end
+        W.stopSpectating(); W.setBtnInactive(TpGoalBtn, W.btn("tp_goal", false))
     else
         W.stopAll(); W.states.isTpGoal = true
         W.setBtnActive(TpGoalBtn, W.btn("tp_goal", true))
@@ -1913,7 +1599,7 @@ end)
 W.addTap(BringBtn, function()
     if W.states.isBringing then
         W.states.isBringing = false
-        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
+        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread=nil end
         W.setBtnInactive(BringBtn, W.btn("bring", false))
     else
         W.stopAll(); W.states.isBringing = true
@@ -1924,7 +1610,7 @@ end)
 W.addTap(LoopBringBtn, function()
     if W.states.isLoopBringing then
         W.states.isLoopBringing = false
-        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
+        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread=nil end
         W.setBtnInactive(LoopBringBtn, W.btn("loop_bring", false))
     else
         W.stopAll(); W.states.isLoopBringing = true
@@ -1933,17 +1619,14 @@ W.addTap(LoopBringBtn, function()
 end)
 
 W.addTap(FreezeAllBtn, function()
-    if W.states.isFreezing then
-        W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, W.btn("freeze", false))
-    else
-        W.stopAll(); W.setBtnActive(FreezeAllBtn, W.btn("freeze", true)); W.startFreeze()
-    end
+    if W.states.isFreezing then W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, W.btn("freeze", false))
+    else W.stopAll(); W.setBtnActive(FreezeAllBtn, W.btn("freeze", true)); W.startFreeze() end
 end)
 
 W.addTap(BoostAllBtn, function()
     if W.states.isBoostingAll then
         W.states.isBoostingAll = false
-        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread=nil end
         W.setBtnInactive(BoostAllBtn, W.btn("boost", false))
     else
         W.stopAll(); W.states.isBoostingAll = true
@@ -1954,7 +1637,7 @@ end)
 W.addTap(SkyBtn, function()
     if W.states.isSkying then
         W.states.isSkying = false
-        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread=nil end
         W.setBtnInactive(SkyBtn, W.btn("sky", false))
     else
         W.stopAll(); W.states.isSkying = true
@@ -1965,7 +1648,7 @@ end)
 W.addTap(TouchGoalBtn, function()
     if W.states.isTouchGoal then
         W.states.isTouchGoal = false
-        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread=nil end
         W.setBtnInactive(TouchGoalBtn, W.btn("touch_goal", false))
     else
         W.stopAll(); W.states.isTouchGoal = true
@@ -1976,7 +1659,7 @@ end)
 W.addTap(MoveBallBtn, function()
     if W.states.isMoveBall then
         W.states.isMoveBall = false
-        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread=nil end
         W.setBtnInactive(MoveBallBtn, W.btn("move", false))
     else
         W.stopAll(); W.states.isMoveBall = true
@@ -1987,7 +1670,7 @@ end)
 W.addTap(OrbitBallBtn, function()
     if W.states.isOrbitBall then
         W.states.isOrbitBall = false
-        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread=nil end
         W.setBtnInactive(OrbitBallBtn, W.btn("orbit", false))
     else
         W.stopAll(); W.states.isOrbitBall = true
@@ -1998,8 +1681,8 @@ end)
 W.addTap(BugBallBtn, function()
     if W.states.isBugBall then
         W.states.isBugBall = false
-        if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread = nil end
-        if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread = nil end
+        if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
+        if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread=nil end
         W.setBtnInactive(BugBallBtn, W.btn("bug", false))
     else
         W.stopAll()
@@ -2009,8 +1692,7 @@ W.addTap(BugBallBtn, function()
 end)
 
 W.addTap(DefendGoalBtn, function()
-    if W.states.isDefending then
-        W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
+    if W.states.isDefending then W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
     else
         W.setBtnActive(DefendGoalBtn, W.btn("defend", true, W.t("goal_" .. string.lower(W.defendSelectedGoal))))
         W.states.isDefending = true; W.startDefend()
@@ -2018,120 +1700,75 @@ W.addTap(DefendGoalBtn, function()
 end)
 
 W.addTap(FarmCoinsBtn, function()
-    if W.states.isFarming then
-        W.stopFarmCoins()
-        W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
-    else
-        W.startFarmCoins()
-        W.setBtnActive(FarmCoinsBtn, W.btn("farm", true))
-    end
+    if W.states.isFarming then W.stopFarmCoins(); W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
+    else W.startFarmCoins(); W.setBtnActive(FarmCoinsBtn, W.btn("farm", true)) end
 end)
 
 W.addTap(PredictBallBtn, function()
-    if W.states.isPredict then
-        W.stopPredictBall()
-        W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
-    else
-        W.startPredictBall()
-        W.setBtnActive(PredictBallBtn, W.btn("predict", true))
-    end
+    if W.states.isPredict then W.stopPredictBall(); W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
+    else W.startPredictBall(); W.setBtnActive(PredictBallBtn, W.btn("predict", true)) end
 end)
 
 W.addTap(PredictKickBtn, function()
-    if W.states.isPredictKick then
-        W.stopPredictKick()
-        W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
-    else
-        W.startPredictKick()
-        W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true))
-    end
+    if W.states.isPredictKick then W.stopPredictKick(); W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
+    else W.startPredictKick(); W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true)) end
 end)
 
 W.addTap(TrackerGABtn, function()
     local savedParent = ScreenGui.Parent or CoreGui
     pcall(function() ScreenGui.Parent = LP:WaitForChild("PlayerGui") end)
-    local ok, err = pcall(function()
-        local code = game:HttpGet(W.urls.trackerga)
-        loadstring(code)()
-    end)
+    local ok, err = pcall(function() local code = game:HttpGet(W.urls.trackerga); loadstring(code)() end)
     if not ok then warn("[Willnzx] Erro no Tracker G-A: " .. tostring(err)) end
     task.wait(0.3)
-    if ScreenGui and not ScreenGui.Parent then
-        pcall(function() ScreenGui.Parent = savedParent end)
-    end
+    if ScreenGui and not ScreenGui.Parent then pcall(function() ScreenGui.Parent = savedParent end) end
 end)
 
 local LangOverlay = Instance.new("Frame")
 LangOverlay.Name = "LangOverlay"
-LangOverlay.Size = UDim2.new(1, 0, 1, 0)
-LangOverlay.Position = UDim2.new(0, 0, 0, 0)
+LangOverlay.Size = UDim2.new(1, 0, 1, 0); LangOverlay.Position = UDim2.new(0, 0, 0, 0)
 LangOverlay.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
 LangOverlay.BackgroundTransparency = 0.1
-LangOverlay.BorderSizePixel = 0
-LangOverlay.ZIndex = 100
-LangOverlay.Active = true
-LangOverlay.Visible = false
-LangOverlay.Parent = MainFrame
-
+LangOverlay.BorderSizePixel = 0; LangOverlay.ZIndex = 100
+LangOverlay.Active = true; LangOverlay.Visible = false; LangOverlay.Parent = MainFrame
 local LOc = Instance.new("UICorner"); LOc.CornerRadius = UDim.new(0, 12); LOc.Parent = LangOverlay
 
 local LTitle = Instance.new("TextLabel")
-LTitle.Size = UDim2.new(1, -20, 0, 26)
-LTitle.Position = UDim2.new(0, 10, 0, 50)
+LTitle.Size = UDim2.new(1, -20, 0, 26); LTitle.Position = UDim2.new(0, 10, 0, 50)
 LTitle.BackgroundTransparency = 1
 LTitle.Text = "🌐 Escolha o idioma / Choose your language"
-LTitle.TextColor3 = Color3.fromRGB(220, 240, 255)
-LTitle.TextSize = 14
-LTitle.Font = Enum.Font.GothamBold
-LTitle.ZIndex = 101
-LTitle.Parent = LangOverlay
+LTitle.TextColor3 = Color3.fromRGB(220, 240, 255); LTitle.TextSize = 14
+LTitle.Font = Enum.Font.GothamBold; LTitle.ZIndex = 101; LTitle.Parent = LangOverlay
 
 local LSub = Instance.new("TextLabel")
-LSub.Size = UDim2.new(1, -20, 0, 18)
-LSub.Position = UDim2.new(0, 10, 0, 78)
+LSub.Size = UDim2.new(1, -20, 0, 18); LSub.Position = UDim2.new(0, 10, 0, 78)
 LSub.BackgroundTransparency = 1
 LSub.Text = "Troque depois com ;lang pt / ;lang en"
-LSub.TextColor3 = Color3.fromRGB(150, 180, 200)
-LSub.TextSize = 10
-LSub.Font = Enum.Font.Gotham
-LSub.ZIndex = 101
-LSub.Parent = LangOverlay
+LSub.TextColor3 = Color3.fromRGB(150, 180, 200); LSub.TextSize = 10
+LSub.Font = Enum.Font.Gotham; LSub.ZIndex = 101; LSub.Parent = LangOverlay
 
 local PtBtn = Instance.new("TextButton")
-PtBtn.Size = UDim2.new(1, -40, 0, 38)
-PtBtn.Position = UDim2.new(0, 20, 0, 120)
+PtBtn.Size = UDim2.new(1, -40, 0, 38); PtBtn.Position = UDim2.new(0, 20, 0, 120)
 PtBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-PtBtn.Text = "🇧🇷  Português (BR)"
-PtBtn.TextSize = 14
-PtBtn.Font = Enum.Font.GothamBold
-PtBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PtBtn.AutoButtonColor = false
-PtBtn.ZIndex = 101
-PtBtn.Parent = LangOverlay
+PtBtn.Text = "🇧🇷  Português (BR)"; PtBtn.TextSize = 14
+PtBtn.Font = Enum.Font.GothamBold; PtBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PtBtn.AutoButtonColor = false; PtBtn.ZIndex = 101; PtBtn.Parent = LangOverlay
 local pbc = Instance.new("UICorner"); pbc.CornerRadius = UDim.new(0, 8); pbc.Parent = PtBtn
 local pbs = Instance.new("UIStroke"); pbs.Thickness = 1.5; pbs.Color = Color3.fromRGB(0, 255, 150); pbs.Transparency = 0.4; pbs.Parent = PtBtn
 
 local EnBtn = Instance.new("TextButton")
-EnBtn.Size = UDim2.new(1, -40, 0, 38)
-EnBtn.Position = UDim2.new(0, 20, 0, 168)
+EnBtn.Size = UDim2.new(1, -40, 0, 38); EnBtn.Position = UDim2.new(0, 20, 0, 168)
 EnBtn.BackgroundColor3 = Color3.fromRGB(0, 90, 170)
-EnBtn.Text = "🇺🇸  English"
-EnBtn.TextSize = 14
-EnBtn.Font = Enum.Font.GothamBold
-EnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-EnBtn.AutoButtonColor = false
-EnBtn.ZIndex = 101
-EnBtn.Parent = LangOverlay
+EnBtn.Text = "🇺🇸  English"; EnBtn.TextSize = 14
+EnBtn.Font = Enum.Font.GothamBold; EnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+EnBtn.AutoButtonColor = false; EnBtn.ZIndex = 101; EnBtn.Parent = LangOverlay
 local ebc = Instance.new("UICorner"); ebc.CornerRadius = UDim.new(0, 8); ebc.Parent = EnBtn
 local ebs = Instance.new("UIStroke"); ebs.Thickness = 1.5; ebs.Color = Color3.fromRGB(0, 200, 255); ebs.Transparency = 0.4; ebs.Parent = EnBtn
 
 local langBlur = Instance.new("BlurEffect")
-langBlur.Size = 12
-langBlur.Parent = Lighting
+langBlur.Size = 12; langBlur.Parent = Lighting
 
 local function finishLang(choice)
-    W.lang = choice
-    W.langRefresh()
+    W.lang = choice; W.langRefresh()
     TS:Create(LangOverlay, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     task.wait(0.3)
     if langBlur and langBlur.Parent then langBlur:Destroy() end
@@ -2142,83 +1779,57 @@ W.addTap(PtBtn, function() finishLang("pt") end)
 W.addTap(EnBtn, function() finishLang("en") end)
 
 task.delay(0.65, function()
-    if LangOverlay and LangOverlay.Parent and not W.lang then
-        LangOverlay.Visible = true
-    end
+    if LangOverlay and LangOverlay.Parent and not W.lang then LangOverlay.Visible = true end
 end)
 
 local ConfirmOverlay = Instance.new("Frame")
 ConfirmOverlay.Name = "ConfirmOverlay"
-ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0)
-ConfirmOverlay.Position = UDim2.new(0, 0, 0, 0)
+ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0); ConfirmOverlay.Position = UDim2.new(0, 0, 0, 0)
 ConfirmOverlay.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
 ConfirmOverlay.BackgroundTransparency = 0.1
-ConfirmOverlay.BorderSizePixel = 0
-ConfirmOverlay.ZIndex = 200
-ConfirmOverlay.Active = true
-ConfirmOverlay.Visible = false
-ConfirmOverlay.Parent = MainFrame
-
+ConfirmOverlay.BorderSizePixel = 0; ConfirmOverlay.ZIndex = 200
+ConfirmOverlay.Active = true; ConfirmOverlay.Visible = false; ConfirmOverlay.Parent = MainFrame
 local COc = Instance.new("UICorner"); COc.CornerRadius = UDim.new(0, 12); COc.Parent = ConfirmOverlay
 
 local COTitle = Instance.new("TextLabel")
-COTitle.Size = UDim2.new(1, -20, 0, 30)
-COTitle.Position = UDim2.new(0, 10, 0, 60)
+COTitle.Size = UDim2.new(1, -20, 0, 30); COTitle.Position = UDim2.new(0, 10, 0, 60)
 COTitle.BackgroundTransparency = 1
 COTitle.Text = "❓ Você realmente quer fechar a GUI?"
-COTitle.TextColor3 = Color3.fromRGB(220, 240, 255)
-COTitle.TextSize = 15
-COTitle.Font = Enum.Font.GothamBold
-COTitle.TextWrapped = true
-COTitle.ZIndex = 201
-COTitle.Parent = ConfirmOverlay
+COTitle.TextColor3 = Color3.fromRGB(220, 240, 255); COTitle.TextSize = 15
+COTitle.Font = Enum.Font.GothamBold; COTitle.TextWrapped = true
+COTitle.ZIndex = 201; COTitle.Parent = ConfirmOverlay
 
 local COSub = Instance.new("TextLabel")
-COSub.Size = UDim2.new(1, -20, 0, 18)
-COSub.Position = UDim2.new(0, 10, 0, 92)
+COSub.Size = UDim2.new(1, -20, 0, 18); COSub.Position = UDim2.new(0, 10, 0, 92)
 COSub.BackgroundTransparency = 1
 COSub.Text = "Todas as funções serão desligadas"
-COSub.TextColor3 = Color3.fromRGB(150, 180, 200)
-COSub.TextSize = 11
-COSub.Font = Enum.Font.Gotham
-COSub.ZIndex = 201
-COSub.Parent = ConfirmOverlay
+COSub.TextColor3 = Color3.fromRGB(150, 180, 200); COSub.TextSize = 11
+COSub.Font = Enum.Font.Gotham; COSub.ZIndex = 201; COSub.Parent = ConfirmOverlay
 
 local COBlur = nil
 
 local SimBtn = Instance.new("TextButton")
-SimBtn.Size = UDim2.new(0.5, -25, 0, 42)
-SimBtn.Position = UDim2.new(0, 20, 0, 140)
+SimBtn.Size = UDim2.new(0.5, -25, 0, 42); SimBtn.Position = UDim2.new(0, 20, 0, 140)
 SimBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 40)
-SimBtn.Text = "✔  SIM"
-SimBtn.TextSize = 14
-SimBtn.Font = Enum.Font.GothamBold
-SimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SimBtn.AutoButtonColor = false
-SimBtn.ZIndex = 201
-SimBtn.Parent = ConfirmOverlay
+SimBtn.Text = "✔  SIM"; SimBtn.TextSize = 14
+SimBtn.Font = Enum.Font.GothamBold; SimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SimBtn.AutoButtonColor = false; SimBtn.ZIndex = 201; SimBtn.Parent = ConfirmOverlay
 local SimC = Instance.new("UICorner"); SimC.CornerRadius = UDim.new(0, 8); SimC.Parent = SimBtn
 local SimS = Instance.new("UIStroke"); SimS.Thickness = 1.5; SimS.Color = Color3.fromRGB(255, 80, 90); SimS.Transparency = 0.3; SimS.Parent = SimBtn
 
 local NaoBtn = Instance.new("TextButton")
-NaoBtn.Size = UDim2.new(0.5, -25, 0, 42)
-NaoBtn.Position = UDim2.new(0.5, 5, 0, 140)
+NaoBtn.Size = UDim2.new(0.5, -25, 0, 42); NaoBtn.Position = UDim2.new(0.5, 5, 0, 140)
 NaoBtn.BackgroundColor3 = Color3.fromRGB(30, 130, 80)
-NaoBtn.Text = "✖  NÃO"
-NaoBtn.TextSize = 14
-NaoBtn.Font = Enum.Font.GothamBold
-NaoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-NaoBtn.AutoButtonColor = false
-NaoBtn.ZIndex = 201
-NaoBtn.Parent = ConfirmOverlay
+NaoBtn.Text = "✖  NÃO"; NaoBtn.TextSize = 14
+NaoBtn.Font = Enum.Font.GothamBold; NaoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NaoBtn.AutoButtonColor = false; NaoBtn.ZIndex = 201; NaoBtn.Parent = ConfirmOverlay
 local NaoC = Instance.new("UICorner"); NaoC.CornerRadius = UDim.new(0, 8); NaoC.Parent = NaoBtn
 local NaoS = Instance.new("UIStroke"); NaoS.Thickness = 1.5; NaoS.Color = Color3.fromRGB(0, 255, 150); NaoS.Transparency = 0.3; NaoS.Parent = NaoBtn
 
 W.showConfirm = function()
     if not COBlur or not COBlur.Parent then
         COBlur = Instance.new("BlurEffect")
-        COBlur.Size = 14
-        COBlur.Parent = Lighting
+        COBlur.Size = 14; COBlur.Parent = Lighting
     end
     ConfirmOverlay.Visible = true
     ConfirmOverlay.BackgroundTransparency = 1
@@ -2229,10 +1840,7 @@ W.hideConfirm = function()
     TS:Create(ConfirmOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
     task.wait(0.2)
     ConfirmOverlay.Visible = false
-    if COBlur and COBlur.Parent then
-        COBlur:Destroy()
-        COBlur = nil
-    end
+    if COBlur and COBlur.Parent then COBlur:Destroy(); COBlur = nil end
 end
 
 W.closeGUI = function()
@@ -2256,8 +1864,7 @@ end
 local minimized = false
 local FULL = UDim2.new(0, 360, 0, 420)
 local MIN = UDim2.new(0, 360, 0, 42)
-W.FULL_SIZE = FULL
-W.MIN_SIZE = MIN
+W.FULL_SIZE = FULL; W.MIN_SIZE = MIN
 W.HOME_POS = UDim2.new(0.5, -180, 0.5, -260)
 
 W.addTap(MinBtn, function()
@@ -2278,95 +1885,19 @@ W.addTap(CloseBtn, function()
     W.showConfirm()
 end)
 
-W.addTap(SimBtn, function()
-    W.hideConfirm()
-    task.wait(0.15)
-    W.closeGUI()
-end)
-
-W.addTap(NaoBtn, function()
-    W.hideConfirm()
-end)
+W.addTap(SimBtn, function() W.hideConfirm(); task.wait(0.15); W.closeGUI() end)
+W.addTap(NaoBtn, function() W.hideConfirm() end)
 
 task.spawn(function()
     task.wait(0.05)
     TS:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = FULL,
-        Position = W.HOME_POS,
-        BackgroundTransparency = 0.25
+        Size = FULL, Position = W.HOME_POS, BackgroundTransparency = 0.25
     }):Play()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
--- ✅ DRAG MOBILE-FRIENDLY
-do
-    local dragging = false
-    local dragStart, startPos
-    local activeInput = nil
-
-    local function isUIButton(target)
-        if not target then return false end
-        local ok, res = pcall(function()
-            return target:IsA("TextButton") or target:IsA("TextBox") or target:IsA("ScrollingFrame") or target:IsA("ImageButton")
-        end)
-        return ok and res
-    end
-
-    UIS.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            local pos = input.Position
-            local ap = MainFrame.AbsolutePosition
-            local as = MainFrame.AbsoluteSize
-            if pos.X >= ap.X and pos.X <= ap.X + as.X
-            and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
-                if isUIButton(input.Target) then return end
-                dragging = true
-                activeInput = input
-                dragStart = pos
-                startPos = MainFrame.Position
-            end
-        end
-    end)
-
-    UIS.InputChanged:Connect(function(input, processed)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-            activeInput = nil
-        end
-    end)
-
-    -- Bônus mobile: segurar o título por 0.6s = reset posição
-    local titleTouchStart = 0
-    Title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            titleTouchStart = tick()
-        end
-    end)
-    Title.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if tick() - titleTouchStart > 0.6 then
-                TS:Create(MainFrame, TweenInfo.new(0.25), {Position = W.HOME_POS}):Play()
-            end
-        end
-    end)
-end
+-- ✅ DRAG: nativo do Roblox (funciona PC + mobile)
+-- MainFrame.Draggable = true já foi setado acima.
 
 -- COMANDOS
 W.processCommand = function(msg)
@@ -2378,10 +1909,7 @@ W.processCommand = function(msg)
     if m == "control" then W.loadModule("control"); return end
     if m == "trackerga" or m == "tracker g-a" or m == "tracker" then W.loadModule("trackerga"); return end
 
-    if m == "resetgui pos" or m == "resetpos" then
-        if W.MainFrame then W.MainFrame.Position = W.HOME_POS end
-        return
-    end
+    if m == "resetpos" then if W.MainFrame then W.MainFrame.Position = W.HOME_POS end; return end
 
     if m == "lang pt" or m == "lang portugues" or m == "lang pt-br" then
         W.lang = "pt"; W.langRefresh()
@@ -2395,12 +1923,9 @@ W.processCommand = function(msg)
     end
 
     if m == "update" then
-        _G.Willnzx = nil
-        W.loaded_base = nil
-        W.loaded = {}
+        _G.Willnzx = nil; W.loaded_base = nil; W.loaded = {}
         pcall(function()
-            local o = CoreGui:FindFirstChild("WillnzxGUI")
-            if o then o:Destroy() end
+            local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
         end)
         task.wait(0.3)
         loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
@@ -2408,18 +1933,12 @@ W.processCommand = function(msg)
     end
 
     if m == "resetgui" then
-        _G.Willnzx = nil
-        W.loaded_base = nil
-        W.loaded = {}
+        _G.Willnzx = nil; W.loaded_base = nil; W.loaded = {}
         pcall(function()
-            local o = CoreGui:FindFirstChild("WillnzxGUI")
-            if o then o:Destroy() end
-            local o2 = CoreGui:FindFirstChild("WillnzxCmdsGUI")
-            if o2 then o2:Destroy() end
-            local o3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI")
-            if o3 then o3:Destroy() end
-            local o4 = CoreGui:FindFirstChild("ArrowControlGUI")
-            if o4 then o4:Destroy() end
+            local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
+            local o2 = CoreGui:FindFirstChild("WillnzxCmdsGUI"); if o2 then o2:Destroy() end
+            local o3 = CoreGui:FindFirstChild("WillnzxCmdBarGUI"); if o3 then o3:Destroy() end
+            local o4 = CoreGui:FindFirstChild("ArrowControlGUI"); if o4 then o4:Destroy() end
         end)
         task.wait(0.3)
         loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
@@ -2427,34 +1946,19 @@ W.processCommand = function(msg)
     end
 
     if m == "predictball" or m == "predict" then
-        if W.states.isPredict then
-            W.stopPredictBall()
-            W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
-        else
-            W.startPredictBall()
-            W.setBtnActive(PredictBallBtn, W.btn("predict", true))
-        end
+        if W.states.isPredict then W.stopPredictBall(); W.setBtnInactive(PredictBallBtn, W.btn("predict", false))
+        else W.startPredictBall(); W.setBtnActive(PredictBallBtn, W.btn("predict", true)) end
         return
     end
     if m == "predictkick" or m == "predict kick" then
-        if W.states.isPredictKick then
-            W.stopPredictKick()
-            W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
-        else
-            W.startPredictKick()
-            W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true))
-        end
+        if W.states.isPredictKick then W.stopPredictKick(); W.setBtnInactive(PredictKickBtn, W.btn("predict_kick", false))
+        else W.startPredictKick(); W.setBtnActive(PredictKickBtn, W.btn("predict_kick", true)) end
         return
     end
 
     if m == "farmcoins" or m == "farm" then
-        if W.states.isFarming then
-            W.stopFarmCoins()
-            W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
-        else
-            W.startFarmCoins()
-            W.setBtnActive(FarmCoinsBtn, W.btn("farm", true))
-        end
+        if W.states.isFarming then W.stopFarmCoins(); W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
+        else W.startFarmCoins(); W.setBtnActive(FarmCoinsBtn, W.btn("farm", true)) end
         return
     end
 
@@ -2468,7 +1972,7 @@ W.processCommand = function(msg)
     end
     if m == "unloop goal" or m == "unloop goal a" or m == "unloop goal b" then
         W.states.isActive = false
-        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread = nil end
+        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread=nil end
         W.setBtnInactive(Button, W.btn("auto_gol", false)); return
     end
 
@@ -2482,13 +1986,12 @@ W.processCommand = function(msg)
     end
     if m == "untpgoal" then
         W.states.isTpGoal = false
-        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread = nil end
+        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread=nil end
         W.stopSpectating(); W.setBtnInactive(TpGoalBtn, W.btn("tp_goal", false)); return
     end
 
     if m == "defendgoal" then
-        if W.states.isDefending then
-            W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
+        if W.states.isDefending then W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
         else
             W.setBtnActive(DefendGoalBtn, W.btn("defend", true, W.t("goal_" .. string.lower(W.defendSelectedGoal))))
             W.states.isDefending = true; W.startDefend()
@@ -2521,7 +2024,7 @@ W.processCommand = function(msg)
     end
     if m == "unbringball" then
         W.states.isBringing = false
-        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread = nil end
+        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread=nil end
         W.setBtnInactive(BringBtn, W.btn("bring", false)); return
     end
 
@@ -2531,7 +2034,7 @@ W.processCommand = function(msg)
     end
     if m == "unloopbring" then
         W.states.isLoopBringing = false
-        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread = nil end
+        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread=nil end
         W.setBtnInactive(LoopBringBtn, W.btn("loop_bring", false)); return
     end
 
@@ -2541,7 +2044,7 @@ W.processCommand = function(msg)
     end
     if m == "unskyball" then
         W.states.isSkying = false
-        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread = nil end
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread=nil end
         W.setBtnInactive(SkyBtn, W.btn("sky", false)); return
     end
 
@@ -2554,10 +2057,7 @@ W.processCommand = function(msg)
 
     if m == "bugball" then
         if W.states.isBugBall then return end
-        W.stopAll()
-        W.setBtnActive(BugBallBtn, W.btn("bug", true))
-        W.startBugBall()
-        return
+        W.stopAll(); W.setBtnActive(BugBallBtn, W.btn("bug", true)); W.startBugBall(); return
     end
 
     if m == "boostall" then
@@ -2566,7 +2066,7 @@ W.processCommand = function(msg)
     end
     if m == "unboostall" then
         W.states.isBoostingAll = false
-        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread = nil end
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread=nil end
         W.setBtnInactive(BoostAllBtn, W.btn("boost", false)); return
     end
 
@@ -2576,7 +2076,7 @@ W.processCommand = function(msg)
     end
     if m == "untouchgoal" then
         W.states.isTouchGoal = false
-        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread = nil end
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread=nil end
         W.setBtnInactive(TouchGoalBtn, W.btn("touch_goal", false)); return
     end
 
@@ -2586,7 +2086,7 @@ W.processCommand = function(msg)
     end
     if m == "unmoveball" then
         W.states.isMoveBall = false
-        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread = nil end
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread=nil end
         W.setBtnInactive(MoveBallBtn, W.btn("move", false)); return
     end
 
@@ -2596,7 +2096,7 @@ W.processCommand = function(msg)
     end
     if m == "unorbitball" then
         W.states.isOrbitBall = false
-        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread = nil end
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread=nil end
         W.setBtnInactive(OrbitBallBtn, W.btn("orbit", false)); return
     end
 
@@ -2604,40 +2104,22 @@ W.processCommand = function(msg)
     if mult then
         local v = math.clamp(tonumber(mult), 1, 6)
         W.Knob.Position = UDim2.new((v-1)/5, -11, 0.5, -11)
-        W.updDots(v)
-        return
+        W.updDots(v); return
     end
 end
 
 LP.Chatted:Connect(W.processCommand)
 
-W.CFGV.autoGoalForce = 5000
-W.CFGV.autoGoalY = 50
-W.CFGV.bringForce = 120
-W.CFGV.bringY = 15
+W.CFGV.autoGoalForce = 5000; W.CFGV.autoGoalY = 50
+W.CFGV.bringForce = 120; W.CFGV.bringY = 15
 W.CFGV.freezeDelay = 0.1
-W.CFGV.moveForce = 3000
-W.CFGV.moveY = 30
-W.CFGV.moveDelay = 0.03
-W.CFGV.orbitForce = 400
-W.CFGV.orbitStep = 0.06
-W.CFGV.orbitDelay = 0.015
-W.CFGV.orbitY = 30
-W.CFGV.skyForce = 5000
-W.CFGV.touchGoalDist = 3
-W.CFGV.boostMaxSpeed = 250
-W.CFGV.boostDelay = 0.15
+W.CFGV.moveForce = 3000; W.CFGV.moveY = 30; W.CFGV.moveDelay = 0.03
+W.CFGV.orbitForce = 400; W.CFGV.orbitStep = 0.06; W.CFGV.orbitDelay = 0.015; W.CFGV.orbitY = 30
+W.CFGV.skyForce = 5000; W.CFGV.touchGoalDist = 3
+W.CFGV.boostMaxSpeed = 250; W.CFGV.boostDelay = 0.15
+W.CFGV.bugOffsetY = 5; W.CFGV.bugForceY = 8000
+W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
+W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
+W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-W.CFGV.bugOffsetY = 5
-W.CFGV.bugForceY = 8000
-W.CFGV.bugKicksPerSecond = 8
-W.CFGV.bugAutoStopTime = 5
-
-W.CFGV.predictTime = 1.2
-W.CFGV.predictDotCount = 35
-W.CFGV.predictDotSize = 0.7
-W.CFGV.predictTargetSize = 2
-W.CFGV.predictKickForce = 250
-W.CFGV.predictKickLift = 45
-
-print("[Willnzx] GUI base carregada — drag mobile + tool mobile")
+print("[Willnzx] GUI base carregada — drag nativo + tool simplificada")
