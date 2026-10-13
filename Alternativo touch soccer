@@ -12,7 +12,7 @@ local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
 if W.loaded_base then
-    warn("[Willnzx] GUI ja carregada. Ignorando execucao duplicada.")
+    warn("[Willnzx] GUI ja carregada.")
     return
 end
 W.loaded_base = true
@@ -378,9 +378,6 @@ end
 
 -- ============================================================
 --  🟡 PREDICT SYSTEM
---   • Amarelo pequeno = pontos da trajetória
---   • Amarelo grande  = target (onde a bola vai parar)
---   • Direção         = CÂMERA (você mira com o mouse)
 -- ============================================================
 W.states.isPredict = false
 W.states.isPredictKick = false
@@ -442,7 +439,6 @@ local function drawTrajectory(list, pos, vel, totalTime)
     end
 end
 
--- Retorna a posição final da trajetória pra colocar o target ball
 local function calcFinalPos(pos, vel, totalTime)
     local gravity = Vector3.new(0, -workspace.Gravity, 0)
     return pos + vel * totalTime + 0.5 * gravity * totalTime * totalTime
@@ -454,7 +450,7 @@ local function updatePredicts()
     W.states.predictLastUpdate = now
 
     local b = W.getBall()
-    local totalTime = W.CFGV.predictTime or 2.5
+    local totalTime = W.CFGV.predictTime or 1.2
 
     if not b then
         if W.states.predictDots then hideList(W.states.predictDots) end
@@ -465,34 +461,25 @@ local function updatePredicts()
         return
     end
 
-    -- ---- PREDICT BALL (amarelo — onde a bola vai cair pela física atual) ----
     if W.states.isPredict and W.states.predictDots then
         drawTrajectory(W.states.predictDots, b.Position, b.Velocity, totalTime)
     elseif W.states.predictDots then
         hideList(W.states.predictDots)
     end
 
-    -- ---- PREDICT KICK (amarelo + target grande — direção da CÂMERA) ----
     if W.states.isPredictKick and W.states.predictKickDots then
         local cam = workspace.CurrentCamera
         local lookDir = cam.CFrame.LookVector
-
-        -- Achata a componente vertical
         local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z)
-        if flatDir.Magnitude > 0.001 then
-            flatDir = flatDir.Unit
-        else
-            flatDir = Vector3.new(0, 0, -1)
-        end
+        if flatDir.Magnitude > 0.001 then flatDir = flatDir.Unit
+        else flatDir = Vector3.new(0, 0, -1) end
 
-        local force = W.CFGV.predictKickForce or 5000
-        local lift = W.CFGV.predictKickLift or 60
+        local force = W.CFGV.predictKickForce or 250
+        local lift = W.CFGV.predictKickLift or 45
         local kickVel = flatDir * force + Vector3.new(0, lift, 0)
 
-        -- Desenha os pontinhos
         drawTrajectory(W.states.predictKickDots, b.Position, kickVel, totalTime)
 
-        -- Coloca o target ball (bola amarela grande) no fim
         if W.states.predictKickTarget and W.states.predictKickTarget.Parent then
             local finalPos = calcFinalPos(b.Position, kickVel, totalTime)
             W.states.predictKickTarget.Position = finalPos
@@ -505,7 +492,6 @@ local function updatePredicts()
         end
     end
 
-    -- Se nenhum dos dois está ativo, encerra
     if not W.states.isPredict and not W.states.isPredictKick then
         if W.states.predictConn then
             W.states.predictConn:Disconnect()
@@ -529,9 +515,9 @@ W.ensurePredictSystem = function()
         W.states.predictFolder = folder
     end
 
-    local dotCount = W.CFGV.predictDotCount or 22
-    local dotSize = W.CFGV.predictDotSize or 0.9
-    local targetSize = W.CFGV.predictTargetSize or 3
+    local dotCount = W.CFGV.predictDotCount or 35
+    local dotSize = W.CFGV.predictDotSize or 0.7
+    local targetSize = W.CFGV.predictTargetSize or 2
 
     if not W.states.predictDots or #W.states.predictDots == 0 then
         W.states.predictDots = buildDots(W.states.predictFolder, dotCount, dotSize, Color3.fromRGB(255, 220, 0))
@@ -551,6 +537,7 @@ end
 W.startPredictBall = function()
     W.states.isPredict = true
     W.ensurePredictSystem()
+    W.states.predictLastUpdate = 0
 end
 
 W.stopPredictBall = function()
@@ -561,6 +548,8 @@ end
 W.startPredictKick = function()
     W.states.isPredictKick = true
     W.ensurePredictSystem()
+    W.states.predictLastUpdate = 0
+    pcall(function() updatePredicts() end)
 end
 
 W.stopPredictKick = function()
@@ -805,7 +794,7 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 MainFrame.BackgroundTransparency = 1
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = false
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 W.MainFrame = MainFrame
@@ -892,7 +881,7 @@ for i, key in ipairs(tabKeys) do
 end
 
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -30, 1, -110)
+ContentArea.Size = UDim2.new(1, -30, 1, -100)
 ContentArea.Position = UDim2.new(0, 15, 0, 72)
 ContentArea.BackgroundTransparency = 1
 ContentArea.ClipsDescendants = true
@@ -903,7 +892,7 @@ Tab1.Size = UDim2.new(1, 0, 1, 0)
 Tab1.BackgroundTransparency = 1; Tab1.BorderSizePixel = 0
 Tab1.ScrollBarThickness = 5; Tab1.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
 Tab1.ScrollBarImageTransparency = 0.3
-Tab1.CanvasSize = UDim2.new(0, 0, 0, 420)
+Tab1.CanvasSize = UDim2.new(0, 0, 0, 320)
 Tab1.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab1.ElasticBehavior = Enum.ElasticBehavior.Never
 Tab1.Parent = ContentArea
@@ -1116,9 +1105,7 @@ W.langRefresh = function()
     end
 
     if W.onLangChange then
-        for _, cb in ipairs(W.onLangChange) do
-            pcall(cb)
-        end
+        for _, cb in ipairs(W.onLangChange) do pcall(cb) end
     end
 end
 
@@ -1391,7 +1378,7 @@ local LOc = Instance.new("UICorner"); LOc.CornerRadius = UDim.new(0, 12); LOc.Pa
 
 local LTitle = Instance.new("TextLabel")
 LTitle.Size = UDim2.new(1, -20, 0, 26)
-LTitle.Position = UDim2.new(0, 10, 0, 60)
+LTitle.Position = UDim2.new(0, 10, 0, 50)
 LTitle.BackgroundTransparency = 1
 LTitle.Text = "🌐 Escolha o idioma / Choose your language"
 LTitle.TextColor3 = Color3.fromRGB(220, 240, 255)
@@ -1402,7 +1389,7 @@ LTitle.Parent = LangOverlay
 
 local LSub = Instance.new("TextLabel")
 LSub.Size = UDim2.new(1, -20, 0, 18)
-LSub.Position = UDim2.new(0, 10, 0, 90)
+LSub.Position = UDim2.new(0, 10, 0, 78)
 LSub.BackgroundTransparency = 1
 LSub.Text = "Troque depois com ;lang pt / ;lang en"
 LSub.TextColor3 = Color3.fromRGB(150, 180, 200)
@@ -1413,7 +1400,7 @@ LSub.Parent = LangOverlay
 
 local PtBtn = Instance.new("TextButton")
 PtBtn.Size = UDim2.new(1, -40, 0, 38)
-PtBtn.Position = UDim2.new(0, 20, 0, 140)
+PtBtn.Position = UDim2.new(0, 20, 0, 120)
 PtBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
 PtBtn.Text = "🇧🇷  Português (BR)"
 PtBtn.TextSize = 14
@@ -1427,7 +1414,7 @@ local pbs = Instance.new("UIStroke"); pbs.Thickness = 1.5; pbs.Color = Color3.fr
 
 local EnBtn = Instance.new("TextButton")
 EnBtn.Size = UDim2.new(1, -40, 0, 38)
-EnBtn.Position = UDim2.new(0, 20, 0, 190)
+EnBtn.Position = UDim2.new(0, 20, 0, 168)
 EnBtn.BackgroundColor3 = Color3.fromRGB(0, 90, 170)
 EnBtn.Text = "🇺🇸  English"
 EnBtn.TextSize = 14
@@ -1462,11 +1449,122 @@ task.delay(0.65, function()
 end)
 
 -- ============================================================
+--  ❓ OVERLAY DE CONFIRMAÇÃO DE FECHAR
+-- ============================================================
+local ConfirmOverlay = Instance.new("Frame")
+ConfirmOverlay.Name = "ConfirmOverlay"
+ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0)
+ConfirmOverlay.Position = UDim2.new(0, 0, 0, 0)
+ConfirmOverlay.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+ConfirmOverlay.BackgroundTransparency = 0.1
+ConfirmOverlay.BorderSizePixel = 0
+ConfirmOverlay.ZIndex = 200
+ConfirmOverlay.Active = true
+ConfirmOverlay.Visible = false
+ConfirmOverlay.Parent = MainFrame
+
+local COc = Instance.new("UICorner"); COc.CornerRadius = UDim.new(0, 12); COc.Parent = ConfirmOverlay
+
+local COTitle = Instance.new("TextLabel")
+COTitle.Size = UDim2.new(1, -20, 0, 30)
+COTitle.Position = UDim2.new(0, 10, 0, 60)
+COTitle.BackgroundTransparency = 1
+COTitle.Text = "❓ Você realmente quer fechar a GUI?"
+COTitle.TextColor3 = Color3.fromRGB(220, 240, 255)
+COTitle.TextSize = 15
+COTitle.Font = Enum.Font.GothamBold
+COTitle.TextWrapped = true
+COTitle.ZIndex = 201
+COTitle.Parent = ConfirmOverlay
+
+local COSub = Instance.new("TextLabel")
+COSub.Size = UDim2.new(1, -20, 0, 18)
+COSub.Position = UDim2.new(0, 10, 0, 92)
+COSub.BackgroundTransparency = 1
+COSub.Text = "Todas as funções serão desligadas"
+COSub.TextColor3 = Color3.fromRGB(150, 180, 200)
+COSub.TextSize = 11
+COSub.Font = Enum.Font.Gotham
+COSub.ZIndex = 201
+COSub.Parent = ConfirmOverlay
+
+local COBlur = nil
+
+local SimBtn = Instance.new("TextButton")
+SimBtn.Size = UDim2.new(0.5, -25, 0, 42)
+SimBtn.Position = UDim2.new(0, 20, 0, 140)
+SimBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 40)
+SimBtn.Text = "✔  SIM"
+SimBtn.TextSize = 14
+SimBtn.Font = Enum.Font.GothamBold
+SimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SimBtn.AutoButtonColor = false
+SimBtn.ZIndex = 201
+SimBtn.Parent = ConfirmOverlay
+local SimC = Instance.new("UICorner"); SimC.CornerRadius = UDim.new(0, 8); SimC.Parent = SimBtn
+local SimS = Instance.new("UIStroke"); SimS.Thickness = 1.5; SimS.Color = Color3.fromRGB(255, 80, 90); SimS.Transparency = 0.3; SimS.Parent = SimBtn
+
+local NaoBtn = Instance.new("TextButton")
+NaoBtn.Size = UDim2.new(0.5, -25, 0, 42)
+NaoBtn.Position = UDim2.new(0.5, 5, 0, 140)
+NaoBtn.BackgroundColor3 = Color3.fromRGB(30, 130, 80)
+NaoBtn.Text = "✖  NÃO"
+NaoBtn.TextSize = 14
+NaoBtn.Font = Enum.Font.GothamBold
+NaoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NaoBtn.AutoButtonColor = false
+NaoBtn.ZIndex = 201
+NaoBtn.Parent = ConfirmOverlay
+local NaoC = Instance.new("UICorner"); NaoC.CornerRadius = UDim.new(0, 8); NaoC.Parent = NaoBtn
+local NaoS = Instance.new("UIStroke"); NaoS.Thickness = 1.5; NaoS.Color = Color3.fromRGB(0, 255, 150); NaoS.Transparency = 0.3; NaoS.Parent = NaoBtn
+
+W.showConfirm = function()
+    if not COBlur or not COBlur.Parent then
+        COBlur = Instance.new("BlurEffect")
+        COBlur.Size = 14
+        COBlur.Parent = Lighting
+    end
+    ConfirmOverlay.Visible = true
+    ConfirmOverlay.BackgroundTransparency = 1
+    TS:Create(ConfirmOverlay, TweenInfo.new(0.25), {BackgroundTransparency = 0.1}):Play()
+end
+
+W.hideConfirm = function()
+    TS:Create(ConfirmOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+    task.wait(0.2)
+    ConfirmOverlay.Visible = false
+    if COBlur and COBlur.Parent then
+        COBlur:Destroy()
+        COBlur = nil
+    end
+end
+
+W.closeGUI = function()
+    W.stopAll()
+    TabBar.Visible = false; ContentArea.Visible = false
+    local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundTransparency = 1
+    })
+    tw:Play()
+    TS:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
+    tw.Completed:Wait()
+    if COBlur and COBlur.Parent then COBlur:Destroy() end
+    ScreenGui:Destroy()
+    W.loaded_base = nil
+    _G.Willnzx = nil
+end
+
+-- ============================================================
 --  MINIMIZAR / FECHAR
 -- ============================================================
 local minimized = false
-local FULL = UDim2.new(0, 360, 0, 520)
+local FULL = UDim2.new(0, 360, 0, 420)
 local MIN = UDim2.new(0, 360, 0, 42)
+W.FULL_SIZE = FULL
+W.MIN_SIZE = MIN
+W.HOME_POS = UDim2.new(0.5, -180, 0.5, -260)
 
 W.addTap(MinBtn, function()
     minimized = not minimized
@@ -1481,57 +1579,88 @@ W.addTap(MinBtn, function()
     end
 end)
 
+-- ✅ CloseBtn agora abre a confirmação
 W.addTap(CloseBtn, function()
-    W.stopAll()
-    TabBar.Visible = false; ContentArea.Visible = false
-    local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        BackgroundTransparency = 1
-    })
-    tw:Play()
-    TS:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
-    tw.Completed:Wait()
-    ScreenGui:Destroy()
-    W.loaded_base = nil
-    _G.Willnzx = nil
+    if ConfirmOverlay.Visible then return end
+    W.showConfirm()
+end)
+
+-- ✅ Botão SIM: fecha a GUI
+W.addTap(SimBtn, function()
+    W.hideConfirm()
+    task.wait(0.15)
+    W.closeGUI()
+end)
+
+-- ✅ Botão NÃO: só fecha a mensagem
+W.addTap(NaoBtn, function()
+    W.hideConfirm()
 end)
 
 task.spawn(function()
     task.wait(0.05)
     TS:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Size = FULL,
-        Position = UDim2.new(0.5, -180, 0.5, -260),
+        Position = W.HOME_POS,
         BackgroundTransparency = 0.25
     }):Play()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
+-- ============================================================
+--  ✅ SISTEMA DE DRAG
+-- ============================================================
 do
-    local d, di, ds, sp
-    MainFrame.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            local okT, isBtn = pcall(function()
-                return i.Target and (i.Target:IsA("TextButton") or i.Target:IsA("TextBox") or i.Target:IsA("ScrollingFrame"))
-            end)
-            if okT and isBtn then return end
-            d = true
-            ds = i.Position
-            sp = MainFrame.Position
-            i.Changed:Connect(function()
-                if i.UserInputState == Enum.UserInputState.End then d = false end
-            end)
+    local dragging = false
+    local dragStart, startPos
+
+    local function isUIButton(target)
+        if not target then return false end
+        local ok, res = pcall(function()
+            return target:IsA("TextButton") or target:IsA("TextBox") or target:IsA("ScrollingFrame")
+        end)
+        return ok and res
+    end
+
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if isUIButton(input.Target) then return end
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
         end
     end)
-    MainFrame.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
-            di = i
+
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
         end
     end)
-    UIS.InputChanged:Connect(function(i)
-        if i == di and d then
-            local delta = i.Position - ds
-            MainFrame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
+
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    local lastTitleClick = 0
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local now = tick()
+            if now - lastTitleClick < 0.4 then
+                TS:Create(MainFrame, TweenInfo.new(0.25), {Position = W.HOME_POS}):Play()
+            end
+            lastTitleClick = now
         end
     end)
 end
@@ -1547,6 +1676,11 @@ W.processCommand = function(msg)
     if m == "cmdbar2" then W.loadModule("cmdbar2"); return end
     if m == "control" then W.loadModule("control"); return end
     if m == "trackerga" or m == "tracker g-a" or m == "tracker" then W.loadModule("trackerga"); return end
+
+    if m == "resetgui pos" or m == "resetpos" then
+        if W.MainFrame then W.MainFrame.Position = W.HOME_POS end
+        return
+    end
 
     if m == "lang pt" or m == "lang portugues" or m == "lang pt-br" then
         W.lang = "pt"; W.langRefresh()
@@ -1799,14 +1933,12 @@ W.CFGV.bugForceY = 8000
 W.CFGV.bugKicksPerSecond = 8
 W.CFGV.bugAutoStopTime = 5
 
--- ✅ PREDICT
-W.CFGV.predictTime = 2.5
-W.CFGV.predictDotCount = 22
-W.CFGV.predictDotSize = 0.9
-W.CFGV.predictTargetSize = 3     -- bola grande no fim da trajetória
+-- Predict
+W.CFGV.predictTime = 1.2
+W.CFGV.predictDotCount = 35
+W.CFGV.predictDotSize = 0.7
+W.CFGV.predictTargetSize = 2
+W.CFGV.predictKickForce = 250
+W.CFGV.predictKickLift = 45
 
--- ✅ PREDICT KICK (direção da CÂMERA)
-W.CFGV.predictKickForce = 5000
-W.CFGV.predictKickLift = 60      -- ⬆️ mais lift pra fazer curva bonita igual ao print
-
-print("[Willnzx] GUI base carregada — Predict KICK usa direção da câmera + target ball")
+print("[Willnzx] GUI base carregada — altura 420 + drag + confirmar fechar")
