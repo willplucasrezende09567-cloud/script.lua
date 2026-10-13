@@ -79,7 +79,7 @@ W.kp = {
 }
 
 -- ============================================================
---  💀 RESET PARTIDA (void fling próprio)
+--  💀 RESET PARTIDA (void fling - versão que funcionou)
 -- ============================================================
 W.voidFlingLoop = false
 W.voidFlingThread = nil
@@ -136,7 +136,7 @@ W.voidFlingOnce = function()
 end
 
 W.startVoidFling = function(times)
-    times = times or 2
+    times = times or 1
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
     W.voidFlingLoop = true
     W.voidFlingThread = task.spawn(function()
@@ -1518,7 +1518,6 @@ local KickPlayerToolBtn = makeButton(Tab4, "🎒 KICK PLAYER TOOL", 294, Color3.
 KickPlayerBtn.TextSize = 13
 KickPlayerToolBtn.TextSize = 13
 
--- ✅ BOTÃO RESET PARTIDA
 local ResetMatchBtn = makeButton(Tab4, "🔄 RESET PARTIDA", 336, Color3.fromRGB(180, 30, 60), Color3.fromRGB(60, 0, 20), "ResetMatchBtn")
 ResetMatchBtn.TextSize = 13
 
@@ -1570,16 +1569,15 @@ W.addTap(KickPlayerToolBtn, function()
     else updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120)) end
 end)
 
--- ✅ RESET PARTIDA (Void Fling)
 W.addTap(ResetMatchBtn, function()
     if W.voidFlingLoop then
         W.stopVoidFling()
         ResetMatchStatus.Text = "Reset: cancelado"
         W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
     else
-        ResetMatchStatus.Text = "Reset: executando 2x..."
-        W.setBtnActive(ResetMatchBtn, "🔄 RESET PARTIDA (2x)")
-        W.startVoidFling(2)
+        ResetMatchStatus.Text = "Reset: teleportando..."
+        W.setBtnActive(ResetMatchBtn, "🔄 RESETANDO...")
+        W.startVoidFling(1)
         task.spawn(function()
             while W.voidFlingLoop do task.wait(0.3) end
             ResetMatchStatus.Text = "Reset: finalizado ✓"
@@ -2027,8 +2025,8 @@ W.processCommand = function(msg)
             W.stopVoidFling()
             if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: OFF") end
         else
-            W.startVoidFling(2)
-            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: ON (2x)") end
+            W.startVoidFling(1)
+            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: ON") end
         end
         return
     end
@@ -2244,4 +2242,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — Reset Partida adicionado")
+print("[Willnzx] GUI base carregada — Reset Partida (versão original -8000)")
