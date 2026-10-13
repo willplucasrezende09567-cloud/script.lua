@@ -78,6 +78,86 @@ W.kp = {
     VoidY=-80, SpikeThreshold=320, AirMinFrames=8, SafeLandOffset=5, SafeFlyDuration=0.4,
 }
 
+-- ============================================================
+--  💀 RESET PARTIDA (void fling próprio)
+-- ============================================================
+W.voidFlingLoop = false
+W.voidFlingThread = nil
+
+W.voidFlingOnce = function()
+    local c = LP.Character
+    if not c then return false end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return false end
+
+    local before = c
+
+    pcall(function() hum.PlatformStand = true end)
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "__VoidFlingBV"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, -8000, 0)
+    bv.Parent = hrp
+
+    local endTime = tick() + 3
+    while LP.Character == before and tick() < endTime do
+        if hrp and hrp.Parent then
+            hrp.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 30, hrp.Position.Z)
+            pcall(function()
+                hrp.Velocity = Vector3.new(0, -8000, 0)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, -8000, 0)
+                hrp.RotVelocity = Vector3.new(9999, 9999, 9999)
+                hrp.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
+            end)
+        end
+        task.wait(0.03)
+    end
+
+    if bv and bv.Parent then bv:Destroy() end
+
+    local t1 = tick() + 4
+    while LP.Character == before and tick() < t1 do task.wait(0.05) end
+
+    local t2 = tick() + 8
+    while tick() < t2 do
+        local nc = LP.Character
+        if nc and nc ~= before and nc:FindFirstChild("HumanoidRootPart") then
+            local nh = nc:FindFirstChildOfClass("Humanoid")
+            if nh and nh.Health > 0 then
+                task.wait(0.4)
+                return true
+            end
+        end
+        task.wait(0.1)
+    end
+    return false
+end
+
+W.startVoidFling = function(times)
+    times = times or 2
+    if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
+    W.voidFlingLoop = true
+    W.voidFlingThread = task.spawn(function()
+        for i = 1, times do
+            if not W.voidFlingLoop then break end
+            W.voidFlingOnce()
+            task.wait(0.3)
+        end
+        W.voidFlingLoop = false
+        W.voidFlingThread = nil
+    end)
+end
+
+W.stopVoidFling = function()
+    W.voidFlingLoop = false
+    if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
+    local c = LP.Character
+    local hum = c and c:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum.PlatformStand = false end) end
+end
+
 local hookSkip = false
 
 W.getBall = function()
@@ -649,7 +729,7 @@ W.stopPredictAll = function()
 end
 W.stopPredict = W.stopPredictAll
 
--- KICK PLAYER (Float Top)
+-- KICK PLAYER
 W.kpFindPlayer = function(q)
     if not q or q == "" then return nil end
     q = tostring(q):lower():gsub("%s", "")
@@ -1058,7 +1138,6 @@ local function kpClickLoop()
     end
 end
 
--- ✅ TOOL IDÊNTICA À DO FLING (que funciona)
 W.kpGiveTool = function()
     if W.kpHasTool() then return false end
     W.kpRemoveTool()
@@ -1246,7 +1325,7 @@ Tab4.Size = UDim2.new(1, 0, 1, 0)
 Tab4.BackgroundTransparency = 1; Tab4.BorderSizePixel = 0
 Tab4.ScrollBarThickness = 5; Tab4.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
 Tab4.ScrollBarImageTransparency = 0.3
-Tab4.CanvasSize = UDim2.new(0, 0, 0, 480)
+Tab4.CanvasSize = UDim2.new(0, 0, 0, 520)
 Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
 Tab4.Visible = false; Tab4.Parent = ContentArea
@@ -1439,6 +1518,21 @@ local KickPlayerToolBtn = makeButton(Tab4, "🎒 KICK PLAYER TOOL", 294, Color3.
 KickPlayerBtn.TextSize = 13
 KickPlayerToolBtn.TextSize = 13
 
+-- ✅ BOTÃO RESET PARTIDA
+local ResetMatchBtn = makeButton(Tab4, "🔄 RESET PARTIDA", 336, Color3.fromRGB(180, 30, 60), Color3.fromRGB(60, 0, 20), "ResetMatchBtn")
+ResetMatchBtn.TextSize = 13
+
+local ResetMatchStatus = Instance.new("TextLabel")
+ResetMatchStatus.Size = UDim2.new(1, -4, 0, 16)
+ResetMatchStatus.Position = UDim2.new(0, 2, 0, 378)
+ResetMatchStatus.BackgroundTransparency = 1
+ResetMatchStatus.Text = "Reset: aguardando"
+ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 150, 180)
+ResetMatchStatus.TextSize = 10
+ResetMatchStatus.Font = Enum.Font.Gotham
+ResetMatchStatus.TextXAlignment = Enum.TextXAlignment.Left
+ResetMatchStatus.Parent = Tab4
+
 local function updateKickStatus(text, color)
     KickStatus.Text = "Status: " .. text
     KickStatus.TextColor3 = color or Color3.fromRGB(120, 220, 255)
@@ -1474,6 +1568,24 @@ W.addTap(KickPlayerToolBtn, function()
     local ok = W.kpGiveTool()
     if ok then updateKickStatus("Tool recebida! Equipe e clique num player", Color3.fromRGB(120, 255, 150))
     else updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120)) end
+end)
+
+-- ✅ RESET PARTIDA (Void Fling)
+W.addTap(ResetMatchBtn, function()
+    if W.voidFlingLoop then
+        W.stopVoidFling()
+        ResetMatchStatus.Text = "Reset: cancelado"
+        W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
+    else
+        ResetMatchStatus.Text = "Reset: executando 2x..."
+        W.setBtnActive(ResetMatchBtn, "🔄 RESET PARTIDA (2x)")
+        W.startVoidFling(2)
+        task.spawn(function()
+            while W.voidFlingLoop do task.wait(0.3) end
+            ResetMatchStatus.Text = "Reset: finalizado ✓"
+            W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
+        end)
+    end
 end)
 
 W.langRefresh = function()
@@ -1545,6 +1657,7 @@ end
 
 W.stopAll = function()
     pcall(function() if W.kpStop then W.kpStop() end end)
+    pcall(function() if W.stopVoidFling then W.stopVoidFling() end end)
     W.states.isActive=false; W.states.isBringing=false; W.states.isLoopBringing=false
     W.states.isFreezing=false; W.states.isBoostingAll=false
     W.states.isSkying=false; W.states.isTouchGoal=false; W.states.isMoveBall=false
@@ -1845,6 +1958,7 @@ end
 
 W.closeGUI = function()
     pcall(function() W.kpStop() end)
+    pcall(function() W.stopVoidFling() end)
     W.stopAll()
     TabBar.Visible = false; ContentArea.Visible = false
     local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
@@ -1896,9 +2010,6 @@ task.spawn(function()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
--- ✅ DRAG: nativo do Roblox (funciona PC + mobile)
--- MainFrame.Draggable = true já foi setado acima.
-
 -- COMANDOS
 W.processCommand = function(msg)
     local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
@@ -1910,6 +2021,17 @@ W.processCommand = function(msg)
     if m == "trackerga" or m == "tracker g-a" or m == "tracker" then W.loadModule("trackerga"); return end
 
     if m == "resetpos" then if W.MainFrame then W.MainFrame.Position = W.HOME_POS end; return end
+
+    if m == "voidfling" or m == "void fling" or m == "void" or m == "resetpartida" then
+        if W.voidFlingLoop then
+            W.stopVoidFling()
+            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: OFF") end
+        else
+            W.startVoidFling(2)
+            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: ON (2x)") end
+        end
+        return
+    end
 
     if m == "lang pt" or m == "lang portugues" or m == "lang pt-br" then
         W.lang = "pt"; W.langRefresh()
@@ -2122,4 +2244,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — drag nativo + tool simplificada")
+print("[Willnzx] GUI base carregada — Reset Partida adicionado")
