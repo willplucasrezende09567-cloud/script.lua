@@ -24,9 +24,6 @@ pcall(function()
     local o4 = CoreGui:FindFirstChild("ArrowControlGUI"); if o4 then o4:Destroy() end
 end)
 
--- ============================================================
---  🌐 IDIOMA
--- ============================================================
 W.lang = W.lang or nil
 
 W.i18n = {
@@ -103,7 +100,6 @@ W.boostMultiplier = 3
 W.selectedGoalIndex = 1
 W.defendSelectedGoal = "A"
 
--- ============ KICK PLAYER (Float Top) ============
 W.kp = {
     active = false, moving = false, dir = nil,
     targetStartY = nil, airFrames = 0,
@@ -598,9 +594,7 @@ W.stopFarmCoins = function()
     if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread = nil end
 end
 
--- ============================================================
---  🟡 PREDICT SYSTEM
--- ============================================================
+-- PREDICT SYSTEM
 W.states.isPredict = false
 W.states.isPredictKick = false
 W.states.predictConn = nil
@@ -779,9 +773,7 @@ end
 
 W.stopPredict = W.stopPredictAll
 
--- ============================================================
---  🎯 KICK PLAYER (Float Top)
--- ============================================================
+-- KICK PLAYER (Float Top)
 W.kpFindPlayer = function(q)
     if not q or q == "" then return nil end
     q = tostring(q):lower():gsub("%s", "")
@@ -1277,6 +1269,7 @@ local function kpClickLoop()
     end
 end
 
+-- ✅ TOOL MOBILE-FRIENDLY
 W.kpGiveTool = function()
     if W.kpHasTool() then return false end
     W.kpRemoveTool()
@@ -1284,14 +1277,38 @@ W.kpGiveTool = function()
     tool.Name = "ClickFloatTopTool"
     tool.RequiresHandle = false
     tool.CanBeDropped = false
-    tool.ToolTip = "Clique num player — Float Top"
-    tool.Activated:Connect(function()
+    tool.ToolTip = "Clique/toca num player — Float Top"
+
+    local function tryTarget()
         local m = LP:GetMouse()
-        if not m or not m.Target then return end
-        local model = m.Target:FindFirstAncestorOfClass("Model")
-        if not model then return end
-        local plr = Players:GetPlayerFromCharacter(model)
-        if plr and plr ~= LP then
+        if not m then return nil end
+        local target = m.Target
+        if target then
+            local model = target:FindFirstAncestorOfClass("Model")
+            if model then
+                local plr = Players:GetPlayerFromCharacter(model)
+                if plr and plr ~= LP then return plr end
+            end
+        end
+        local cam = workspace.CurrentCamera
+        local ray = cam:ViewportPointToRay(m.X, m.Y)
+        local rp = RaycastParams.new()
+        rp.FilterDescendantsInstances = {LP.Character}
+        rp.FilterType = Enum.RaycastFilterType.Exclude
+        local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, rp)
+        if result and result.Instance then
+            local model = result.Instance:FindFirstAncestorOfClass("Model")
+            if model then
+                local plr = Players:GetPlayerFromCharacter(model)
+                if plr and plr ~= LP then return plr end
+            end
+        end
+        return nil
+    end
+
+    local function applyTarget()
+        local plr = tryTarget()
+        if plr then
             if W.kp.active and W.kp.activeTarget == plr then
                 W.kpStop()
             else
@@ -1300,15 +1317,40 @@ W.kpGiveTool = function()
                 W.kpStart(plr)
             end
         end
+    end
+
+    tool.Activated:Connect(applyTarget)
+
+    tool.Equipped:Connect(function(mouse)
+        if mouse then
+            mouse.Button1Down:Connect(function()
+                task.wait(0.05)
+                if not W.kp.active then
+                    applyTarget()
+                end
+            end)
+        end
     end)
+
     tool.Destroying:Connect(function()
         if W.kp.toolObj == tool then
             W.kp.toolObj = nil
             if W.kp.active then W.kpStop() end
         end
     end)
+
     local bp = LP:FindFirstChildOfClass("Backpack")
     tool.Parent = bp or LP.Character or LP
+
+    task.spawn(function()
+        task.wait(0.1)
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and tool.Parent ~= char then
+            pcall(function() hum:EquipTool(tool) end)
+        end
+    end)
+
     W.kp.toolObj = tool
     if not W.kpClickLoopRunning then
         W.kpClickLoopRunning = true
@@ -1629,7 +1671,6 @@ local TrackerGABtn = makeButton(Tab4, W.fnNames.tracker, 46, Color3.fromRGB(0, 2
 local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.fromRGB(255, 220, 0), Color3.fromRGB(255, 100, 0), "PredictBallBtn")
 local PredictKickBtn = makeButton(Tab4, W.btn("predict_kick", false), 130, Color3.fromRGB(255, 220, 0), Color3.fromRGB(200, 120, 0), "PredictKickBtn")
 
--- ============ ABA OUTROS: KICK PLAYER ============
 local KPTitle = Instance.new("TextLabel")
 KPTitle.Size = UDim2.new(1, -4, 0, 18)
 KPTitle.Position = UDim2.new(0, 2, 0, 172)
@@ -2020,7 +2061,6 @@ W.addTap(TrackerGABtn, function()
     end
 end)
 
--- SELETOR DE IDIOMA
 local LangOverlay = Instance.new("Frame")
 LangOverlay.Name = "LangOverlay"
 LangOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -2107,7 +2147,6 @@ task.delay(0.65, function()
     end
 end)
 
--- CONFIRMAÇÃO DE FECHAR
 local ConfirmOverlay = Instance.new("Frame")
 ConfirmOverlay.Name = "ConfirmOverlay"
 ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -2259,10 +2298,11 @@ task.spawn(function()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
--- DRAG
+-- ✅ DRAG MOBILE-FRIENDLY
 do
     local dragging = false
     local dragStart, startPos
+    local activeInput = nil
 
     local function isUIButton(target)
         if not target then return false end
@@ -2272,21 +2312,28 @@ do
         return ok and res
     end
 
-    MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if isUIButton(input.Target) then return end
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+    UIS.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            local ap = MainFrame.AbsolutePosition
+            local as = MainFrame.AbsoluteSize
+            if pos.X >= ap.X and pos.X <= ap.X + as.X
+            and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
+                if isUIButton(input.Target) then return end
+                dragging = true
+                activeInput = input
+                dragStart = pos
+                startPos = MainFrame.Position
+            end
         end
     end)
 
-    UIS.InputChanged:Connect(function(input)
+    UIS.InputChanged:Connect(function(input, processed)
         if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -2296,19 +2343,27 @@ do
     end)
 
     UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
+            activeInput = nil
         end
     end)
 
-    local lastTitleClick = 0
+    -- Bônus mobile: segurar o título por 0.6s = reset posição
+    local titleTouchStart = 0
     Title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local now = tick()
-            if now - lastTitleClick < 0.4 then
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            titleTouchStart = tick()
+        end
+    end)
+    Title.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if tick() - titleTouchStart > 0.6 then
                 TS:Create(MainFrame, TweenInfo.new(0.25), {Position = W.HOME_POS}):Play()
             end
-            lastTitleClick = now
         end
     end)
 end
@@ -2585,4 +2640,4 @@ W.CFGV.predictTargetSize = 2
 W.CFGV.predictKickForce = 250
 W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — Kick Player + Tool adicionados")
+print("[Willnzx] GUI base carregada — drag mobile + tool mobile")
