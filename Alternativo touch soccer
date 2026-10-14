@@ -76,7 +76,7 @@ W.urls = {
 -- 🔁 Link usado APENAS no rejoin (queue_on_teleport)
 W.REJOIN_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
 -- 🔄 Link usado no update/resetgui
-W.BASE_URL = "https://pastefy.app/HtWcu7oC/raw"
+W.SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
 
 W.CoreGui=CoreGui; W.UIS=UIS; W.TS=TS; W.RS=RS; W.Players=Players; W.LP=LP
 W.UID=LP.UserId; W.TKN=LP.Name
