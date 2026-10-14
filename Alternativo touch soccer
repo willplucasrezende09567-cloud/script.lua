@@ -1,3 +1,12 @@
+-- ═══════════════════════════════════════════════════════════════
+--  🛡️ FLAG ANTI-DUPLICAÇÃO (3 níveis de proteção)
+-- ═══════════════════════════════════════════════════════════════
+if _G.Willnzx_ANTIDUP then
+    warn("[Willnzx] ⚠️ Script já está rodando nesta sessão. Bloqueado.")
+    return
+end
+_G.Willnzx_ANTIDUP = true
+
 local CoreGui = game:GetService("CoreGui")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
@@ -10,7 +19,17 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
-if W.loaded_base then warn("[Willnzx] GUI ja carregada."); return end
+if W.loaded_base then
+    warn("[Willnzx] ⚠️ GUI ja carregada.")
+    return
+end
+
+local _existingGui = CoreGui:FindFirstChild("WillnzxGUI")
+if _existingGui and _existingGui:FindFirstChild("__WillnzxTag") then
+    warn("[Willnzx] ⚠️ GUI já existe na tela. Bloqueado.")
+    return
+end
+
 W.loaded_base = true
 
 pcall(function()
@@ -54,6 +73,11 @@ W.urls = {
     trackerga = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Tracker%20g-a",
 }
 
+-- 🔁 Link usado APENAS no rejoin (queue_on_teleport)
+W.REJOIN_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
+-- 🔄 Link usado no update/resetgui
+W.BASE_URL = "https://pastefy.app/HtWcu7oC/raw"
+
 W.CoreGui=CoreGui; W.UIS=UIS; W.TS=TS; W.RS=RS; W.Players=Players; W.LP=LP
 W.UID=LP.UserId; W.TKN=LP.Name
 W.KBE = RS:WaitForChild("KickBall")
@@ -80,10 +104,47 @@ W.kp = {
 }
 
 -- ============================================================
---  💀 RESET PARTIDA — técnica do CF Helper (BodyPosition + desativar estados)
+--  💀 RESET PARTIDA — single-shot + loop TP até achar Team####
 -- ============================================================
+W.RETURN_POS = Vector3.new(-214.75, 7.68, 3.49)
 W.voidFlingLoop = false
 W.voidFlingThread = nil
+W.voidFlingSuccess = false
+
+W._checkBugFired = function()
+    local ok, log = pcall(function()
+        return game:GetService("LogService"):GetLogHistory()
+    end)
+    if ok and log then
+        local start = math.max(1, #log - 30)
+        for i = start, #log do
+            local entry = log[i]
+            if entry.message and entry.message:find("UpperTorso is not a valid member", 1, true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+W.isInTeam = function()
+    local teamFolder = workspace:FindFirstChild("team")
+    if teamFolder then
+        local myModel = teamFolder:FindFirstChild(LP.Name)
+        if myModel then
+            for _, o in pairs(myModel:GetChildren()) do
+                if o.Name:match("^Team%d%d%d%d$") then return true end
+            end
+        end
+    end
+    local c = LP.Character
+    if c then
+        for _, o in pairs(c:GetChildren()) do
+            if o.Name:match("^Team%d%d%d%d$") then return true end
+        end
+    end
+    return false
+end
 
 W.voidFlingOnce = function()
     local c = LP.Character
@@ -94,7 +155,6 @@ W.voidFlingOnce = function()
 
     local before = c
 
-    -- ✅ Desabilita estados (mesma técnica do CF Helper)
     pcall(function()
         hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
@@ -103,7 +163,6 @@ W.voidFlingOnce = function()
     end)
     pcall(function() hum.PlatformStand = true end)
 
-    -- ✅ BodyPosition segurando Y bem baixo
     local bp = Instance.new("BodyPosition")
     bp.Name = "__VoidBP"
     bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -112,14 +171,12 @@ W.voidFlingOnce = function()
     bp.Position = Vector3.new(hrp.Position.X, -5000, hrp.Position.Z)
     bp.Parent = hrp
 
-    -- ✅ BodyVelocity ajudando
     local bv = Instance.new("BodyVelocity")
     bv.Name = "__VoidBV"
     bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.new(0, -8000, 0)
     bv.Parent = hrp
 
-    -- ✅ Loop: teleporta via CFrame (mesma técnica do CF Helper)
     local endTime = tick() + 3
     while LP.Character == before and tick() < endTime do
         if hrp and hrp.Parent then
@@ -141,44 +198,102 @@ W.voidFlingOnce = function()
     if bv and bv.Parent then bv:Destroy() end
     if bp and bp.Parent then bp:Destroy() end
 
-    -- Restaura estados
     pcall(function()
         hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
         hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
         hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
         hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
     end)
+    pcall(function() hum.PlatformStand = false end)
 
-    local t1 = tick() + 4
-    while LP.Character == before and tick() < t1 do task.wait(0.05) end
-
-    local t2 = tick() + 8
-    while tick() < t2 do
-        local nc = LP.Character
-        if nc and nc ~= before and nc:FindFirstChild("HumanoidRootPart") then
-            local nh = nc:FindFirstChildOfClass("Humanoid")
-            if nh and nh.Health > 0 then
-                task.wait(0.4)
-                return true
-            end
-        end
-        task.wait(0.1)
-    end
-    return false
+    task.wait(0.3)
+    return LP.Character ~= before
 end
 
-W.startVoidFling = function(times)
-    times = times or 1
+W.startVoidFling = function(onFinish)
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
     W.voidFlingLoop = true
+    W.voidFlingSuccess = false
+
     W.voidFlingThread = task.spawn(function()
-        for i = 1, times do
+        local MAX = 10
+        local DELAY = 2.5
+        local tentativa = 0
+
+        while W.voidFlingLoop and tentativa < MAX do
+            tentativa = tentativa + 1
+
+            local c = LP.Character
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            local waitStart = tick()
+            while W.voidFlingLoop and (not hum or hum.Health <= 0) and tick() - waitStart < 5 do
+                task.wait(0.1)
+                c = LP.Character
+                hum = c and c:FindFirstChildOfClass("Humanoid")
+            end
             if not W.voidFlingLoop then break end
+
+            local before = LP.Character
             W.voidFlingOnce()
-            task.wait(0.3)
+
+            task.wait(0.5)
+            if W._checkBugFired() or LP.Character ~= before then
+                W.voidFlingSuccess = true
+                break
+            end
+
+            local t = tick() + DELAY
+            while W.voidFlingLoop and tick() < t do task.wait(0.1) end
         end
+
+        if W.voidFlingSuccess then
+            local c = LP.Character
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            local t = tick() + 8
+            while tick() < t and (not hum or hum.Health <= 0) do
+                task.wait(0.2)
+                c = LP.Character
+                hum = c and c:FindFirstChildOfClass("Humanoid")
+            end
+
+            task.wait(0.5)
+
+            local TP_TIMEOUT = 20
+            local tpStart = tick()
+            local teamFound = false
+
+            while W.voidFlingLoop and (tick() - tpStart) < TP_TIMEOUT do
+                local cc = LP.Character
+                local hh = cc and cc:FindFirstChild("HumanoidRootPart")
+                if hh then
+                    pcall(function()
+                        hh.CFrame = CFrame.new(W.RETURN_POS)
+                        hh.AssemblyLinearVelocity = Vector3.zero
+                        hh.AssemblyAngularVelocity = Vector3.zero
+                    end)
+                end
+
+                if W.isInTeam() then
+                    teamFound = true
+                    break
+                end
+
+                task.wait(0.12)
+            end
+
+            if teamFound then
+                task.wait(0.2)
+                local cc = LP.Character
+                local hh = cc and cc:FindFirstChild("HumanoidRootPart")
+                if hh then
+                    pcall(function() hh.CFrame = CFrame.new(W.RETURN_POS) end)
+                end
+            end
+        end
+
         W.voidFlingLoop = false
         W.voidFlingThread = nil
+        if onFinish then onFinish(W.voidFlingSuccess) end
     end)
 end
 
@@ -195,6 +310,11 @@ W.stopVoidFling = function()
             hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
             hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
         end)
+    end
+    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local bp = hrp:FindFirstChild("__VoidBP"); if bp then bp:Destroy() end
+        local bv = hrp:FindFirstChild("__VoidBV"); if bv then bv:Destroy() end
     end
 end
 
@@ -256,17 +376,6 @@ W.catmull = function(p0, p1, p2, p3, t)
     return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3)
 end
 
-W.isInTeam = function()
-    local c = LP.Character
-    if not c then return false end
-    for _, o in pairs(c:GetChildren()) do
-        if o.Name:match("^Team%d+$") then return true end
-        if o.Name == "Team" and (o:IsA("NumberValue") or o:IsA("IntValue")) and o.Value and o.Value > 0 then return true end
-    end
-    if LP.Team and tostring(LP.Team) ~= "" then return true end
-    return false
-end
-
 W.getRandomPlayer = function()
     local l = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -299,11 +408,30 @@ end
 
 _G.Willnzx = W
 
+-- ═══════════════════════════════════════════════════════════════
+--  🔁 REJOIN com queue_on_teleport (usa W.REJOIN_URL)
+-- ═══════════════════════════════════════════════════════════════
 local function rejoin()
+    _G.Willnzx_ANTIDUP = nil
+    W.loaded_base = nil
+    _G.Willnzx = nil
+
+    pcall(function()
+        if queue_on_teleport then
+            queue_on_teleport([[
+                task.wait(2)
+                loadstring(game:HttpGet("]] .. W.REJOIN_URL .. [["))()
+            ]])
+        end
+    end)
+
     local jid = game.JobId
     pcall(function()
-        if jid and jid ~= "" then TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
-        else TPS:Teleport(game.PlaceId, LP) end
+        if jid and jid ~= "" then
+            TPS:TeleportToPlaceInstance(game.PlaceId, jid, LP)
+        else
+            TPS:Teleport(game.PlaceId, LP)
+        end
     end)
 end
 
@@ -1242,7 +1370,6 @@ task.spawn(function()
     end
 end)
 
--- Failsafe anti-travamento
 task.spawn(function()
     while task.wait(0.5) do
         local c = LP.Character
@@ -1293,6 +1420,7 @@ end)
 
 pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
 
+-- ═══ UI com SIDEBAR ═══
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "WillnzxGUI"
 ScreenGui.ResetOnSpawn = false
@@ -1301,6 +1429,11 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LP:WaitForChild("PlayerGui") end
 W.ScreenGui = ScreenGui
+
+local _tag = Instance.new("BoolValue")
+_tag.Name = "__WillnzxTag"
+_tag.Value = true
+_tag.Parent = ScreenGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 0, 0, 0)
@@ -1333,7 +1466,7 @@ bg.Color = ColorSequence.new({
 bg.Rotation = 45; bg.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -80, 0, 22); Title.Position = UDim2.new(0, 10, 0, 10)
+Title.Size = UDim2.new(1, -90, 0, 22); Title.Position = UDim2.new(0, 12, 0, 8)
 Title.BackgroundTransparency = 1; Title.Text = "By: @willnzx.mt + miguelestrellaaa"
 Title.TextColor3 = Color3.fromRGB(0, 230, 255); Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.Parent = MainFrame
@@ -1345,53 +1478,52 @@ tg.Color = ColorSequence.new({
 tg.Parent = Title
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 26, 0, 26); MinBtn.Position = UDim2.new(1, -62, 0, 8)
+MinBtn.Size = UDim2.new(0, 26, 0, 26); MinBtn.Position = UDim2.new(1, -62, 0, 6)
 MinBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MinBtn.BackgroundTransparency = 0.5
 MinBtn.Text = "-"; MinBtn.TextSize = 16; MinBtn.TextColor3 = Color3.fromRGB(0, 230, 255)
 MinBtn.Font = Enum.Font.GothamBold; MinBtn.AutoButtonColor = false; MinBtn.Parent = MainFrame
 local mcc = Instance.new("UICorner"); mcc.CornerRadius = UDim.new(0, 5); mcc.Parent = MinBtn
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 26, 0, 26); CloseBtn.Position = UDim2.new(1, -32, 0, 8)
+CloseBtn.Size = UDim2.new(0, 26, 0, 26); CloseBtn.Position = UDim2.new(1, -32, 0, 6)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); CloseBtn.BackgroundTransparency = 0.5
 CloseBtn.Text = "X"; CloseBtn.TextSize = 16; CloseBtn.TextColor3 = Color3.fromRGB(255, 60, 60)
 CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.AutoButtonColor = false; CloseBtn.Parent = MainFrame
 local ccc = Instance.new("UICorner"); ccc.CornerRadius = UDim.new(0, 5); ccc.Parent = CloseBtn
 
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -30, 0, 28); TabBar.Position = UDim2.new(0, 15, 0, 36)
+TabBar.Size = UDim2.new(0, 88, 1, -52)
+TabBar.Position = UDim2.new(0, 12, 0, 40)
 TabBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 TabBar.BackgroundTransparency = 0.5
-TabBar.BorderSizePixel = 0; TabBar.Parent = MainFrame
+TabBar.BorderSizePixel = 0
+TabBar.Parent = MainFrame
 local tbc = Instance.new("UICorner"); tbc.CornerRadius = UDim.new(0, 8); tbc.Parent = TabBar
 local tbs = Instance.new("UIStroke"); tbs.Thickness = 1; tbs.Color = Color3.fromRGB(0, 200, 255); tbs.Transparency = 0.5; tbs.Parent = TabBar
-
-local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(1, 0, 1, 0)
-TabContainer.BackgroundTransparency = 1; TabContainer.Parent = TabBar
 
 local tabButtons = {}
 local tabKeys = {"tab_atq", "tab_bola", "tab_outros"}
 for i, key in ipairs(tabKeys) do
     local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(1/3, -3, 1, -8)
-    tab.Position = UDim2.new((i-1)/3, 1.5, 0, 4)
+    tab.Size = UDim2.new(1, -8, 0, 34)
+    tab.Position = UDim2.new(0, 4, 0, (i-1)*38 + 4)
     tab.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     tab.BackgroundTransparency = 0.5
     tab.Text = W.t(key); tab.TextSize = 12
     tab.Font = Enum.Font.GothamBold
     tab.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tab.AutoButtonColor = false; tab.Parent = TabContainer
+    tab.AutoButtonColor = false; tab.Parent = TabBar
     local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 6); c.Parent = tab
     local s = Instance.new("UIStroke"); s.Thickness = 1; s.Color = Color3.fromRGB(80, 80, 80); s.Transparency = 0.5; s.Parent = tab
     tabButtons[i] = tab
 end
 
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -30, 1, -100)
-ContentArea.Position = UDim2.new(0, 15, 0, 72)
+ContentArea.Size = UDim2.new(1, -116, 1, -52)
+ContentArea.Position = UDim2.new(0, 104, 0, 40)
 ContentArea.BackgroundTransparency = 1
-ContentArea.ClipsDescendants = true; ContentArea.Parent = MainFrame
+ContentArea.ClipsDescendants = true
+ContentArea.Parent = MainFrame
 
 local Tab1 = Instance.new("ScrollingFrame")
 Tab1.Size = UDim2.new(1, 0, 1, 0)
@@ -1586,7 +1718,7 @@ local KickNameBox = Instance.new("TextBox")
 KickNameBox.Name = "KickNameBox"
 KickNameBox.Size = UDim2.new(1, -4, 0, 32); KickNameBox.Position = UDim2.new(0, 2, 0, 194)
 KickNameBox.BackgroundColor3 = Color3.fromRGB(0, 0, 0); KickNameBox.BackgroundTransparency = 0.45
-KickNameBox.PlaceholderText = "Digite o nome (qualquer letra)..."
+KickNameBox.PlaceholderText = "Digite o nome..."
 KickNameBox.PlaceholderColor3 = Color3.fromRGB(120, 130, 160)
 KickNameBox.Text = ""; KickNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 KickNameBox.TextSize = 13; KickNameBox.Font = Enum.Font.Gotham
@@ -1649,16 +1781,16 @@ W.addTap(KickPlayerBtn, function()
     W.kp.activeTarget = p
     W.kp.FloatTopStopVelocity = 35
     W.kpStart(p)
-    updateKickStatus("KICK: float top em " .. p.Name .. " (detecção 35)", Color3.fromRGB(255, 100, 100))
+    updateKickStatus("KICK: float top em " .. p.Name, Color3.fromRGB(255, 100, 100))
 end)
 
 W.addTap(KickPlayerToolBtn, function()
     if W.kpHasTool() then
-        updateKickStatus("Você já tem a Tool do Float Top!", Color3.fromRGB(255, 200, 100))
+        updateKickStatus("Você já tem a Tool!", Color3.fromRGB(255, 200, 100))
         return
     end
     local ok = W.kpGiveTool()
-    if ok then updateKickStatus("Tool recebida! Equipe e clique num player", Color3.fromRGB(120, 255, 150))
+    if ok then updateKickStatus("Tool recebida!", Color3.fromRGB(120, 255, 150))
     else updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120)) end
 end)
 
@@ -1666,17 +1798,29 @@ W.addTap(ResetMatchBtn, function()
     if W.voidFlingLoop then
         W.stopVoidFling()
         ResetMatchStatus.Text = "Reset: cancelado"
+        ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 150, 180)
         W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
-    else
-        ResetMatchStatus.Text = "Reset: teleportando..."
-        W.setBtnActive(ResetMatchBtn, "🔄 RESETANDO...")
-        W.startVoidFling(1)
-        task.spawn(function()
-            while W.voidFlingLoop do task.wait(0.3) end
-            ResetMatchStatus.Text = "Reset: finalizado ✓"
-            W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
-        end)
+        return
     end
+
+    ResetMatchStatus.Text = "Reset: iniciando..."
+    ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+    W.setBtnActive(ResetMatchBtn, "🔄 RESETANDO...")
+
+    W.startVoidFling(function(success)
+        if success then
+            ResetMatchStatus.Text = "Reset: BUG ✓ → TP até achar time..."
+            ResetMatchStatus.TextColor3 = Color3.fromRGB(120, 255, 150)
+        else
+            ResetMatchStatus.Text = "Reset: não conseguiu"
+            ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        end
+        W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
+        task.delay(5, function()
+            ResetMatchStatus.Text = "Reset: aguardando"
+            ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 150, 180)
+        end)
+    end)
 end)
 
 W.langRefresh = function()
@@ -1972,9 +2116,32 @@ local langBlur = Instance.new("BlurEffect")
 langBlur.Size = 12; langBlur.Parent = Lighting
 
 local function finishLang(choice)
-    W.lang = choice; W.langRefresh()
-    TS:Create(LangOverlay, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    task.wait(0.3)
+    W.lang = choice
+    local chosenBtn = (choice == "pt") and PtBtn or EnBtn
+    local otherBtn = (choice == "pt") and EnBtn or PtBtn
+
+    local origSize = chosenBtn.Size
+    TS:Create(chosenBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+    TS:Create(chosenBtn, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = origSize + UDim2.new(0, 12, 0, 6)
+    }):Play()
+    task.wait(0.12)
+
+    TS:Create(otherBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.7}):Play()
+
+    TS:Create(LangOverlay, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0.85, 0, 0.85, 0),
+        Position = UDim2.new(0.075, 0, 0.075, 0)
+    }):Play()
+    TS:Create(LTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+    TS:Create(LSub, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+    TS:Create(PtBtn, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+    TS:Create(EnBtn, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+
+    W.langRefresh()
+    task.wait(0.4)
+
     if langBlur and langBlur.Parent then langBlur:Destroy() end
     if LangOverlay and LangOverlay.Parent then LangOverlay:Destroy() end
 end
@@ -1996,7 +2163,7 @@ ConfirmOverlay.Active = true; ConfirmOverlay.Visible = false; ConfirmOverlay.Par
 local COc = Instance.new("UICorner"); COc.CornerRadius = UDim.new(0, 12); COc.Parent = ConfirmOverlay
 
 local COTitle = Instance.new("TextLabel")
-COTitle.Size = UDim2.new(1, -20, 0, 30); COTitle.Position = UDim2.new(0, 10, 0, 60)
+COTitle.Size = UDim2.new(1, -20, 0, 30); COTitle.Position = UDim2.new(0, 10, 0, 80)
 COTitle.BackgroundTransparency = 1
 COTitle.Text = "❓ Você realmente quer fechar a GUI?"
 COTitle.TextColor3 = Color3.fromRGB(220, 240, 255); COTitle.TextSize = 15
@@ -2004,7 +2171,7 @@ COTitle.Font = Enum.Font.GothamBold; COTitle.TextWrapped = true
 COTitle.ZIndex = 201; COTitle.Parent = ConfirmOverlay
 
 local COSub = Instance.new("TextLabel")
-COSub.Size = UDim2.new(1, -20, 0, 18); COSub.Position = UDim2.new(0, 10, 0, 92)
+COSub.Size = UDim2.new(1, -20, 0, 18); COSub.Position = UDim2.new(0, 10, 0, 112)
 COSub.BackgroundTransparency = 1
 COSub.Text = "Todas as funções serão desligadas"
 COSub.TextColor3 = Color3.fromRGB(150, 180, 200); COSub.TextSize = 11
@@ -2013,7 +2180,7 @@ COSub.Font = Enum.Font.Gotham; COSub.ZIndex = 201; COSub.Parent = ConfirmOverlay
 local COBlur = nil
 
 local SimBtn = Instance.new("TextButton")
-SimBtn.Size = UDim2.new(0.5, -25, 0, 42); SimBtn.Position = UDim2.new(0, 20, 0, 140)
+SimBtn.Size = UDim2.new(0.5, -25, 0, 42); SimBtn.Position = UDim2.new(0, 20, 0, 160)
 SimBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 40)
 SimBtn.Text = "✔  SIM"; SimBtn.TextSize = 14
 SimBtn.Font = Enum.Font.GothamBold; SimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2022,7 +2189,7 @@ local SimC = Instance.new("UICorner"); SimC.CornerRadius = UDim.new(0, 8); SimC.
 local SimS = Instance.new("UIStroke"); SimS.Thickness = 1.5; SimS.Color = Color3.fromRGB(255, 80, 90); SimS.Transparency = 0.3; SimS.Parent = SimBtn
 
 local NaoBtn = Instance.new("TextButton")
-NaoBtn.Size = UDim2.new(0.5, -25, 0, 42); NaoBtn.Position = UDim2.new(0.5, 5, 0, 140)
+NaoBtn.Size = UDim2.new(0.5, -25, 0, 42); NaoBtn.Position = UDim2.new(0.5, 5, 0, 160)
 NaoBtn.BackgroundColor3 = Color3.fromRGB(30, 130, 80)
 NaoBtn.Text = "✖  NÃO"; NaoBtn.TextSize = 14
 NaoBtn.Font = Enum.Font.GothamBold; NaoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2064,34 +2231,99 @@ W.closeGUI = function()
     ScreenGui:Destroy()
     W.loaded_base = nil
     _G.Willnzx = nil
+    _G.Willnzx_ANTIDUP = nil
 end
 
 local minimized = false
-local FULL = UDim2.new(0, 360, 0, 420)
-local MIN = UDim2.new(0, 360, 0, 42)
+local animating = false
+local FULL = UDim2.new(0, 380, 0, 430)
+local MIN = UDim2.new(0, 380, 0, 42)
 W.FULL_SIZE = FULL; W.MIN_SIZE = MIN
-W.HOME_POS = UDim2.new(0.5, -180, 0.5, -260)
+W.HOME_POS = UDim2.new(0.5, -190, 0.5, -215)
+
+W.unminimize = function(callback)
+    if not minimized then if callback then callback() end; return end
+    if animating then
+        local t = tick() + 0.5
+        while animating and tick() < t do task.wait(0.02) end
+        if callback then callback() end
+        return
+    end
+    minimized = false
+    animating = true
+    TabBar.Visible = true
+    ContentArea.Visible = true
+    MinBtn.Text = "-"
+    local tw = TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = FULL})
+    tw:Play()
+    tw.Completed:Connect(function()
+        animating = false
+        if callback then callback() end
+    end)
+end
 
 W.addTap(MinBtn, function()
-    minimized = not minimized
+    if animating then return end
+    if ConfirmOverlay.Visible then return end
     if minimized then
-        TabBar.Visible = false; ContentArea.Visible = false
-        TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = MIN}):Play()
-        MinBtn.Text = "+"
+        W.unminimize()
     else
-        TabBar.Visible = true; ContentArea.Visible = true
-        TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = FULL}):Play()
-        MinBtn.Text = "-"
+        minimized = true
+        animating = true
+        TabBar.Visible = false; ContentArea.Visible = false
+        MinBtn.Text = "+"
+        local tw = TS:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = MIN})
+        tw:Play()
+        tw.Completed:Connect(function() animating = false end)
     end
 end)
 
 W.addTap(CloseBtn, function()
+    if animating then return end
     if ConfirmOverlay.Visible then return end
-    W.showConfirm()
+    if minimized then
+        W.unminimize(function()
+            task.wait(0.08)
+            W.showConfirm()
+        end)
+    else
+        W.showConfirm()
+    end
 end)
 
-W.addTap(SimBtn, function() W.hideConfirm(); task.wait(0.15); W.closeGUI() end)
-W.addTap(NaoBtn, function() W.hideConfirm() end)
+local function animateConfirmClick(btn, baseColor, callback)
+    local origSize = btn.Size
+    local origPos = btn.Position
+    TS:Create(btn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+    TS:Create(btn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = origSize - UDim2.new(0, 10, 0, 10),
+        Position = origPos + UDim2.new(0, 5, 0, 5)
+    }):Play()
+    task.wait(0.09)
+    TS:Create(btn, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        BackgroundColor3 = baseColor,
+        Size = origSize,
+        Position = origPos
+    }):Play()
+    task.wait(0.12)
+    if callback then callback() end
+end
+
+W.addTap(SimBtn, function()
+    if animating then return end
+    animateConfirmClick(SimBtn, Color3.fromRGB(180, 30, 40), function()
+        W.hideConfirm()
+        task.wait(0.15)
+        W.closeGUI()
+    end)
+end)
+
+W.addTap(NaoBtn, function()
+    if animating then return end
+    animateConfirmClick(NaoBtn, Color3.fromRGB(30, 130, 80), function()
+        W.hideConfirm()
+    end)
+end)
 
 task.spawn(function()
     task.wait(0.05)
@@ -2116,10 +2348,15 @@ W.processCommand = function(msg)
     if m == "voidfling" or m == "void fling" or m == "void" or m == "resetpartida" then
         if W.voidFlingLoop then
             W.stopVoidFling()
-            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: OFF") end
+            if W.sendToChat then W.sendToChat("[Willnzx] Reset: OFF") end
         else
-            W.startVoidFling(1)
-            if W.sendToChat then W.sendToChat("[Willnzx] Reset Partida: ON") end
+            W.startVoidFling(function(success)
+                if W.sendToChat then
+                    if success then W.sendToChat("[Willnzx] Reset: BUG ATIVADO ✓")
+                    else W.sendToChat("[Willnzx] Reset: falhou") end
+                end
+            end)
+            if W.sendToChat then W.sendToChat("[Willnzx] Reset: ON") end
         end
         return
     end
@@ -2137,16 +2374,18 @@ W.processCommand = function(msg)
 
     if m == "update" then
         _G.Willnzx = nil; W.loaded_base = nil; W.loaded = {}
+        _G.Willnzx_ANTIDUP = nil
         pcall(function()
             local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
         end)
         task.wait(0.3)
-        loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
+        loadstring(game:HttpGet(W.BASE_URL))()
         return
     end
 
     if m == "resetgui" then
         _G.Willnzx = nil; W.loaded_base = nil; W.loaded = {}
+        _G.Willnzx_ANTIDUP = nil
         pcall(function()
             local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
             local o2 = CoreGui:FindFirstChild("WillnzxCmdsGUI"); if o2 then o2:Destroy() end
@@ -2154,7 +2393,7 @@ W.processCommand = function(msg)
             local o4 = CoreGui:FindFirstChild("ArrowControlGUI"); if o4 then o4:Destroy() end
         end)
         task.wait(0.3)
-        loadstring(game:HttpGet("https://pastefy.app/HtWcu7oC/raw"))()
+        loadstring(game:HttpGet(W.BASE_URL))()
         return
     end
 
@@ -2335,4 +2574,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] GUI base carregada — Reset Partida com técnica do CF Helper")
+print("[Willnzx] ✅ GUI carregada — anti-dup + queue_on_teleport + abas laterais")
