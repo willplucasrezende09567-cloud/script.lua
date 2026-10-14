@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════
---  🛡️ FLAG ANTI-DUPLICAÇÃO (3 níveis de proteção)
+--  🛡️ FLAG ANTI-DUPLICAÇÃO (3 níveis)
 -- ═══════════════════════════════════════════════════════════════
 if _G.Willnzx_ANTIDUP then
-    warn("[Willnzx] ⚠️ Script já está rodando nesta sessão. Bloqueado.")
+    warn("[Willnzx] ⚠️ Script já está rodando. Bloqueado.")
     return
 end
 _G.Willnzx_ANTIDUP = true
@@ -19,14 +19,11 @@ local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
 
-if W.loaded_base then
-    warn("[Willnzx] ⚠️ GUI ja carregada.")
-    return
-end
+if W.loaded_base then warn("[Willnzx] ⚠️ GUI ja carregada."); return end
 
 local _existingGui = CoreGui:FindFirstChild("WillnzxGUI")
 if _existingGui and _existingGui:FindFirstChild("__WillnzxTag") then
-    warn("[Willnzx] ⚠️ GUI já existe na tela. Bloqueado.")
+    warn("[Willnzx] ⚠️ GUI já existe. Bloqueado.")
     return
 end
 
@@ -72,11 +69,7 @@ W.urls = {
     control = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Control",
     trackerga = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Tracker%20g-a",
 }
-
--- 🔁 Link usado APENAS no rejoin (queue_on_teleport)
-W.REJOIN_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
--- 🔄 Link usado no update/resetgui
-W.BASE_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
+W.SCRIPT_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
 
 W.CoreGui=CoreGui; W.UIS=UIS; W.TS=TS; W.RS=RS; W.Players=Players; W.LP=LP
 W.UID=LP.UserId; W.TKN=LP.Name
@@ -103,13 +96,24 @@ W.kp = {
     wasActive=false,
 }
 
--- ============================================================
---  💀 RESET PARTIDA — single-shot + loop TP até achar Team####
--- ============================================================
+-- ═══════════════════════════════════════════════════════════════
+--  💀 RESET — micro-TPs + loop
+-- ═══════════════════════════════════════════════════════════════
 W.RETURN_POS = Vector3.new(-214.75, 7.68, 3.49)
 W.voidFlingLoop = false
 W.voidFlingThread = nil
 W.voidFlingSuccess = false
+
+-- 🎯 Config micro-TPs
+W.VOID_XZ = Vector2.new(-259.91, -13.53)
+W.VOID_Y = -502
+W.VOID_STEP = 100
+W.VOID_DELAY = 0.001
+W.VOID_MAX_TIME = 10
+
+-- ♾️ Loop reset
+W.loopResetActive = false
+W.loopResetThread = nil
 
 W._checkBugFired = function()
     local ok, log = pcall(function()
@@ -146,6 +150,7 @@ W.isInTeam = function()
     return false
 end
 
+-- 🎯 Micro-TPs + loop no void
 W.voidFlingOnce = function()
     local c = LP.Character
     if not c then return false end
@@ -154,56 +159,71 @@ W.voidFlingOnce = function()
     if not hrp or not hum then return false end
 
     local before = c
+    local noclipSaved = {}
 
-    pcall(function()
-        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-        hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-        hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-        hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
-    end)
-    pcall(function() hum.PlatformStand = true end)
-
-    local bp = Instance.new("BodyPosition")
-    bp.Name = "__VoidBP"
-    bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bp.P = 100000
-    bp.D = 10000
-    bp.Position = Vector3.new(hrp.Position.X, -5000, hrp.Position.Z)
-    bp.Parent = hrp
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "__VoidBV"
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.Velocity = Vector3.new(0, -8000, 0)
-    bv.Parent = hrp
-
-    local endTime = tick() + 3
-    while LP.Character == before and tick() < endTime do
-        if hrp and hrp.Parent then
-            local rot = hrp.CFrame - hrp.CFrame.Position
-            hrp.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 30, hrp.Position.Z) * rot
-            pcall(function()
-                hrp.Velocity = Vector3.new(0, -8000, 0)
-                hrp.AssemblyLinearVelocity = Vector3.new(0, -8000, 0)
-                hrp.RotVelocity = Vector3.new(9999, 9999, 9999)
-                hrp.AssemblyAngularVelocity = Vector3.new(9999, 9999, 9999)
-            end)
-            if bp and bp.Parent then
-                bp.Position = Vector3.new(hrp.Position.X, hrp.Position.Y - 5000, hrp.Position.Z)
+    local function applyNoclip()
+        local cc = LP.Character
+        if not cc then return end
+        for _, d in ipairs(cc:GetDescendants()) do
+            if d:IsA("BasePart") then
+                if noclipSaved[d] == nil then
+                    noclipSaved[d] = d.CanCollide
+                end
+                d.CanCollide = false
             end
         end
-        task.wait(0.03)
     end
 
-    if bv and bv.Parent then bv:Destroy() end
-    if bp and bp.Parent then bp:Destroy() end
+    applyNoclip()
+    local noclipThread = task.spawn(function()
+        while LP.Character == before do
+            applyNoclip()
+            task.wait(0.1)
+        end
+    end)
 
     pcall(function()
-        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        hum.PlatformStand = false
         hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-        hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
-        hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
     end)
+
+    local startTime = tick()
+    local reachedTarget = false
+
+    while LP.Character == before and tick() - startTime < W.VOID_MAX_TIME do
+        local cur = LP.Character
+        if not cur or cur ~= before then break end
+        local chrp = cur:FindFirstChild("HumanoidRootPart")
+        if not chrp then break end
+
+        local currentY = chrp.Position.Y
+        if not reachedTarget then
+            local nextY = currentY - W.VOID_STEP
+            if nextY <= W.VOID_Y then
+                nextY = W.VOID_Y
+                reachedTarget = true
+            end
+            pcall(function()
+                chrp.CFrame = CFrame.new(chrp.Position.X, nextY, chrp.Position.Z)
+                chrp.AssemblyLinearVelocity = Vector3.zero
+            end)
+        else
+            pcall(function()
+                chrp.CFrame = CFrame.new(W.VOID_XZ.X, W.VOID_Y, W.VOID_XZ.Y)
+                chrp.AssemblyLinearVelocity = Vector3.zero
+            end)
+        end
+        task.wait(W.VOID_DELAY)
+    end
+
+    if noclipThread then task.cancel(noclipThread) end
+
+    for d, orig in pairs(noclipSaved) do
+        if typeof(d) == "Instance" and d.Parent then
+            pcall(function() d.CanCollide = orig end)
+        end
+    end
+
     pcall(function() hum.PlatformStand = false end)
 
     task.wait(0.3)
@@ -272,12 +292,10 @@ W.startVoidFling = function(onFinish)
                         hh.AssemblyAngularVelocity = Vector3.zero
                     end)
                 end
-
                 if W.isInTeam() then
                     teamFound = true
                     break
                 end
-
                 task.wait(0.12)
             end
 
@@ -300,21 +318,43 @@ end
 W.stopVoidFling = function()
     W.voidFlingLoop = false
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
+end
+
+-- ♾️ Loop reset infinito
+W.startLoopReset = function(onCount)
+    if W.loopResetThread then task.cancel(W.loopResetThread); W.loopResetThread = nil end
+    W.loopResetActive = true
+    local count = 0
+
+    W.loopResetThread = task.spawn(function()
+        while W.loopResetActive do
+            local c = LP.Character
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            local waitStart = tick()
+            while W.loopResetActive and (not c or not hum or hum.Health <= 0) and tick() - waitStart < 10 do
+                task.wait(0.2)
+                c = LP.Character
+                hum = c and c:FindFirstChildOfClass("Humanoid")
+            end
+            if not W.loopResetActive then break end
+
+            task.wait(0.5)
+            W.voidFlingOnce()
+            count = count + 1
+            if onCount then pcall(onCount, count) end
+        end
+        W.loopResetActive = false
+        W.loopResetThread = nil
+    end)
+end
+
+W.stopLoopReset = function()
+    W.loopResetActive = false
+    if W.loopResetThread then task.cancel(W.loopResetThread); W.loopResetThread = nil end
     local c = LP.Character
-    local hum = c and c:FindFirstChildOfClass("Humanoid")
-    if hum then
-        pcall(function() hum.PlatformStand = false end)
-        pcall(function()
-            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
-        end)
-    end
-    local hrp = c and c:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        local bp = hrp:FindFirstChild("__VoidBP"); if bp then bp:Destroy() end
-        local bv = hrp:FindFirstChild("__VoidBV"); if bv then bv:Destroy() end
+    if c then
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if hum then pcall(function() hum.PlatformStand = false end) end
     end
 end
 
@@ -408,9 +448,6 @@ end
 
 _G.Willnzx = W
 
--- ═══════════════════════════════════════════════════════════════
---  🔁 REJOIN com queue_on_teleport (usa W.REJOIN_URL)
--- ═══════════════════════════════════════════════════════════════
 local function rejoin()
     _G.Willnzx_ANTIDUP = nil
     W.loaded_base = nil
@@ -420,7 +457,7 @@ local function rejoin()
         if queue_on_teleport then
             queue_on_teleport([[
                 task.wait(2)
-                loadstring(game:HttpGet("]] .. W.REJOIN_URL .. [["))()
+                loadstring(game:HttpGet("]] .. W.SCRIPT_URL .. [["))()
             ]])
         end
     end)
@@ -897,7 +934,7 @@ W.stopPredictAll = function()
 end
 W.stopPredict = W.stopPredictAll
 
--- KICK PLAYER
+-- KICK PLAYER (código original mantido)
 W.kpFindPlayer = function(q)
     if not q or q == "" then return nil end
     q = tostring(q):lower():gsub("%s", "")
@@ -1420,7 +1457,7 @@ end)
 
 pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
 
--- ═══ UI com SIDEBAR ═══
+-- ═══ UI (abas laterais) ═══
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "WillnzxGUI"
 ScreenGui.ResetOnSpawn = false
@@ -1550,7 +1587,7 @@ Tab4.Size = UDim2.new(1, 0, 1, 0)
 Tab4.BackgroundTransparency = 1; Tab4.BorderSizePixel = 0
 Tab4.ScrollBarThickness = 5; Tab4.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
 Tab4.ScrollBarImageTransparency = 0.3
-Tab4.CanvasSize = UDim2.new(0, 0, 0, 520)
+Tab4.CanvasSize = UDim2.new(0, 0, 0, 580)
 Tab4.ScrollingDirection = Enum.ScrollingDirection.Y
 Tab4.ElasticBehavior = Enum.ElasticBehavior.Never
 Tab4.Visible = false; Tab4.Parent = ContentArea
@@ -1743,12 +1780,15 @@ local KickPlayerToolBtn = makeButton(Tab4, "🎒 KICK PLAYER TOOL", 294, Color3.
 KickPlayerBtn.TextSize = 13
 KickPlayerToolBtn.TextSize = 13
 
-local ResetMatchBtn = makeButton(Tab4, "🔄 RESET PARTIDA", 336, Color3.fromRGB(180, 30, 60), Color3.fromRGB(60, 0, 20), "ResetMatchBtn")
+local LoopResetBtn = makeButton(Tab4, "♾️ LOOP RESET: OFF", 336, Color3.fromRGB(120, 0, 200), Color3.fromRGB(60, 0, 100), "LoopResetBtn")
+LoopResetBtn.TextSize = 13
+
+local ResetMatchBtn = makeButton(Tab4, "🔄 RESET PARTIDA", 378, Color3.fromRGB(180, 30, 60), Color3.fromRGB(60, 0, 20), "ResetMatchBtn")
 ResetMatchBtn.TextSize = 13
 
 local ResetMatchStatus = Instance.new("TextLabel")
 ResetMatchStatus.Size = UDim2.new(1, -4, 0, 16)
-ResetMatchStatus.Position = UDim2.new(0, 2, 0, 378)
+ResetMatchStatus.Position = UDim2.new(0, 2, 0, 420)
 ResetMatchStatus.BackgroundTransparency = 1
 ResetMatchStatus.Text = "Reset: aguardando"
 ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 150, 180)
@@ -1794,6 +1834,25 @@ W.addTap(KickPlayerToolBtn, function()
     else updateKickStatus("Não foi possível dar a tool", Color3.fromRGB(255, 120, 120)) end
 end)
 
+-- ♾️ Loop Reset
+W.addTap(LoopResetBtn, function()
+    if W.loopResetActive then
+        W.stopLoopReset()
+        W.setBtnInactive(LoopResetBtn, "♾️ LOOP RESET: OFF")
+        ResetMatchStatus.Text = "Loop: parado"
+        ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+        if W.sendToChat then W.sendToChat("[Willnzx] Loop Reset: OFF") end
+    else
+        W.stopVoidFling()
+        W.startLoopReset()
+        W.setBtnActive(LoopResetBtn, "♾️ LOOP RESET: ON")
+        ResetMatchStatus.Text = "Loop: ativo (infinito)"
+        ResetMatchStatus.TextColor3 = Color3.fromRGB(255, 120, 200)
+        if W.sendToChat then W.sendToChat("[Willnzx] Loop Reset: ON") end
+    end
+end)
+
+-- 🔄 Reset Partida (single-shot)
 W.addTap(ResetMatchBtn, function()
     if W.voidFlingLoop then
         W.stopVoidFling()
@@ -1809,7 +1868,7 @@ W.addTap(ResetMatchBtn, function()
 
     W.startVoidFling(function(success)
         if success then
-            ResetMatchStatus.Text = "Reset: BUG ✓ → TP até achar time..."
+            ResetMatchStatus.Text = "Reset: BUG ✓ → TP time"
             ResetMatchStatus.TextColor3 = Color3.fromRGB(120, 255, 150)
         else
             ResetMatchStatus.Text = "Reset: não conseguiu"
@@ -1893,6 +1952,10 @@ end
 W.stopAll = function()
     pcall(function() if W.kpStop then W.kpStop() end end)
     pcall(function() if W.stopVoidFling then W.stopVoidFling() end end)
+    pcall(function() if W.stopLoopReset then W.stopLoopReset() end end)
+    if LoopResetBtn and LoopResetBtn.Parent then
+        pcall(function() W.setBtnInactive(LoopResetBtn, "♾️ LOOP RESET: OFF") end)
+    end
     W.states.isActive=false; W.states.isBringing=false; W.states.isLoopBringing=false
     W.states.isFreezing=false; W.states.isBoostingAll=false
     W.states.isSkying=false; W.states.isTouchGoal=false; W.states.isMoveBall=false
@@ -2217,6 +2280,7 @@ end
 W.closeGUI = function()
     pcall(function() W.kpStop() end)
     pcall(function() W.stopVoidFling() end)
+    pcall(function() W.stopLoopReset() end)
     W.stopAll()
     TabBar.Visible = false; ContentArea.Visible = false
     local tw = TS:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
@@ -2345,6 +2409,20 @@ W.processCommand = function(msg)
 
     if m == "resetpos" then if W.MainFrame then W.MainFrame.Position = W.HOME_POS end; return end
 
+    if m == "loopreset" or m == "loop reset" or m == "autobug" then
+        if W.loopResetActive then
+            W.stopLoopReset()
+            W.setBtnInactive(LoopResetBtn, "♾️ LOOP RESET: OFF")
+            if W.sendToChat then W.sendToChat("[Willnzx] Loop Reset: OFF") end
+        else
+            W.stopVoidFling()
+            W.startLoopReset()
+            W.setBtnActive(LoopResetBtn, "♾️ LOOP RESET: ON")
+            if W.sendToChat then W.sendToChat("[Willnzx] Loop Reset: ON") end
+        end
+        return
+    end
+
     if m == "voidfling" or m == "void fling" or m == "void" or m == "resetpartida" then
         if W.voidFlingLoop then
             W.stopVoidFling()
@@ -2379,7 +2457,7 @@ W.processCommand = function(msg)
             local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
         end)
         task.wait(0.3)
-        loadstring(game:HttpGet(W.BASE_URL))()
+        loadstring(game:HttpGet(W.SCRIPT_URL))()
         return
     end
 
@@ -2393,7 +2471,7 @@ W.processCommand = function(msg)
             local o4 = CoreGui:FindFirstChild("ArrowControlGUI"); if o4 then o4:Destroy() end
         end)
         task.wait(0.3)
-        loadstring(game:HttpGet(W.BASE_URL))()
+        loadstring(game:HttpGet(W.SCRIPT_URL))()
         return
     end
 
@@ -2574,4 +2652,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] ✅ GUI carregada — anti-dup + queue_on_teleport + abas laterais")
+print("[Willnzx] ✅ GUI carregada — Loop Reset + micro-TPs + anti-dup")
