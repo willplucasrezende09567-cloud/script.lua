@@ -90,8 +90,6 @@ W.kp = {
     active=false, moving=false, dir=nil, targetStartY=nil, airFrames=0,
     spikePaused=false, spikeStartTime=0, activeTarget=nil, noclipActive=false, spectating=false,
     toolObj=nil, myOriginalCFrame=nil,
-    FloatTopStopVelocity=35, FloatTopOffset=1.0, FloatTopVelocity=-250, FloatTopStepDown=1.0,
-    FloatTopFrontOffset=14.0, FloatRisingOffset=13, FloatRisingThreshold=5,
     MoveVelocityThreshold=16, StopVelocityThreshold=3, DirectionChangeThreshold=60,
     VoidY=-80, SpikeThreshold=320, AirMinFrames=8, SafeLandOffset=5, SafeFlyDuration=0.4,
     wasActive=false,
@@ -157,7 +155,6 @@ W.isInTeam = function()
     return false
 end
 
--- 🎯 Núcleo: micro-TPs travados
 W._microTPReset = function()
     local c = LP.Character
     if not c then return false end
@@ -194,7 +191,6 @@ W._microTPReset = function()
         hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
     end)
 
-    -- 🔒 Trava Y
     local bv = Instance.new("BodyVelocity")
     bv.Name = "__ResetBV"
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -209,7 +205,6 @@ W._microTPReset = function()
     bp.Position = hrp.Position
     bp.Parent = hrp
 
-    -- 1️⃣ TP pra debaixo do chão
     local tp1 = Vector3.new(W.TP_X, W.TP_UNDERGROUND_Y, W.TP_Z)
     pcall(function()
         hrp.CFrame = CFrame.new(tp1)
@@ -217,7 +212,6 @@ W._microTPReset = function()
     end)
     bp.Position = tp1
 
-    -- 2️⃣ Micro-TPs
     local currentY = W.TP_UNDERGROUND_Y
     local targetY = W.KILLZONE_Y + W.STOP_ABOVE_KILLZONE
 
@@ -246,19 +240,16 @@ W._microTPReset = function()
         return true
     end
 
-    -- 3️⃣ Solta
     if bv and bv.Parent then bv:Destroy() end
     if bp and bp.Parent then bp:Destroy() end
     if noclipThread then task.cancel(noclipThread) end
 
-    -- Restaura colisão
     for d, orig in pairs(savedCollide) do
         if typeof(d) == "Instance" and d.Parent then
             pcall(function() d.CanCollide = orig end)
         end
     end
 
-    -- Aguarda morrer caindo
     local fallStart = tick()
     while LP.Character == before and tick() - fallStart < W.FALL_TIMEOUT do
         task.wait(0.02)
@@ -267,11 +258,9 @@ W._microTPReset = function()
     return LP.Character ~= before
 end
 
--- Reset single-shot (com TP pro time depois)
 W.voidFlingOnce = function()
     local died = W._microTPReset()
     if died then
-        -- Espera respawn + TP pro time
         task.wait(0.5)
         local c = LP.Character
         local hum = c and c:FindFirstChildOfClass("Humanoid")
@@ -346,14 +335,12 @@ W.stopVoidFling = function()
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread = nil end
 end
 
--- ♾️ LOOP RESET — auto infinito (event-driven)
 W.startLoopReset = function(onUpdate)
     if W.loopResetThread then task.cancel(W.loopResetThread); W.loopResetThread = nil end
     if W.loopResetCharConn then W.loopResetCharConn:Disconnect(); W.loopResetCharConn = nil end
     W.loopResetActive = true
     W.loopResetCycle = 0
 
-    -- Watchdog (loop leve que só existe pra saber quando parar)
     W.loopResetThread = task.spawn(function()
         while W.loopResetActive do
             task.wait(0.5)
@@ -362,7 +349,6 @@ W.startLoopReset = function(onUpdate)
         W.loopResetThread = nil
     end)
 
-    -- 🎯 Event-driven: cada respawn dispara o reset
     W.loopResetCharConn = LP.CharacterAdded:Connect(function(newChar)
         if not W.loopResetActive then return end
         W.loopResetCycle = W.loopResetCycle + 1
@@ -371,7 +357,6 @@ W.startLoopReset = function(onUpdate)
             onUpdate("💀 ciclo " .. W.loopResetCycle, Color3.fromRGB(255, 100, 200))
         end
 
-        -- Espera HRP existir (máx 1s)
         local waited = 0
         while W.loopResetActive and waited < 1 do
             if newChar:FindFirstChild("HumanoidRootPart") then break end
@@ -385,7 +370,6 @@ W.startLoopReset = function(onUpdate)
         end)
     end)
 
-    -- 🔥 Se já tá vivo, começa agora
     local c = LP.Character
     local hum = c and c:FindFirstChildOfClass("Humanoid")
     if c and hum and hum.Health > 0 and c:FindFirstChild("HumanoidRootPart") then
@@ -991,7 +975,7 @@ W.stopPredictAll = function()
 end
 W.stopPredict = W.stopPredictAll
 
--- KICK PLAYER (código original mantido — vou pular a maioria)
+-- KICK PLAYER
 W.kpFindPlayer = function(q)
     if not q or q == "" then return nil end
     q = tostring(q):lower():gsub("%s", "")
@@ -1169,23 +1153,175 @@ local function kpUpdateDir(cur, new)
     return cur
 end
 
+-- ═══════════════════════════════════════════════════════════════
+--  🎯 FLOAT TOP v6 — Offset = velocidade × ping  -- ⬅️ NOVO (bloco inteiro)
+--  Sem UI própria. Ativado via KickPlayerBtn / KickPlayerToolBtn.
+-- ═══════════════════════════════════════════════════════════════
+W.fl = {
+    activeTarget = nil,
+    lastPing = 0.1,
+    pingSamples = {},
+    lastPos = nil,
+    stepDown = false,
+
+    PING_MULT         = 1.5,
+    MIN_OFFSET        = 1,
+    MAX_OFFSET        = 30,
+    Y_OFFSET          = 1.5,
+    DESCEND_VELOCITY  = -250,
+    STEP_DOWN         = 1.0,
+    STOP_VELOCITY     = 37,
+    MOVE_THRESHOLD    = 1,
+    VOID_Y            = -80,
+
+    DETECT = {
+        Y_VELOCITY_THRESHOLD       = 40,
+        ROT_VELOCITY_THRESHOLD     = 8,
+        TILT_ANGLE_THRESHOLD       = 45,
+        UPWARD_MOVE_THRESHOLD      = 8,
+        JITTER_THRESHOLD           = 12,
+        HORIZONTAL_SPEED_THRESHOLD = 80,
+    },
+}
+
+W.flUpdatePing = function()
+    local ok, ping = pcall(function()
+        return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if ok and ping and ping > 0 then
+        local pingSec = ping / 1000
+        table.insert(W.fl.pingSamples, pingSec)
+        if #W.fl.pingSamples > 10 then table.remove(W.fl.pingSamples, 1) end
+        local sum = 0
+        for _, p in ipairs(W.fl.pingSamples) do sum = sum + p end
+        W.fl.lastPing = sum / #W.fl.pingSamples
+    end
+end
+
+W.flCheckSuspicious = function(tRoot, lastPos)
+    if not tRoot then return false, nil end
+    local D = W.fl.DETECT
+    local vel = tRoot.AssemblyLinearVelocity
+    if math.abs(vel.Y) > D.Y_VELOCITY_THRESHOLD then return true, "Y_vel_" .. math.floor(vel.Y) end
+    local rotVel = tRoot.AssemblyAngularVelocity.Magnitude
+    if rotVel > D.ROT_VELOCITY_THRESHOLD then return true, "rot_" .. math.floor(rotVel) end
+    local cf = tRoot.CFrame
+    local tiltDeg = math.deg(math.acos(math.clamp(cf.UpVector.Y, -1, 1)))
+    if tiltDeg > D.TILT_ANGLE_THRESHOLD then return true, "tilt_" .. math.floor(tiltDeg) .. "°" end
+    local horizSpeed = math.sqrt(vel.X^2 + vel.Z^2)
+    if horizSpeed > D.HORIZONTAL_SPEED_THRESHOLD then return true, "hspd_" .. math.floor(horizSpeed) end
+    if lastPos and (tRoot.Position.Y - lastPos.Y) > D.UPWARD_MOVE_THRESHOLD then
+        return true, "up_" .. math.floor(tRoot.Position.Y - lastPos.Y)
+    end
+    if lastPos and (tRoot.Position - lastPos).Magnitude > D.JITTER_THRESHOLD then
+        return true, "jitter"
+    end
+    return false, nil
+end
+
+-- Retorna "ok" ou "stop"
+W.flMotionStep = function(t, hrp, hum)
+    local tRoot  = kpGetRoot(t)
+    local tHum   = kpGetHumanoid(t)
+    local tTorso = kpGetTorso(t)
+    if not tRoot or not tRoot.Parent then return "ok" end
+
+    local spd = tRoot.AssemblyLinearVelocity.Magnitude
+
+    -- 🚨 Detecção automática
+    local sus, motivo = W.flCheckSuspicious(tRoot, W.fl.lastPos)
+    if sus then
+        kpKillFlingVel()
+        if W.updateKickStatus then
+            W.updateKickStatus("🚨 " .. tostring(motivo), Color3.fromRGB(255, 100, 100))
+        end
+        return "stop"
+    end
+    W.fl.lastPos = tRoot.Position
+
+    if spd > W.fl.STOP_VELOCITY then return "stop" end
+
+    -- 📶 ping + offset
+    W.flUpdatePing()
+    local ping = W.fl.lastPing
+
+    local totalOffset = 0
+    if spd >= W.fl.MOVE_THRESHOLD then
+        totalOffset = math.clamp(spd * ping * W.fl.PING_MULT, W.fl.MIN_OFFSET, W.fl.MAX_OFFSET)
+    end
+
+    local moveDir = tHum and tHum.MoveDirection or Vector3.zero
+    local flatMove = Vector3.new(moveDir.X, 0, moveDir.Z)
+    if flatMove.Magnitude < 0.01 then
+        local look = tRoot.CFrame.LookVector
+        flatMove = Vector3.new(look.X, 0, look.Z)
+    end
+    if flatMove.Magnitude > 0.01 then flatMove = flatMove.Unit end
+
+    W.fl.stepDown = not W.fl.stepDown
+    local yOff = W.fl.stepDown and -W.fl.STEP_DOWN or 0
+    local refPos = (tTorso and tTorso.Position) or tRoot.Position
+
+    local posDest
+    if spd >= W.fl.MOVE_THRESHOLD then
+        posDest = refPos + (flatMove * totalOffset) + Vector3.new(0, W.fl.Y_OFFSET + yOff, 0)
+    else
+        posDest = refPos + Vector3.new(0, W.fl.Y_OFFSET + yOff, 0)
+    end
+
+    hrp.CFrame   = CFrame.lookAt(posDest, posDest + Vector3.new(0, -1, 0))
+    hrp.Velocity = Vector3.new(0, W.fl.DESCEND_VELOCITY, 0)
+    hrp.RotVelocity = Vector3.zero
+
+    local bv = hrp:FindFirstChild("FlingVelocity")
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.Name = "FlingVelocity"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Parent = hrp
+    end
+    bv.Velocity = Vector3.new(0, W.fl.DESCEND_VELOCITY, 0)
+
+    if W.updateKickStatus then
+        local state = spd >= W.fl.MOVE_THRESHOLD and "andando" or "parado"
+        W.updateKickStatus(
+            "🎯 " .. t.Name .. " | " .. state ..
+            " | Spd: " .. math.floor(spd) ..
+            " | Offset: " .. string.format("%.1f", totalOffset) ..
+            " | Ping: " .. math.floor(ping * 1000) .. "ms",
+            Color3.fromRGB(255, 180, 100)
+        )
+    end
+    return "ok"
+end
+
+-- ⬅️ NOVO — kpStop atualizado pra limpar o fl também
 W.kpStop = function()
     W.kp.active=false; W.kp.moving=false; W.kp.dir=nil
     W.kp.targetStartY=nil; W.kp.airFrames=0
     W.kp.spikePaused=false; W.kp.spikeStartTime=0
     W.kp.activeTarget=nil
+    W.fl.activeTarget=nil
+    W.fl.lastPos=nil
     kpStopSpectate(); W.kpCleanup()
 end
 
+-- ⬅️ NOVO — kpStart usando W.flMotionStep
 W.kpStart = function(target)
     if not target or kpIsDead(target) then return end
     W.kp.wasActive = true
-    W.kp.active=true; W.kp.moving=false; W.kp.dir=nil
-    W.kp.targetStartY=nil; W.kp.airFrames=0
-    W.kp.spikePaused=false; W.kp.spikeStartTime=0
+    W.kp.active = true
+    W.kp.moving = false; W.kp.dir = nil
+    W.kp.targetStartY = nil; W.kp.airFrames = 0
+    W.kp.activeTarget = target
+
+    W.fl.activeTarget = target
+    W.fl.lastPos = nil
+    W.fl.stepDown = false
+
     kpSaveMyPosition(); kpApplyNoclip(); kpSpectate(target)
+
     task.spawn(function()
-        local stepDown = false
         while W.kp.active do
             local c = LP.Character
             if not c then LP.CharacterAdded:Wait(); task.wait(0.2); c = LP.Character end
@@ -1194,7 +1330,7 @@ W.kpStart = function(target)
                 local hum = c:FindFirstChildOfClass("Humanoid")
                 if hrp and hum then
                     hum.PlatformStand = true
-                    if hrp.Position.Y < W.kp.VoidY + 15 then
+                    if hrp.Position.Y < W.fl.VOID_Y + 15 then
                         if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
                         kpKillFlingVel(); RunService.Heartbeat:Wait(); continue
                     end
@@ -1213,68 +1349,8 @@ W.kpStart = function(target)
                         end)
                         W.kp.active = false; break
                     end
-                    local tRoot = kpGetRoot(t)
-                    local tHum = kpGetHumanoid(t)
-                    local tTorso = kpGetTorso(t)
-                    if tRoot and tRoot.Parent then
-                        local spd = tRoot.AssemblyLinearVelocity.Magnitude
-                        if spd > W.kp.SpikeThreshold then
-                            if not W.kp.spikePaused then
-                                W.kp.spikePaused = true; W.kp.spikeStartTime = tick()
-                                kpKillFlingVel()
-                                pcall(function()
-                                    hrp.AssemblyLinearVelocity = Vector3.zero
-                                    hrp.AssemblyAngularVelocity = Vector3.zero
-                                end)
-                            end
-                            if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
-                            hum.PlatformStand = true
-                            if not W.kp.spectating then kpSpectate(t) end
-                            RunService.Heartbeat:Wait(); continue
-                        else W.kp.spikePaused = false end
-                        if spd > W.kp.FloatTopStopVelocity then W.kp.active = false; break end
-                        if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
-                        if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
-                            W.kp.airFrames = W.kp.airFrames + 1
-                        else W.kp.airFrames = 0 end
-                        if W.kp.airFrames >= W.kp.AirMinFrames then W.kp.active = false; break end
-                        stepDown = not stepDown
-                        local yOff = stepDown and -W.kp.FloatTopStepDown or 0
-                        local refPos = (tTorso and tTorso.Position) or tRoot.Position
-                        local tVel = tRoot.AssemblyLinearVelocity.Magnitude
-                        if tVel >= W.kp.MoveVelocityThreshold then W.kp.moving = true
-                        elseif tVel < W.kp.StopVelocityThreshold then W.kp.moving = false; W.kp.dir = nil end
-                        local isMoving = W.kp.moving
-                        if isMoving then
-                            local newDir = kpMoveDir(tRoot, tHum)
-                            W.kp.dir = kpUpdateDir(W.kp.dir, newDir)
-                        end
-                        local moveDir = W.kp.dir or Vector3.zero
-                        local hasDir = moveDir.Magnitude > 0.1
-                        local velY = tRoot.AssemblyLinearVelocity.Y
-                        local isRising = velY > W.kp.FloatRisingThreshold
-                        local basePos
-                        if isRising and isMoving and hasDir then
-                            basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatRisingOffset, 0)
-                        elseif isRising then
-                            basePos = refPos + Vector3.new(0, W.kp.FloatRisingOffset, 0)
-                        elseif isMoving and hasDir then
-                            basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatTopOffset, 0)
-                        else
-                            basePos = refPos + Vector3.new(0, W.kp.FloatTopOffset, 0)
-                        end
-                        local posDest = basePos + Vector3.new(0, yOff, 0)
-                        hrp.CFrame = CFrame.lookAt(posDest, posDest + Vector3.new(0, -1, 0))
-                        hrp.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
-                        hrp.RotVelocity = Vector3.zero
-                        local bv = hrp:FindFirstChild("FlingVelocity")
-                        if not bv then
-                            bv = Instance.new("BodyVelocity")
-                            bv.Name = "FlingVelocity"
-                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                            bv.Parent = hrp
-                        end
-                        bv.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
+                    if W.flMotionStep(t, hrp, hum) == "stop" then
+                        W.kp.active = false; break
                     end
                 end
             end
@@ -1318,6 +1394,7 @@ W.kpRemoveTool = function()
 end
 
 W.kpClickLoopRunning = false
+-- ⬅️ NOVO — kpClickLoop usando W.flMotionStep
 local function kpClickLoop()
     while true do
         if not W.kp.toolObj or not W.kp.toolObj.Parent then break end
@@ -1329,7 +1406,7 @@ local function kpClickLoop()
             if hrp and hum then
                 hum.PlatformStand = true
                 if not t or kpIsDead(t) or kpIsGone(t) then W.kp.active = false end
-                if hrp.Position.Y < W.kp.VoidY + 15 then
+                if hrp.Position.Y < W.fl.VOID_Y + 15 then
                     if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
                     kpKillFlingVel(); RunService.Heartbeat:Wait(); continue
                 end
@@ -1339,71 +1416,8 @@ local function kpClickLoop()
                         if d.CanCollide ~= isTorso then d.CanCollide = isTorso end
                     end
                 end
-                local tRoot = kpGetRoot(t)
-                local tHum = kpGetHumanoid(t)
-                local tTorso = kpGetTorso(t)
-                if tRoot and tRoot.Parent then
-                    local spd = tRoot.AssemblyLinearVelocity.Magnitude
-                    if spd > W.kp.SpikeThreshold then
-                        if not W.kp.spikePaused then
-                            W.kp.spikePaused = true; W.kp.spikeStartTime = tick()
-                            kpKillFlingVel()
-                            pcall(function()
-                                hrp.AssemblyLinearVelocity = Vector3.zero
-                                hrp.AssemblyAngularVelocity = Vector3.zero
-                            end)
-                        end
-                        if W.kp.myOriginalCFrame then pcall(function() hrp.CFrame = W.kp.myOriginalCFrame end) end
-                        if not W.kp.spectating then kpSpectate(t) end
-                        RunService.Heartbeat:Wait(); continue
-                    else W.kp.spikePaused = false end
-                    if spd > W.kp.FloatTopStopVelocity then W.kp.active = false
-                    else
-                        if not W.kp.targetStartY then W.kp.targetStartY = tRoot.Position.Y end
-                        if tRoot.AssemblyLinearVelocity.Y > 300 or (tRoot.Position.Y - W.kp.targetStartY) > 60 then
-                            W.kp.airFrames = W.kp.airFrames + 1
-                        else W.kp.airFrames = 0 end
-                        if W.kp.airFrames >= W.kp.AirMinFrames then W.kp.active = false
-                        else
-                            local stepDown = (tick() * 10) % 2 < 1
-                            local yOff = stepDown and -W.kp.FloatTopStepDown or 0
-                            local refPos = (tTorso and tTorso.Position) or tRoot.Position
-                            local tVel = tRoot.AssemblyLinearVelocity.Magnitude
-                            if tVel >= W.kp.MoveVelocityThreshold then W.kp.moving = true
-                            elseif tVel < W.kp.StopVelocityThreshold then W.kp.moving = false; W.kp.dir = nil end
-                            local isMoving = W.kp.moving
-                            if isMoving then
-                                local newDir = kpMoveDir(tRoot, tHum)
-                                W.kp.dir = kpUpdateDir(W.kp.dir, newDir)
-                            end
-                            local moveDir = W.kp.dir or Vector3.zero
-                            local hasDir = moveDir.Magnitude > 0.1
-                            local velY = tRoot.AssemblyLinearVelocity.Y
-                            local isRising = velY > W.kp.FloatRisingThreshold
-                            local basePos
-                            if isRising and isMoving and hasDir then
-                                basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatRisingOffset, 0)
-                            elseif isRising then
-                                basePos = refPos + Vector3.new(0, W.kp.FloatRisingOffset, 0)
-                            elseif isMoving and hasDir then
-                                basePos = refPos + (moveDir * W.kp.FloatTopFrontOffset) + Vector3.new(0, W.kp.FloatTopOffset, 0)
-                            else
-                                basePos = refPos + Vector3.new(0, W.kp.FloatTopOffset, 0)
-                            end
-                            local posDest = basePos + Vector3.new(0, yOff, 0)
-                            hrp.CFrame = CFrame.lookAt(posDest, posDest + Vector3.new(0, -1, 0))
-                            hrp.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
-                            hrp.RotVelocity = Vector3.zero
-                            local bv = hrp:FindFirstChild("FlingVelocity")
-                            if not bv then
-                                bv = Instance.new("BodyVelocity")
-                                bv.Name = "FlingVelocity"
-                                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                bv.Parent = hrp
-                            end
-                            bv.Velocity = Vector3.new(0, W.kp.FloatTopVelocity, 0)
-                        end
-                    end
+                if W.kp.active and W.flMotionStep(t, hrp, hum) == "stop" then
+                    W.kp.active = false
                 end
             end
         end
@@ -1670,7 +1684,6 @@ local function makeButton(parent, text, y, color1, color2, name)
 end
 W.makeButton = makeButton
 
--- Botões Aba 1
 local GoalSelectFrame = Instance.new("Frame")
 GoalSelectFrame.Size = UDim2.new(1, -4, 0, 30); GoalSelectFrame.Position = UDim2.new(0, 2, 0, 4)
 GoalSelectFrame.BackgroundTransparency = 1; GoalSelectFrame.Parent = Tab1
@@ -1721,7 +1734,6 @@ local TouchGoalBtn = makeButton(Tab1, W.btn("touch_goal", false), 124, Color3.fr
 local SkyBtn = makeButton(Tab1, W.btn("sky", false), 166, Color3.fromRGB(80, 200, 255), Color3.fromRGB(0, 100, 200), "SkyBtn")
 local BoostAllBtn = makeButton(Tab1, W.btn("boost", false), 208, Color3.fromRGB(255,100,0), Color3.fromRGB(255,200,0), "BoostAllBtn")
 
--- Slider multiplier
 local SliderFrame = Instance.new("Frame")
 SliderFrame.Size = UDim2.new(1, -4, 0, 45); SliderFrame.Position = UDim2.new(0, 2, 0, 250)
 SliderFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SliderFrame.BackgroundTransparency = 0.5
@@ -1788,7 +1800,6 @@ for i, d in ipairs(dotButtons) do
 end
 W.updDots(3)
 
--- Aba 2
 local BringBtn = makeButton(Tab2, W.btn("bring", false), 4, Color3.fromRGB(120,0,180), Color3.fromRGB(0,230,255), "BringBtn")
 local LoopBringBtn = makeButton(Tab2, W.btn("loop_bring", false), 46, Color3.fromRGB(200,0,255), Color3.fromRGB(0,150,255), "LoopBringBtn")
 local MoveBallBtn = makeButton(Tab2, W.btn("move", false), 88, Color3.fromRGB(150, 0, 255), Color3.fromRGB(0, 200, 100), "MoveBallBtn")
@@ -1797,7 +1808,6 @@ local FreezeAllBtn = makeButton(Tab2, W.btn("freeze", false), 172, Color3.fromRG
 local BugBallBtn = makeButton(Tab2, W.btn("bug", false), 214, Color3.fromRGB(180, 0, 255), Color3.fromRGB(255, 0, 100), "BugBallBtn")
 local DefendGoalBtn = makeButton(Tab2, W.btn("defend", false), 256, Color3.fromRGB(255, 60, 60), Color3.fromRGB(180, 0, 0), "DefendGoalBtn")
 
--- Aba 4
 local FarmCoinsBtn = makeButton(Tab4, W.btn("farm", false), 4, Color3.fromRGB(200, 160, 0), Color3.fromRGB(255, 220, 0), "FarmCoinsBtn")
 local TrackerGABtn = makeButton(Tab4, W.fnNames.tracker, 46, Color3.fromRGB(0, 200, 100), Color3.fromRGB(0, 255, 180), "TrackerGABtn")
 local PredictBallBtn = makeButton(Tab4, W.btn("predict", false), 88, Color3.fromRGB(255, 220, 0), Color3.fromRGB(255, 100, 0), "PredictBallBtn")
@@ -1836,7 +1846,6 @@ KickStatus.Parent = Tab4
 local KickPlayerBtn = makeButton(Tab4, "🎯 KICK PLAYER", 252, Color3.fromRGB(255, 60, 60), Color3.fromRGB(120, 0, 0), "KickPlayerBtn")
 local KickPlayerToolBtn = makeButton(Tab4, "🎒 KICK PLAYER TOOL", 294, Color3.fromRGB(200, 60, 255), Color3.fromRGB(80, 0, 120), "KickPlayerToolBtn")
 
--- 🔄 Botões de reset
 local LoopResetBtn = makeButton(Tab4, "♾️ LOOP RESET: OFF", 336, Color3.fromRGB(120, 0, 200), Color3.fromRGB(60, 0, 100), "LoopResetBtn")
 LoopResetBtn.TextSize = 13
 
@@ -1858,6 +1867,7 @@ local function updateKickStatus(text, color)
     KickStatus.Text = "Status: " .. text
     KickStatus.TextColor3 = color or Color3.fromRGB(120, 220, 255)
 end
+W.updateKickStatus = updateKickStatus   -- ⬅️ NOVO — expõe pro W.flMotionStep
 
 KickNameBox:GetPropertyChangedSignal("Text"):Connect(function()
     local q = KickNameBox.Text
@@ -1867,6 +1877,7 @@ KickNameBox:GetPropertyChangedSignal("Text"):Connect(function()
     else updateKickStatus("nenhum jogador encontrado", Color3.fromRGB(255, 120, 120)) end
 end)
 
+-- ⬅️ NOVO — sem W.kp.FloatTopStopVelocity (não existe mais)
 W.addTap(KickPlayerBtn, function()
     local q = KickNameBox.Text
     if not q or q == "" then updateKickStatus("digite um nome primeiro!", Color3.fromRGB(255, 120, 120)); return end
@@ -1876,7 +1887,6 @@ W.addTap(KickPlayerBtn, function()
     if W.kp.active then W.kpStop() end
     task.wait(0.1)
     W.kp.activeTarget = p
-    W.kp.FloatTopStopVelocity = 35
     W.kpStart(p)
     updateKickStatus("KICK: float top em " .. p.Name, Color3.fromRGB(255, 100, 100))
 end)
@@ -1891,7 +1901,6 @@ W.addTap(KickPlayerToolBtn, function()
     else updateKickStatus("Não foi possível", Color3.fromRGB(255, 120, 120)) end
 end)
 
--- ♾️ Loop Reset
 W.addTap(LoopResetBtn, function()
     if W.loopResetActive then
         W.stopLoopReset()
@@ -1912,7 +1921,6 @@ W.addTap(LoopResetBtn, function()
     end
 end)
 
--- 🔄 Reset Partida (single-shot)
 W.addTap(ResetMatchBtn, function()
     if W.voidFlingLoop then
         W.stopVoidFling()
@@ -2192,7 +2200,6 @@ W.addTap(TrackerGABtn, function()
     if ScreenGui and not ScreenGui.Parent then pcall(function() ScreenGui.Parent = savedParent end) end
 end)
 
--- Overlays (Lang, Confirm, etc)
 local LangOverlay = Instance.new("Frame")
 LangOverlay.Name = "LangOverlay"
 LangOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -2432,7 +2439,6 @@ task.spawn(function()
     TS:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
 end)
 
--- COMANDOS
 W.processCommand = function(msg)
     local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
     if m:sub(1,1) == ";" then m = m:sub(2) end
@@ -2499,4 +2505,4 @@ W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
 W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
-print("[Willnzx] ✅ GUI carregada — Loop Reset + Reset Partida")
+print("[Willnzx] ✅ GUI carregada — Loop Reset + Reset Partida + FloatTop v6")
