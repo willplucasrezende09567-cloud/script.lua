@@ -1570,8 +1570,9 @@ local initKeyLang = function()
     local MINHA_KEY = "87748599204675"
     W.keyValidated = false
 
-    local keyBlur = nil
-    local langBlur = nil
+    -- ⬅️ FIX: salva as variáveis na W.UI pra poder destruir no close
+    W.UI.keyBlur = nil
+    W.UI.langBlur = nil
     local LangOverlay, LTitle, PtBtn, EnBtn, finishLang
 
     local function makeOverlay()
@@ -1637,13 +1638,13 @@ local initKeyLang = function()
             TS:Create(KBtn, TweenInfo.new(0.2), {TextTransparency=1, BackgroundTransparency=1}):Play()
             TS:Create(KError, TweenInfo.new(0.2), {TextTransparency=1}):Play()
             task.wait(0.4)
-            if keyBlur and keyBlur.Parent then keyBlur:Destroy() end
+            if W.UI.keyBlur and W.UI.keyBlur.Parent then W.UI.keyBlur:Destroy() end
             if KeyOverlay and KeyOverlay.Parent then KeyOverlay:Destroy() end
             task.wait(0.1)
             if LangOverlay and LangOverlay.Parent then
                 LangOverlay.Visible=true
-                if not langBlur or not langBlur.Parent then
-                    langBlur=Instance.new("BlurEffect"); langBlur.Size=12; langBlur.Parent=Lighting
+                if not W.UI.langBlur or not W.UI.langBlur.Parent then
+                    W.UI.langBlur=Instance.new("BlurEffect"); W.UI.langBlur.Size=12; W.UI.langBlur.Parent=Lighting
                 end
             end
         else
@@ -1657,8 +1658,8 @@ local initKeyLang = function()
     task.delay(0.65, function()
         if KeyOverlay and KeyOverlay.Parent and not W.keyValidated then
             KeyOverlay.Visible=true
-            if not keyBlur or not keyBlur.Parent then
-                keyBlur=Instance.new("BlurEffect"); keyBlur.Size=12; keyBlur.Parent=Lighting
+            if not W.UI.keyBlur or not W.UI.keyBlur.Parent then
+                W.UI.keyBlur=Instance.new("BlurEffect"); W.UI.keyBlur.Size=12; W.UI.keyBlur.Parent=Lighting
             end
         end
     end)
@@ -1700,7 +1701,7 @@ local initKeyLang = function()
         TS:Create(PtBtn, TweenInfo.new(0.2), {TextTransparency=1}):Play()
         TS:Create(EnBtn, TweenInfo.new(0.2), {TextTransparency=1}):Play()
         task.wait(0.4)
-        if langBlur and langBlur.Parent then langBlur:Destroy() end
+        if W.UI.langBlur and W.UI.langBlur.Parent then W.UI.langBlur:Destroy() end
         if LangOverlay and LangOverlay.Parent then LangOverlay:Destroy() end
     end
 
@@ -1763,9 +1764,36 @@ local initOpenClose = function()
     end
 
     local function closeGUI()
+        -- ⬅️ FIX 1: Cancela todos os loops e tarefas em segundo plano
         pcall(function() W.flStop() end)
         pcall(function() W.stopVoidFling() end)
         pcall(function() W.stopLoopReset() end)
+        pcall(function() W.stopFreeze() end)
+        pcall(function() W.stopDefend() end)
+        pcall(function() W.stopFarmCoins() end)
+
+        W.states.isActive=false; W.states.isBringing=false; W.states.isLoopBringing=false
+        W.states.isFreezing=false; W.states.isBoostingAll=false
+        W.states.isSkying=false; W.states.isTouchGoal=false; W.states.isMoveBall=false
+        W.states.isOrbitBall=false; W.states.isBugBall=false
+        W.states.isTpGoal=false; W.states.isDefending=false; W.states.isFarming=false
+
+        if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread=nil end
+        if W.states.tpGoalThread then task.cancel(W.states.tpGoalThread); W.states.tpGoalThread=nil end
+        if W.states.bringThread then task.cancel(W.states.bringThread); W.states.bringThread=nil end
+        if W.states.loopBringThread then task.cancel(W.states.loopBringThread); W.states.loopBringThread=nil end
+        if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread=nil end
+        if W.states.boostAllThread then task.cancel(W.states.boostAllThread); W.states.boostAllThread=nil end
+        if W.states.skyThread then task.cancel(W.states.skyThread); W.states.skyThread=nil end
+        if W.states.touchGoalThread then task.cancel(W.states.touchGoalThread); W.states.touchGoalThread=nil end
+        if W.states.moveBallThread then task.cancel(W.states.moveBallThread); W.states.moveBallThread=nil end
+        if W.states.orbitBallThread then task.cancel(W.states.orbitBallThread); W.states.orbitBallThread=nil end
+        if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
+        if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread=nil end
+        if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread=nil end
+        if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread=nil end
+
+        -- Animação de fechamento
         W.UI.TabBar.Visible=false; W.UI.ContentArea.Visible=false
         local tw=TS:Create(W.UI.MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Size=UDim2.new(0,0,0,0), Position=UDim2.new(0.5,0,0.5,0),
@@ -1774,12 +1802,26 @@ local initOpenClose = function()
         tw:Play()
         TS:Create(W.UI.Stroke, TweenInfo.new(0.3), {Transparency=1}):Play()
         tw.Completed:Wait()
+
+        -- ⬅️ FIX 2: Destrói os blurs (inclusive os globais)
         if COBlur and COBlur.Parent then COBlur:Destroy() end
+        if W.UI.keyBlur and W.UI.keyBlur.Parent then W.UI.keyBlur:Destroy() end
+        if W.UI.langBlur and W.UI.langBlur.Parent then W.UI.langBlur:Destroy() end
+
+        -- ⬅️ FIX 3: Varre o Lighting e mata qualquer BlurEffect órfão
+        for _, v in ipairs(Lighting:GetChildren()) do
+            if v:IsA("BlurEffect") then
+                pcall(function() v:Destroy() end)
+            end
+        end
+
+        -- Fecha a GUI e libera o Anti-Dup
         W.UI.ScreenGui:Destroy()
         W.loaded_base=nil; _G.Willnzx=nil; _G.Willnzx_ANTIDUP=nil
     end
 
-    W.addTap(SimBtn, function() showConfirm(); ConfirmOverlay.Visible=false; closeGUI() end)
+    -- ⬅️ FIX 4: Removido o showConfirm() duplicado daqui
+    W.addTap(SimBtn, function() ConfirmOverlay.Visible=false; closeGUI() end)
     W.addTap(NaoBtn, function()
         TS:Create(ConfirmOverlay, TweenInfo.new(0.2), {BackgroundTransparency=1}):Play()
         task.wait(0.2)
@@ -1908,7 +1950,7 @@ end
 LP.Chatted:Connect(W.processCommand)
 
 _G.Willnzx = W
-print("[Willnzx] ✅ Frosted Glass — Kill/Kick + Loop Reset (cmdbar2 removido)")
+print("[Willnzx] ✅ Frosted Glass — Kill/Kick + Loop Reset (fix blur e loops)")
 
 -- ═══════════════════════════════════════════════════════════════
 --  ⚙️ CONFIGS DO FLING
