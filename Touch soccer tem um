@@ -1,52 +1,72 @@
--- Fonte do script (usado tanto pra rodar agora quanto pro queue_on_teleport)
-local SOURCE = [==[
-    -- Remove tudo do CoreGui (inclui nosso ScreenGui antigo de antes do teleport)
-    for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        pcall(function()
-            gui:Destroy()
-        end)
-    end
+-- Link que será re-executado após cada teleport (deve conter ESTE script)
+local URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20tem%20um"
 
-    -- Cria ScreenGui base
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "LolMessage"
-    screenGui.IgnoreGuiInset = true
-    screenGui.ResetOnSpawn = false
-    screenGui.DisplayOrder = 2147483647 -- máximo
-    screenGui.Parent = game:GetService("CoreGui")
+-- =========================================================
+-- PARTE 1 — Executa agora (limpa CoreGui + tela preta + "lol")
+-- =========================================================
 
-    -- Fundo preto cobrindo tudo
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.fromScale(1, 1)
-    bg.Position = UDim2.fromScale(0, 0)
-    bg.BackgroundColor3 = Color3.new(0, 0, 0)
-    bg.BackgroundTransparency = 0
-    bg.BorderSizePixel = 0
-    bg.Parent = screenGui
+-- Remove tudo do CoreGui
+for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+    pcall(function()
+        gui:Destroy()
+    end)
+end
 
-    -- Texto "lol"
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Text = "lol"
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = true
-    label.Font = Enum.Font.SourceSansBold
-    label.TextStrokeTransparency = 0
-    label.TextStrokeColor3 = Color3.new(0, 0, 0)
-    label.Parent = screenGui
-]==]
+-- ScreenGui base (por cima de tudo)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LolMessage"
+screenGui.IgnoreGuiInset = true
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 2147483647 -- int32 máximo
+screenGui.Parent = game:GetService("CoreGui")
 
--- Re-agenda o script pra rodar de novo após cada teleport
+-- Fundo preto cobrindo tudo
+local bg = Instance.new("Frame")
+bg.Size = UDim2.fromScale(1, 1)
+bg.Position = UDim2.fromScale(0, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0
+bg.BorderSizePixel = 0
+bg.Parent = screenGui
+
+-- Texto "lol"
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromScale(1, 1)
+label.BackgroundTransparency = 1
+label.Text = "lol"
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.Font = Enum.Font.SourceSansBold
+label.TextStrokeTransparency = 0
+label.TextStrokeColor3 = Color3.new(0, 0, 0)
+label.Parent = screenGui
+
+-- =========================================================
+-- PARTE 2 — Re-agendamento em loop (roda no FINAL do script)
+-- =========================================================
+
+-- Função que agenda o próximo teleport via URL
 local function queue()
+    -- O que roda após o teleport: baixa o script do link e executa
+    local src = string.format(
+        "pcall(function() loadstring(game:HttpGet(%q))() end)",
+        URL
+    )
+
     if type(queue_on_teleport) == "function" then
-        queue_on_teleport(SOURCE)
+        queue_on_teleport(src)
     elseif syn and syn.queue_on_teleport then
-        syn.queue_on_teleport(SOURCE)
+        syn.queue_on_teleport(src)
     elseif fluxus and fluxus.queue_on_teleport then
-        fluxus.queue_on_teleport(SOURCE)
+        fluxus.queue_on_teleport(src)
     end
 end
 
-queue() -- agenda antes
-loadstring(SOURCE)() -- executa agora
+-- Loop que mantém o re-agendamento sempre ativo.
+-- Cada nova execução (após teleport) cai aqui de novo → loop infinito.
+task.spawn(function()
+    while true do
+        pcall(queue)
+        task.wait(5) -- re-agenda a cada 5s (pode aumentar/diminuir)
+    end
+end)
