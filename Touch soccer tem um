@@ -1,22 +1,10 @@
 --[[
-    LolCube | texto pequeno + cubo preto 4x4x4 com "lol" em todas as faces
-    Re-agendamento via queue_on_teleport
+    LolCube | texto pequeno + cubo preto com "lol" + re-agendamento
 
-    ─── Como funciona ────────────────────────────────────────────────
-    - Executa o "work()" (cria UI + cubo) na hora.
-    - Depois registra a si mesmo em queue_on_teleport(...) para rodar
-      de novo quando o jogador teleportar.
-    - Se SELF_URL for preenchida, ele baixa o script da URL a cada
-      teleport (método mais confiável, igual o LALOL Hub faz).
-    - Se SELF_URL ficar vazia, tenta usar debug.info() para pegar o
-      próprio código (funciona em vários executores).
-
-    ─── Configuração ────────────────────────────────────────────────
-    Deixe SELF_URL="" para tentar debug.info,
-    ou cole uma URL raw (Pastebin/GitHub raw) do próprio arquivo.
+    URL usada para persistência via queue_on_teleport.
 ]]
 
-local SELF_URL = ""   -- ex: "https://raw.githubusercontent.com/user/repo/main/lol.lua"
+local SELF_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20tem%20um"
 
 -- ════════════════════════════════════════════════════════════════
 -- 1) Trabalho: texto pequeno + cubo preto com "lol"
@@ -34,31 +22,31 @@ local function work()
     sg.Parent = coreGui
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size                  = UDim2.fromOffset(110, 26)
-    lbl.Position              = UDim2.fromOffset(12, 12)
-    lbl.BackgroundColor3      = Color3.new(0, 0, 0)
-    lbl.BackgroundTransparency= 0.2
-    lbl.TextColor3            = Color3.new(1, 1, 1)
-    lbl.Text                  = "small lol text"
-    lbl.Font                  = Enum.Font.GothamBold
-    lbl.TextSize              = 14
-    lbl.Parent                = sg
+    lbl.Size                   = UDim2.fromOffset(110, 26)
+    lbl.Position               = UDim2.fromOffset(12, 12)
+    lbl.BackgroundColor3       = Color3.new(0, 0, 0)
+    lbl.BackgroundTransparency = 0.2
+    lbl.TextColor3             = Color3.new(1, 1, 1)
+    lbl.Text                   = "small lol text"
+    lbl.Font                   = Enum.Font.GothamBold
+    lbl.TextSize               = 14
+    lbl.Parent                 = sg
 
     -- 1.2) Cubo preto 4x4x4 com "lol" em cada face
     local oldCube = workspace:FindFirstChild("LolCube")
     if oldCube then oldCube:Destroy() end
 
     local cube = Instance.new("Part")
-    cube.Name      = "LolCube"
-    cube.Size      = Vector3.new(4, 4, 4)
-    cube.Anchored  = true
-    cube.CanCollide= false
-    cube.Color     = Color3.new(0, 0, 0)
-    cube.Material  = Enum.Material.SmoothPlastic
-    cube.CFrame    = (workspace.CurrentCamera
-                      and workspace.CurrentCamera.CFrame * CFrame.new(0, 0, -10))
-                     or CFrame.new(0, 10, 0)
-    cube.Parent    = workspace
+    cube.Name       = "LolCube"
+    cube.Size       = Vector3.new(4, 4, 4)
+    cube.Anchored   = true
+    cube.CanCollide = false
+    cube.Color      = Color3.new(0, 0, 0)
+    cube.Material   = Enum.Material.SmoothPlastic
+    cube.CFrame     = (workspace.CurrentCamera
+                       and workspace.CurrentCamera.CFrame * CFrame.new(0, 0, -10))
+                      or CFrame.new(0, 10, 0)
+    cube.Parent     = workspace
 
     for _, face in ipairs({
         Enum.NormalId.Front, Enum.NormalId.Back,
@@ -66,19 +54,19 @@ local function work()
         Enum.NormalId.Top,   Enum.NormalId.Bottom,
     }) do
         local surf = Instance.new("SurfaceGui")
-        surf.Face            = face
-        surf.SizingMode      = Enum.SurfaceGuiSizingMode.PixelsPerStud
-        surf.PixelsPerStud   = 100
-        surf.Parent          = cube
+        surf.Face          = face
+        surf.SizingMode    = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        surf.PixelsPerStud = 100
+        surf.Parent        = cube
 
         local t = Instance.new("TextLabel")
-        t.Size                  = UDim2.fromScale(1, 1)
-        t.BackgroundTransparency= 1
-        t.Text                  = "lol"
-        t.TextColor3            = Color3.new(1, 1, 1)
-        t.Font                  = Enum.Font.GothamBlack
-        t.TextScaled            = true
-        t.Parent                = surf
+        t.Size                   = UDim2.fromScale(1, 1)
+        t.BackgroundTransparency = 1
+        t.Text                   = "lol"
+        t.TextColor3             = Color3.new(1, 1, 1)
+        t.Font                   = Enum.Font.GothamBlack
+        t.TextScaled             = true
+        t.Parent                 = surf
     end
 end
 
@@ -86,7 +74,7 @@ end
 work()
 
 -- ════════════════════════════════════════════════════════════════
--- 2) Re-agendamento (queue_on_teleport)
+-- 2) Re-agendamento via queue_on_teleport
 -- ════════════════════════════════════════════════════════════════
 local queue = (syn    and syn.queue_on_teleport)
            or queue_on_teleport
@@ -97,29 +85,5 @@ if not queue then
     return
 end
 
-if SELF_URL ~= "" then
-    -- Caminho mais confiável (igual ao original): baixa da URL a cada teleport
-    queue(("loadstring(game:HttpGet('%s'))()"):format(SELF_URL))
-    print("[LolCube] Re-agendado via URL.")
-else
-    -- Fallback: tenta capturar o próprio código-fonte
-    local src
-    for lvl = 1, 5 do
-        local ok, s = pcall(function() return debug.info(lvl, "s") end)
-        if ok
-           and type(s) == "string"
-           and #s > 50
-           and not s:match("^%[")           -- descarta "[C]" e "[string \"...\"]"
-           and not s:match("%.%.%.$") then  -- descarta truncados "..."
-            src = (s:gsub("^[=@]", ""))
-            break
-        end
-    end
-
-    if src then
-        queue(src)
-        print("[LolCube] Re-agendado via self-source (debug.info).")
-    else
-        warn("[LolCube] Não capturei o fonte. Preencha SELF_URL para persistência.")
-    end
-end
+queue(("loadstring(game:HttpGet('%s'))()"):format(SELF_URL))
+print("[LolCube] Re-agendado via URL.")
