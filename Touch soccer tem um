@@ -1,72 +1,125 @@
--- Link que será re-executado após cada teleport (deve conter ESTE script)
-local URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20tem%20um"
+--[[
+    LolCube | texto pequeno + cubo preto 4x4x4 com "lol" em todas as faces
+    Re-agendamento via queue_on_teleport
 
--- =========================================================
--- PARTE 1 — Executa agora (limpa CoreGui + tela preta + "lol")
--- =========================================================
+    ─── Como funciona ────────────────────────────────────────────────
+    - Executa o "work()" (cria UI + cubo) na hora.
+    - Depois registra a si mesmo em queue_on_teleport(...) para rodar
+      de novo quando o jogador teleportar.
+    - Se SELF_URL for preenchida, ele baixa o script da URL a cada
+      teleport (método mais confiável, igual o LALOL Hub faz).
+    - Se SELF_URL ficar vazia, tenta usar debug.info() para pegar o
+      próprio código (funciona em vários executores).
 
--- Remove tudo do CoreGui
-for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-    pcall(function()
-        gui:Destroy()
-    end)
-end
+    ─── Configuração ────────────────────────────────────────────────
+    Deixe SELF_URL="" para tentar debug.info,
+    ou cole uma URL raw (Pastebin/GitHub raw) do próprio arquivo.
+]]
 
--- ScreenGui base (por cima de tudo)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LolMessage"
-screenGui.IgnoreGuiInset = true
-screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 2147483647 -- int32 máximo
-screenGui.Parent = game:GetService("CoreGui")
+local SELF_URL = ""   -- ex: "https://raw.githubusercontent.com/user/repo/main/lol.lua"
 
--- Fundo preto cobrindo tudo
-local bg = Instance.new("Frame")
-bg.Size = UDim2.fromScale(1, 1)
-bg.Position = UDim2.fromScale(0, 0)
-bg.BackgroundColor3 = Color3.new(0, 0, 0)
-bg.BackgroundTransparency = 0
-bg.BorderSizePixel = 0
-bg.Parent = screenGui
+-- ════════════════════════════════════════════════════════════════
+-- 1) Trabalho: texto pequeno + cubo preto com "lol"
+-- ════════════════════════════════════════════════════════════════
+local function work()
+    -- 1.1) Textinho no canto
+    local coreGui = game:GetService("CoreGui")
+    local oldGui = coreGui:FindFirstChild("LolTextGui")
+    if oldGui then oldGui:Destroy() end
 
--- Texto "lol"
-local label = Instance.new("TextLabel")
-label.Size = UDim2.fromScale(1, 1)
-label.BackgroundTransparency = 1
-label.Text = "lol"
-label.TextColor3 = Color3.new(1, 1, 1)
-label.TextScaled = true
-label.Font = Enum.Font.SourceSansBold
-label.TextStrokeTransparency = 0
-label.TextStrokeColor3 = Color3.new(0, 0, 0)
-label.Parent = screenGui
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "LolTextGui"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.Parent = coreGui
 
--- =========================================================
--- PARTE 2 — Re-agendamento em loop (roda no FINAL do script)
--- =========================================================
+    local lbl = Instance.new("TextLabel")
+    lbl.Size                  = UDim2.fromOffset(110, 26)
+    lbl.Position              = UDim2.fromOffset(12, 12)
+    lbl.BackgroundColor3      = Color3.new(0, 0, 0)
+    lbl.BackgroundTransparency= 0.2
+    lbl.TextColor3            = Color3.new(1, 1, 1)
+    lbl.Text                  = "small lol text"
+    lbl.Font                  = Enum.Font.GothamBold
+    lbl.TextSize              = 14
+    lbl.Parent                = sg
 
--- Função que agenda o próximo teleport via URL
-local function queue()
-    -- O que roda após o teleport: baixa o script do link e executa
-    local src = string.format(
-        "pcall(function() loadstring(game:HttpGet(%q))() end)",
-        URL
-    )
+    -- 1.2) Cubo preto 4x4x4 com "lol" em cada face
+    local oldCube = workspace:FindFirstChild("LolCube")
+    if oldCube then oldCube:Destroy() end
 
-    if type(queue_on_teleport) == "function" then
-        queue_on_teleport(src)
-    elseif syn and syn.queue_on_teleport then
-        syn.queue_on_teleport(src)
-    elseif fluxus and fluxus.queue_on_teleport then
-        fluxus.queue_on_teleport(src)
+    local cube = Instance.new("Part")
+    cube.Name      = "LolCube"
+    cube.Size      = Vector3.new(4, 4, 4)
+    cube.Anchored  = true
+    cube.CanCollide= false
+    cube.Color     = Color3.new(0, 0, 0)
+    cube.Material  = Enum.Material.SmoothPlastic
+    cube.CFrame    = (workspace.CurrentCamera
+                      and workspace.CurrentCamera.CFrame * CFrame.new(0, 0, -10))
+                     or CFrame.new(0, 10, 0)
+    cube.Parent    = workspace
+
+    for _, face in ipairs({
+        Enum.NormalId.Front, Enum.NormalId.Back,
+        Enum.NormalId.Left,  Enum.NormalId.Right,
+        Enum.NormalId.Top,   Enum.NormalId.Bottom,
+    }) do
+        local surf = Instance.new("SurfaceGui")
+        surf.Face            = face
+        surf.SizingMode      = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        surf.PixelsPerStud   = 100
+        surf.Parent          = cube
+
+        local t = Instance.new("TextLabel")
+        t.Size                  = UDim2.fromScale(1, 1)
+        t.BackgroundTransparency= 1
+        t.Text                  = "lol"
+        t.TextColor3            = Color3.new(1, 1, 1)
+        t.Font                  = Enum.Font.GothamBlack
+        t.TextScaled            = true
+        t.Parent                = surf
     end
 end
 
--- Loop que mantém o re-agendamento sempre ativo.
--- Cada nova execução (após teleport) cai aqui de novo → loop infinito.
-task.spawn(function()
-    while true do
-        pcall(queue)
-        task.wait(5) -- re-agenda a cada 5s (pode aumentar/diminuir)
+-- Executa já
+work()
+
+-- ════════════════════════════════════════════════════════════════
+-- 2) Re-agendamento (queue_on_teleport)
+-- ════════════════════════════════════════════════════════════════
+local queue = (syn    and syn.queue_on_teleport)
+           or queue_on_teleport
+           or (fluxus and fluxus.queue_on_teleport)
+
+if not queue then
+    warn("[LolCube] Este executor não expõe queue_on_teleport — sem persistência.")
+    return
+end
+
+if SELF_URL ~= "" then
+    -- Caminho mais confiável (igual ao original): baixa da URL a cada teleport
+    queue(("loadstring(game:HttpGet('%s'))()"):format(SELF_URL))
+    print("[LolCube] Re-agendado via URL.")
+else
+    -- Fallback: tenta capturar o próprio código-fonte
+    local src
+    for lvl = 1, 5 do
+        local ok, s = pcall(function() return debug.info(lvl, "s") end)
+        if ok
+           and type(s) == "string"
+           and #s > 50
+           and not s:match("^%[")           -- descarta "[C]" e "[string \"...\"]"
+           and not s:match("%.%.%.$") then  -- descarta truncados "..."
+            src = (s:gsub("^[=@]", ""))
+            break
+        end
     end
-end)
+
+    if src then
+        queue(src)
+        print("[LolCube] Re-agendado via self-source (debug.info).")
+    else
+        warn("[LolCube] Não capturei o fonte. Preencha SELF_URL para persistência.")
+    end
+end
