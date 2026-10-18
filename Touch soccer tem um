@@ -1,0 +1,52 @@
+-- Fonte do script (usado tanto pra rodar agora quanto pro queue_on_teleport)
+local SOURCE = [==[
+    -- Remove tudo do CoreGui (inclui nosso ScreenGui antigo de antes do teleport)
+    for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        pcall(function()
+            gui:Destroy()
+        end)
+    end
+
+    -- Cria ScreenGui base
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "LolMessage"
+    screenGui.IgnoreGuiInset = true
+    screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 2147483647 -- máximo
+    screenGui.Parent = game:GetService("CoreGui")
+
+    -- Fundo preto cobrindo tudo
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.fromScale(1, 1)
+    bg.Position = UDim2.fromScale(0, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0
+    bg.BorderSizePixel = 0
+    bg.Parent = screenGui
+
+    -- Texto "lol"
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Text = "lol"
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Parent = screenGui
+]==]
+
+-- Re-agenda o script pra rodar de novo após cada teleport
+local function queue()
+    if type(queue_on_teleport) == "function" then
+        queue_on_teleport(SOURCE)
+    elseif syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(SOURCE)
+    elseif fluxus and fluxus.queue_on_teleport then
+        fluxus.queue_on_teleport(SOURCE)
+    end
+end
+
+queue() -- agenda antes
+loadstring(SOURCE)() -- executa agora
