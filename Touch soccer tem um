@@ -1,26 +1,26 @@
 --[[
-    LolCube | texto pequeno + cubo preto com "lol" + re-agendamento
-
-    URL usada para persistência via queue_on_teleport.
+    LolCube (UI) | cubo preto na tela com "lol" + texto pequeno
+    Re-agendamento via queue_on_teleport
 ]]
 
 local SELF_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Touch%20soccer%20tem%20um"
 
 -- ════════════════════════════════════════════════════════════════
--- 1) Trabalho: texto pequeno + cubo preto com "lol"
+-- 1) Work: cria tudo na CoreGui
 -- ════════════════════════════════════════════════════════════════
 local function work()
-    -- 1.1) Textinho no canto
     local coreGui = game:GetService("CoreGui")
-    local oldGui = coreGui:FindFirstChild("LolTextGui")
-    if oldGui then oldGui:Destroy() end
+    local old = coreGui:FindFirstChild("LolTextGui")
+    if old then old:Destroy() end
 
     local sg = Instance.new("ScreenGui")
     sg.Name = "LolTextGui"
     sg.ResetOnSpawn = false
     sg.IgnoreGuiInset = true
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = coreGui
 
+    -- ── Textinho no canto ──────────────────────────────────────
     local lbl = Instance.new("TextLabel")
     lbl.Size                   = UDim2.fromOffset(110, 26)
     lbl.Position               = UDim2.fromOffset(12, 12)
@@ -32,56 +32,80 @@ local function work()
     lbl.TextSize               = 14
     lbl.Parent                 = sg
 
-    -- 1.2) Cubo preto 4x4x4 com "lol" em cada face
-    local oldCube = workspace:FindFirstChild("LolCube")
-    if oldCube then oldCube:Destroy() end
+    -- ── Cubo preto (UI) com "lol" ──────────────────────────────
+    local cube = Instance.new("Frame")
+    cube.Name                  = "LolCube"
+    cube.Size                  = UDim2.fromOffset(120, 120)
+    cube.Position              = UDim2.new(0.5, -60, 0.5, -60)  -- centro da tela
+    cube.BackgroundColor3      = Color3.new(0, 0, 0)
+    cube.BorderSizePixel       = 0
+    cube.Active                = true
+    cube.Parent                = sg
 
-    local cube = Instance.new("Part")
-    cube.Name       = "LolCube"
-    cube.Size       = Vector3.new(4, 4, 4)
-    cube.Anchored   = true
-    cube.CanCollide = false
-    cube.Color      = Color3.new(0, 0, 0)
-    cube.Material   = Enum.Material.SmoothPlastic
-    cube.CFrame     = (workspace.CurrentCamera
-                       and workspace.CurrentCamera.CFrame * CFrame.new(0, 0, -10))
-                      or CFrame.new(0, 10, 0)
-    cube.Parent     = workspace
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = cube
 
-    for _, face in ipairs({
-        Enum.NormalId.Front, Enum.NormalId.Back,
-        Enum.NormalId.Left,  Enum.NormalId.Right,
-        Enum.NormalId.Top,   Enum.NormalId.Bottom,
-    }) do
-        local surf = Instance.new("SurfaceGui")
-        surf.Face          = face
-        surf.SizingMode    = Enum.SurfaceGuiSizingMode.PixelsPerStud
-        surf.PixelsPerStud = 100
-        surf.Parent        = cube
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.new(1, 1, 1)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
+    stroke.Parent = cube
 
-        local t = Instance.new("TextLabel")
-        t.Size                   = UDim2.fromScale(1, 1)
-        t.BackgroundTransparency = 1
-        t.Text                   = "lol"
-        t.TextColor3             = Color3.new(1, 1, 1)
-        t.Font                   = Enum.Font.GothamBlack
-        t.TextScaled             = true
-        t.Parent                 = surf
-    end
+    local txt = Instance.new("TextLabel")
+    txt.Size                   = UDim2.fromScale(1, 1)
+    txt.BackgroundTransparency = 1
+    txt.Text                   = "lol"
+    txt.TextColor3             = Color3.new(1, 1, 1)
+    txt.Font                   = Enum.Font.GothamBlack
+    txt.TextScaled             = true
+    txt.Parent                 = cube
+
+    -- ── Arrastar o cubo ────────────────────────────────────────
+    local UIS = game:GetService("UserInputService")
+    local dragging, dragStart, startPos
+
+    cube.InputBegan:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch)
+            and UIS:GetFocusedTextBox() == nil then
+            dragging = true
+            dragStart = input.Position
+            startPos = cube.Position
+        end
+    end)
+
+    cube.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            cube.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
 end
 
--- Executa já
 work()
 
 -- ════════════════════════════════════════════════════════════════
--- 2) Re-agendamento via queue_on_teleport
+-- 2) Re-agendamento
 -- ════════════════════════════════════════════════════════════════
 local queue = (syn    and syn.queue_on_teleport)
            or queue_on_teleport
            or (fluxus and fluxus.queue_on_teleport)
 
 if not queue then
-    warn("[LolCube] Este executor não expõe queue_on_teleport — sem persistência.")
+    warn("[LolCube] Sem queue_on_teleport nesse executor — sem persistência.")
     return
 end
 
