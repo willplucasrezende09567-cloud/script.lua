@@ -1,9 +1,8 @@
--- ═══════════════════════════════════════════════════════════════
---  🛡️ ANTI-DUPLICAÇÃO
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🛡️ ANTI-DUPLICAÇÃO
+-- ════════════════════════════════════════════════════════════
 if _G.Willnzx_ANTIDUP then warn("[Willnzx] Já rodando"); return end
 _G.Willnzx_ANTIDUP = true
-
 local CoreGui = game:GetService("CoreGui")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
@@ -15,66 +14,74 @@ local TPS = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 local LP = Players.LocalPlayer
 local W = _G.Willnzx or {}
-
 if W.loaded_base then warn("[Willnzx] GUI carregada"); return end
 W.loaded_base = true
-
 pcall(function()
-    local o = CoreGui:FindFirstChild("WillnzxGUI"); if o then o:Destroy() end
+    local o = CoreGui:FindFirstChild("WillnzxGUI")
+    if o then o:Destroy() end
 end)
-
 W.CoreGui=CoreGui; W.UIS=UIS; W.TS=TS; W.RS=RS; W.Players=Players; W.LP=LP
 W.UID=LP.UserId; W.TKN=LP.Name
 W.KBE = RS:WaitForChild("KickBall")
 W.UI = {}
-
 pcall(function() LP.RespawnTime = 0.1 end)
 
--- ═══════════════════════════════════════════════════════════════
---  🎨 PALETA — Frosted Glass
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🎨 PALETA — Vidro Fosco
+-- ════════════════════════════════════════════════════════════
 W.Colors = {
-    bg          = Color3.fromRGB(245, 248, 255),
-    btnIdle     = Color3.fromRGB(255, 255, 255),
-    btnPress    = Color3.fromRGB(140, 180, 255),
-    textDark    = Color3.fromRGB(30, 40, 60),
-    textLight   = Color3.fromRGB(255, 255, 255),
-    accent      = Color3.fromRGB(100, 150, 255),
-    red         = Color3.fromRGB(255, 100, 120),
-    green       = Color3.fromRGB(80, 200, 140),
+    bg = Color3.fromRGB(245, 248, 255),
+    btnIdle = Color3.fromRGB(255, 255, 255),
+    btnPress = Color3.fromRGB(140, 180, 255),
+    textDark = Color3.fromRGB(30, 40, 60),
+    textLight = Color3.fromRGB(255, 255, 255),
+    accent = Color3.fromRGB(100, 150, 255),
+    red = Color3.fromRGB(255, 100, 120),
+    green = Color3.fromRGB(80, 200, 140),
 }
 
 W.urls = {
     cmds = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Cmds",
-    control = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Control",
+    controle = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Control",
     trackerga = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/aura.lua/refs/heads/main/Tracker%20g-a",
 }
 
 -- i18n
 W.lang = W.lang or nil
 W.i18n = {
-    pt = { tab_atq="ATQ", tab_bola="BOLA", tab_fling="FLING", tab_outros="OUTROS",
-           goal_a="GOL A", goal_b="GOL B", state_on="ATIVADO", state_off="DESATIVADO",
-           multiplier="MULTIPLICADOR: " },
-    en = { tab_atq="ATK", tab_bola="BALL", tab_fling="FLING", tab_outros="OTHER",
-           goal_a="GOAL A", goal_b="GOAL B", state_on="ON", state_off="OFF",
-           multiplier="MULTIPLIER: " },
+    pt = {
+        tab_atq="ATQ", tab_bola="BOLA", tab_fling="FLING", tab_outros="OUTROS",
+        goal_a="GOL A", goal_b="GOL B", state_on="ATIVADO", state_off="DESATIVADO",
+        multiplicador="MULTIPLICADOR: ",
+    },
+    en = {
+        tab_atq="ATK", tab_bola="BALL", tab_fling="FLING", tab_outros="OTHER",
+        goal_a="GOL A", goal_b="GOL B", state_on="LIGADO", state_off="DESLIGADO",
+        multiplicador="MULTIPLIER: ",
+    },
 }
+
 W.fnNames = {
-    auto_gol="AUTO-GOAL", tp_goal="TP GOAL", touch_goal="TOUCH GOAL", sky="SKY BALL",
-    boost="BOOST ALL", bring="BRING BALL", loop_bring="LOOP BRING", move="MOVE BALL",
-    orbit="ORBIT BALL", freeze="FREEZE BALL", bug="BUG BALL", defend="DEFEND GOAL",
-    farm="FARM COINS", tracker="TRACKER G-A", predict="PREDICT BALL", predict_kick="PREDICT KICK",
+    auto_gol="GOL AUTOMÁTICO", tp_goal="GOL DE TOQUE", touch_goal="GOL DE TOQUE",
+    sky="BOLA NO AR", boost="IMPULSO TOTAL", bring="TRAZER BOLA",
+    loop_bring="TRAZER LOOP", move="MOVER BOLA", orbit="BOLA EM ÓRBITA",
+    freeze="BOLA CONGELANTE", bug="BOLA DE INSETO", defend="GOL DEFENDIDO",
+    farm="FARM COINS", tracker="TRACKER GA", predict="PREVER BOLA",
+    predict_kick="PREVER CHUTE",
 }
+
 W.t = function(k)
     local tbl = W.i18n[W.lang or "pt"] or W.i18n.pt
     return tbl[k] or W.i18n.pt[k] or k
 end
+
 W.btn = function(key, active, extra)
-    local nome = W.fnNames[key] or key
+    local name = W.fnNames[key] or key
     local estado = active and W.t("state_on") or W.t("state_off")
-    if extra and extra ~= "" then return nome .. ": " .. estado .. " (" .. extra .. ")" end
-    return nome .. ": " .. estado
+    if extra and extra ~= "" then
+        return name .. ": " .. estado .. " (" .. extra .. ")"
+    end
+    return name .. ": " .. estado
 end
 
 W.TPPOS = Vector3.new(-186.25, 6.29, -28.13)
@@ -82,30 +89,29 @@ W.GOALS = {[1]={pos=Vector3.new(-316.8,12.7,92.8)}, [2]={pos=Vector3.new(-112.2,
 W.MOVEA = Vector3.new(-213.81, 6.32, 26.87)
 W.MOVEB = Vector3.new(-215.15, 6.32, 160.50)
 W.ORB = {
-    Vector3.new(-214.45, 6.32, 115.19), Vector3.new(-235.27, 6.32, 91.72),
-    Vector3.new(-214.60, 6.32, 70.07), Vector3.new(-193.58, 6.32, 93.71)
+    Vector3.new(-214.45, 6.32, 115.19),
+    Vector3.new(-235.27, 6.32, 91.72),
+    Vector3.new(-214.60, 6.32, 70.07),
+    Vector3.new(-193.58, 6.32, 93.71)
 }
-
 W.states={}; W.CFGV={}; W.loaded={}; W.toggles={}
 W.boostMultiplier=3; W.selectedGoalIndex=1; W.defendSelectedGoal="A"
-
 W.CFGV.autoGoalForce = 5000; W.CFGV.autoGoalY = 50
-W.CFGV.bringForce = 120; W.CFGV.bringY = 15
+W.CFGV.bringForce = 120;    W.CFGV.bringY = 15
 W.CFGV.freezeDelay = 0.1
-W.CFGV.moveForce = 3000; W.CFGV.moveY = 30; W.CFGV.moveDelay = 0.03
-W.CFGV.orbitForce = 400; W.CFGV.orbitStep = 0.06; W.CFGV.orbitDelay = 0.015; W.CFGV.orbitY = 30
-W.CFGV.skyForce = 5000; W.CFGV.touchGoalDist = 3
+W.CFGV.moveForce = 3000;    W.CFGV.moveY = 30; W.CFGV.moveDelay = 0.03
+W.CFGV.orbitForce = 400;    W.CFGV.orbitStep = 0.06; W.CFGV.orbitDelay = 0.015; W.CFGV.orbitY = 30
+W.CFGV.skyForce = 5000;     W.CFGV.touchGoalDist = 3
 W.CFGV.boostMaxSpeed = 250; W.CFGV.boostDelay = 0.15
-W.CFGV.bugOffsetY = 5; W.CFGV.bugForceY = 8000
+W.CFGV.bugOffsetY = 5;      W.CFGV.bugForceY = 8000
 W.CFGV.bugKicksPerSecond = 8; W.CFGV.bugAutoStopTime = 5
-W.CFGV.predictTime = 1.2; W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
+W.CFGV.predictTime = 1.2;   W.CFGV.predictDotCount = 35; W.CFGV.predictDotSize = 0.7
 W.CFGV.predictTargetSize = 2; W.CFGV.predictKickForce = 250; W.CFGV.predictKickLift = 45
 
--- ═══════════════════════════════════════════════════════════════
---  🔧 HELPERS
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🔧 HELPERS
+-- ════════════════════════════════════════════════════════════
 local hookSkip = false
-
 W.getBall = function()
     local ff = workspace:FindFirstChild("FootballField")
     if ff then
@@ -116,9 +122,9 @@ W.getBall = function()
     end
     return workspace:FindFirstChild("SoccerBall", true)
 end
-
-W.safeFire = function(...) hookSkip=true; W.KBE:FireServer(...); hookSkip=false end
-
+W.safeFire = function(...)
+    hookSkip=true; W.KBE:FireServer(...); hookSkip=false
+end
 W.addTap = function(btn, cb)
     local ts, tm, tt = nil,false,0
     btn.InputBegan:Connect(function(i)
@@ -138,27 +144,32 @@ W.addTap = function(btn, cb)
         end
     end)
 end
-
 W.catmull = function(p0,p1,p2,p3,t)
     local t2,t3=t*t,t*t*t
     return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)
 end
-
 W.isInTeam = function()
     local tf=workspace:FindFirstChild("team")
     if tf then
         local m=tf:FindFirstChild(LP.Name)
-        if m then for _,o in pairs(m:GetChildren()) do if o.Name:match("^Team%d%d%d%d$") then return true end end end
+        if m then
+            for _,o in pairs(m:GetChildren()) do
+                if o.Name:match("^Team%d%d%d%d$") then return true end
+            end
+        end
     end
     local c=LP.Character
-    if c then for _,o in pairs(c:GetChildren()) do if o.Name:match("^Team%d%d%d%d$") then return true end end end
+    if c then
+        for _,o in pairs(c:GetChildren()) do
+            if o.Name:match("^Team%d%d%d%d$") then return true end
+        end
+    end
     return false
 end
-
 W.kpFindPlayer = function(q)
     if not q or q=="" then return nil end
     q=tostring(q):lower():gsub("%s","")
-    local best,bs
+    local best, bs
     for _,p in ipairs(Players:GetPlayers()) do
         if p~=LP and p.Character then
             local n=p.Name:lower():gsub("%s","")
@@ -171,7 +182,6 @@ W.kpFindPlayer = function(q)
     end
     return best
 end
-
 W.setBtnActive = function(btn, text)
     btn:SetAttribute("IsActive", true); btn.Text = text
     TS:Create(btn, TweenInfo.new(0.2), {
@@ -194,21 +204,28 @@ W.setBtnInactive = function(btn, text)
         TS:Create(btn:FindFirstChildOfClass("UIStroke"), TweenInfo.new(0.2), {Transparency = 0.3}):Play()
     end
 end
-
 W.loadModule = function(name)
     if W.loaded[name] then
-        local tg = W.toggles[name]; if tg then tg() end; return
+        local tg = W.toggles[name]
+        if tg then tg() end
+        return
     end
     W.loaded[name] = true
     local url = W.urls[name]
-    if not url then warn("[Willnzx] URL nao configurada: " .. name); W.loaded[name]=false; return end
-    local ok, err = pcall(function() local code = game:HttpGet(url); loadstring(code)() end)
-    if not ok then W.loaded[name]=false; warn("[Willnzx] Erro " .. name .. ": " .. tostring(err)) end
+    if not url then warn("[Willnzx] URL não configurada: " .. name); W.loaded[name]=false; return end
+    local ok, err = pcall(function()
+        local code = game:HttpGet(url)
+        loadstring(code)()
+    end)
+    if not ok then
+        W.loaded[name]=false
+        warn("[Willnzx] Erro " .. name .. ": " .. tostring(err))
+    end
 end
 
--- ═══════════════════════════════════════════════════════════════
---  ⚽ FUNÇÕES BALL
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- ⚽ BOLA — FUNÇÕES
+-- ════════════════════════════════════════════════════════════
 W.startAutoGoal = function()
     W.states.loopThread = task.spawn(function()
         while W.states.isActive do
@@ -222,12 +239,12 @@ W.startAutoGoal = function()
         end
     end)
 end
-
 W.startTpGoal = function()
     W.states.tpGoalThread = task.spawn(function()
         while W.states.isTpGoal do
             if W.isInTeam() then
-                local c=LP.Character; local h=c and c:FindFirstChild("HumanoidRootPart")
+                local c=LP.Character
+                local h=c and c:FindFirstChild("HumanoidRootPart")
                 if h then h.CFrame=CFrame.new(W.TPPOS) end
                 local b=W.getBall()
                 if b then
@@ -239,13 +256,13 @@ W.startTpGoal = function()
         end
     end)
 end
-
 W.startTouchGoal = function()
     W.states.touchGoalThread = task.spawn(function()
         while W.states.isTouchGoal do
             local b=W.getBall()
             if not b then W.states.isTouchGoal=false; break end
-            local c=LP.Character; local h=c and c:FindFirstChild("HumanoidRootPart")
+            local c=LP.Character
+            local h=c and c:FindFirstChild("HumanoidRootPart")
             if h and (b.Position-h.Position).Magnitude < W.CFGV.touchGoalDist then
                 local d=(W.GOALS[W.selectedGoalIndex].pos-b.Position).Unit
                 W.safeFire(W.TKN,W.UID,"",b.Position,(d*W.CFGV.autoGoalForce)+Vector3.new(0,W.CFGV.autoGoalY,0),Vector3.new(0,0,0))
@@ -254,23 +271,24 @@ W.startTouchGoal = function()
         end
     end)
 end
-
 W.startSky = function()
     W.states.skyThread = task.spawn(function()
         while W.states.isSkying do
             local b=W.getBall()
-            if b then W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,W.CFGV.skyForce,0),Vector3.new(0,0,0)) end
+            if b then
+                W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,W.CFGV.skyForce,0),Vector3.new(0,0,0))
+            end
             task.wait(0.05)
         end
     end)
 end
-
 W.startBoostAll = function()
     W.states.boostAllThread = task.spawn(function()
         while W.states.isBoostingAll do
             local b=W.getBall()
             if b then
-                local vel=b.Velocity; local sp=vel.Magnitude
+                local vel=b.Velocity
+                local sp=vel.Magnitude
                 if sp>5 and sp<W.CFGV.boostMaxSpeed then
                     local ts=math.min(sp*W.boostMultiplier,W.CFGV.boostMaxSpeed)
                     W.safeFire(W.TKN,W.UID,"",b.Position,vel.Unit*ts,Vector3.new(0,0,0))
@@ -280,10 +298,10 @@ W.startBoostAll = function()
         end
     end)
 end
-
 W.stickBall = function()
     local b=W.getBall()
-    local c=LP.Character; local h=c and c:FindFirstChild("HumanoidRootPart")
+    local c=LP.Character
+    local h=c and c:FindFirstChild("HumanoidRootPart")
     if not b or not h then return end
     local dir=h.Position-b.Position
     if dir.Magnitude>1 then
@@ -293,32 +311,36 @@ W.stickBall = function()
         W.safeFire(W.TKN,W.UID,"",b.Position,f,Vector3.new(0,0,0))
     end
 end
-
 W.startBring = function()
     W.states.bringThread = task.spawn(function()
         local st=tick()
-        while W.states.isBringing and (tick()-st)<0.5 do W.stickBall(); task.wait(0.03) end
+        while W.states.isBringing and (tick()-st)<0.5 do
+            W.stickBall(); task.wait(0.03)
+        end
         W.states.isBringing=false
     end)
 end
-
 W.startLoopBring = function()
     W.states.loopBringThread = task.spawn(function()
-        while W.states.isLoopBringing do W.stickBall(); task.wait(0.03) end
+        while W.states.isLoopBringing do
+            W.stickBall(); task.wait(0.03)
+        end
     end)
 end
-
 W.startMoveBall = function()
     W.states.moveBallThread = task.spawn(function()
         local uA,tS,cnt=true,tick(),0
         while W.states.isMoveBall do
             local b=W.getBall()
-            if not b then task.wait(0.2) continue end
+            if not b then task.wait(0.2); continue end
             local tg=uA and W.MOVEA or W.MOVEB
-            if (tg-b.Position).Magnitude<5 then uA=not uA; tS=tick(); task.wait(0.05)
+            if (tg-b.Position).Magnitude<5 then
+                uA=not uA; tS=tick(); task.wait(0.05)
             else
                 cnt=cnt+1
-                if cnt%3==0 then W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,0,0),Vector3.new(0,0,0)) end
+                if cnt%3==0 then
+                    W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,0,0),Vector3.new(0,0,0))
+                end
                 local d=(tg-b.Position).Unit
                 W.safeFire(W.TKN,W.UID,"",b.Position,(d*W.CFGV.moveForce)+Vector3.new(0,W.CFGV.moveY,0),Vector3.new(0,0,0))
                 task.wait(W.CFGV.moveDelay)
@@ -327,10 +349,10 @@ W.startMoveBall = function()
         end
     end)
 end
-
 W.startOrbitBall = function()
     W.states.orbitBallThread = task.spawn(function()
-        local n=#W.ORB; local seg,t,cnt=1,0,0
+        local n=#W.ORB
+        local seg,t,cnt=1,0,0
         while W.states.isOrbitBall do
             local b=W.getBall()
             if not b then W.states.isOrbitBall=false; break end
@@ -355,13 +377,14 @@ W.startOrbitBall = function()
         end
     end)
 end
-
 W.startFreeze = function()
     W.states.isFreezing=true
     W.states.freezeThread = task.spawn(function()
         while W.states.isFreezing do
             local b=W.getBall()
-            if b then W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,0,0),Vector3.new(0,0,0)) end
+            if b then
+                W.safeFire(W.TKN,W.UID,"",b.Position,Vector3.new(0,0,0),Vector3.new(0,0,0))
+            end
             task.wait(W.CFGV.freezeDelay)
         end
     end)
@@ -370,7 +393,6 @@ W.stopFreeze = function()
     W.states.isFreezing=false
     if W.states.freezeThread then task.cancel(W.states.freezeThread); W.states.freezeThread=nil end
 end
-
 W.startBugBall = function()
     if W.states.bugStopThread then task.cancel(W.states.bugStopThread); W.states.bugStopThread=nil end
     if W.states.bugBallThread then task.cancel(W.states.bugBallThread); W.states.bugBallThread=nil end
@@ -392,10 +414,8 @@ W.startBugBall = function()
         W.states.bugStopThread=nil
     end)
 end
-
 W.DEFEND={radius=5,force=5000,lift=50,delay=0.08,cooldown=0.15}
 W.states.defendLastKick=0
-
 W.tryDefend = function()
     local b=W.getBall(); if not b then return end
     local goal=W.GOALS[W.defendSelectedGoal=="A" and 1 or 2].pos
@@ -408,22 +428,24 @@ W.tryDefend = function()
     if f.Magnitude>8000 then f=f.Unit*8000 end
     W.safeFire(W.TKN,W.UID,"",b.Position,f,Vector3.new(0,0,0))
 end
-
 W.startDefend = function()
     W.states.defendThread = task.spawn(function()
-        while W.states.isDefending do pcall(W.tryDefend); task.wait(W.DEFEND.delay) end
+        while W.states.isDefending do
+            pcall(W.tryDefend); task.wait(W.DEFEND.delay)
+        end
     end)
 end
 W.stopDefend = function()
     W.states.isDefending=false
     if W.states.defendThread then task.cancel(W.states.defendThread); W.states.defendThread=nil end
 end
-
 W.states.farmSeen={}; W.states.farmSeenTime={}; W.states.farmTotal=0
 W.collectNewCoins = function()
-    local c=LP.Character; local h=c and c:FindFirstChild("HumanoidRootPart")
+    local c=LP.Character
+    local h=c and c:FindFirstChild("HumanoidRootPart")
     if not h then return end
-    local folder=workspace:FindFirstChild("Coins"); if not folder then return end
+    local folder=workspace:FindFirstChild("Coins")
+    if not folder then return end
     local now=tick()
     for k,t in pairs(W.states.farmSeenTime) do
         if now-t>3 then W.states.farmSeenTime[k]=nil; W.states.farmSeen[k]=nil end
@@ -433,7 +455,9 @@ W.collectNewCoins = function()
             W.states.farmSeen[obj]=true; W.states.farmSeenTime[obj]=now
             local p
             if obj:IsA("BasePart") then p=obj
-            elseif obj:IsA("Model") then p=obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart") end
+            elseif obj:IsA("Model") then
+                p=obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            end
             if p and p.Parent then
                 pcall(function() h.CFrame=CFrame.new(p.Position+Vector3.new(0,3,0)) end)
                 W.states.farmTotal=W.states.farmTotal+1
@@ -454,17 +478,14 @@ W.stopFarmCoins = function()
     if W.states.farmThread then task.cancel(W.states.farmThread); W.states.farmThread=nil end
 end
 
--- ═══════════════════════════════════════════════════════════════
---  🚶 FLING
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🚶 FLING
+-- ════════════════════════════════════════════════════════════
 local initFling = function()
     W.FL = {
-        active=false, thread=nil,
-        oldCFrame=nil, targetStartY=nil,
-        frontFlip=false, killTarget=nil, kickTarget=nil,
-        forceMode="full",
+        active=false, thread=nil, oldCFrame=nil, targetStartY=nil,
+        frontFlip=false, killTarget=nil, kickTarget=nil, forceMode="full",
     }
-
     local function flGetHum(p) local c=p and p.Character; return c and c:FindFirstChildOfClass("Humanoid") end
     local function flIsDead(p) if not p then return true end; local h=flGetHum(p); return (not h) or h.Health<=0 end
     local function flIsGone(p)
@@ -474,45 +495,40 @@ local initFling = function()
         return not Players:FindFirstChild(p.Name)
     end
     local function flRestoreCam()
-        local c=LP.Character; local h=c and c:FindFirstChildOfClass("Humanoid")
-        if h then pcall(function()
-            workspace.CurrentCamera.CameraSubject=h
-            workspace.CurrentCamera.CameraType=Enum.CameraType.Custom
-        end) end
+        local c=LP.Character
+        local h=c and c:FindFirstChildOfClass("Humanoid")
+        if h then
+            pcall(function()
+                workspace.CurrentCamera.CameraSubject=h
+                workspace.CurrentCamera.CameraType=Enum.CameraType.Custom
+            end)
+        end
     end
     local function flSpectate(t)
         local h=t and flGetHum(t); if not h then return end
         workspace.CurrentCamera.CameraSubject=h
         workspace.CurrentCamera.CameraType=Enum.CameraType.Custom
     end
-
     local flOnStatus = function() end
     W.flOnStatus = function(fn) flOnStatus = fn end
-
     local function flTick(target)
         local c=LP.Character
         local hum=c and c:FindFirstChildOfClass("Humanoid")
         local hrp=c and c:FindFirstChild("HumanoidRootPart")
         if not hrp or not hum then return "stop" end
-
         local tChar=target.Character; if not tChar then return "stop" end
         local tHum=tChar:FindFirstChildOfClass("Humanoid")
         local tRoot=tHum and tHum.RootPart
         local tHead=tChar:FindFirstChild("Head")
         local tBase=tRoot or tHead
         if not tBase then return "stop" end
-
         local tiltDeg=math.deg(math.acos(math.clamp(tBase.CFrame.UpVector.Y,-1,1)))
         if tiltDeg>W.FL_TILT then return "stop" end
         if W.FL.targetStartY and (W.FL.targetStartY-tBase.Position.Y) >= W.FL_DROP then return "stop" end
-
-        local basePart = tBase
+        local basePart=tBase
         if tRoot and tHead then
-            if (tRoot.Position - tHead.Position).Magnitude > W.FL_HEAD_DIST then
-                basePart = tHead
-            end
+            if (tRoot.Position - tHead.Position).Magnitude > W.FL_HEAD_DIST then basePart=tHead end
         end
-
         local bv = hrp:FindFirstChild("__FL_BV")
         if not bv then
             bv = Instance.new("BodyVelocity")
@@ -521,14 +537,12 @@ local initFling = function()
             bv.Velocity=Vector3.zero
             bv.Parent=hrp
         end
-
         local velXZ,velY,rot
         if W.FL.forceMode=="reduced" then
             velXZ=W.FL_KICK_XZ; velY=W.FL_KICK_Y; rot=W.FL_KICK_ROT
         else
             velXZ=W.FL_KILL_XZ; velY=W.FL_KILL_Y; rot=W.FL_KILL_ROT
         end
-
         local tVel=basePart.AssemblyLinearVelocity
         local flatVel=Vector3.new(tVel.X,0,tVel.Z)
         local moveDir=tHum.MoveDirection or Vector3.zero
@@ -541,29 +555,23 @@ local initFling = function()
             local flk=Vector3.new(lk.X,0,lk.Z)
             dir=flk.Magnitude>0.01 and flk.Unit or Vector3.new(0,0,1)
         end
-
         local frontMag = basePart.Velocity.Magnitude / W.FL_STUD
         W.FL.frontFlip = not W.FL.frontFlip
         local frontSign = W.FL.frontFlip and 1 or -1
         local frontOffset = tHum.MoveDirection * frontMag * frontSign
-
         local yOff = W.FL_Y
         local basePos = basePart.Position + Vector3.new(0, yOff, 0)
         local destPos = basePos + frontOffset
-
         hrp.CFrame = CFrame.lookAt(destPos, destPos + Vector3.new(0, -1, 0), dir)
         hrp.Velocity = Vector3.new((math.random()-0.5)*velXZ, -velY, (math.random()-0.5)*velXZ)
         hrp.RotVelocity = Vector3.new((math.random()-0.5)*rot, (math.random()-0.5)*rot, (math.random()-0.5)*rot)
-
         local dropNow = W.FL.targetStartY and (W.FL.targetStartY-basePart.Position.Y) or 0
         local mode = W.FL.forceMode=="reduced" and "💥" or "🔥"
         local dirInfo = W.FL.frontFlip and "➡ FRENTE" or "⬅ TRÁS"
         flOnStatus(mode.." "..target.Name.." | "..dirInfo.." | Y "..math.floor(basePart.Position.Y)..
-            " | drop "..string.format("%.1f",dropNow).."/"..W.FL_DROP,
-            Color3.fromRGB(100,150,255))
+            " | soltar "..string.format("%.1f",dropNow).."/"..W.FL_DROP, Color3.fromRGB(100,150,255))
         return "ok"
     end
-
     local function flCleanup()
         local c=LP.Character
         local h=c and c:FindFirstChild("HumanoidRootPart")
@@ -597,7 +605,6 @@ local initFling = function()
         workspace.FallenPartsDestroyHeight = getgenv().FPDH or workspace.FallenPartsDestroyHeight
         flRestoreCam()
     end
-
     local function flReturn()
         if not W.FL.oldCFrame then return end
         local c=LP.Character; if not c then return end
@@ -627,39 +634,32 @@ local initFling = function()
             task.wait(0.15)
             local c2=LP.Character
             local h2=c2 and c2:FindFirstChildOfClass("Humanoid")
-            if h2 and h2.Health>0 and h2.Health<h2.MaxHealth then
+            if h2 and h2.Health > 0 and h2.Health < h2.MaxHealth then
                 pcall(function() h2.Health=h2.MaxHealth end)
             end
         end
     end
-
     local function flStart(target, forceMode)
         if not target or flIsDead(target) then return end
         if W.FL.thread then task.cancel(W.FL.thread); W.FL.thread=nil end
         W.FL.forceMode = forceMode or "full"
         W.FL.frontFlip = false
-
         local c=LP.Character
         local h=c and c:FindFirstChild("HumanoidRootPart")
         if h then W.FL.oldCFrame=h.CFrame end
-
         local tRootP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
         local tHeadP = target.Character and target.Character:FindFirstChild("Head")
         local tRef = tRootP or tHeadP
         W.FL.targetStartY = tRef and tRef.Position.Y or nil
-
         getgenv().FPDH = workspace.FallenPartsDestroyHeight
         workspace.FallenPartsDestroyHeight = 0/0
-
         W.FL.active = true
         flSpectate(target)
-
         local hum=c and c:FindFirstChildOfClass("Humanoid")
         if hum then
             hum.PlatformStand=true
             pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false) end)
         end
-
         W.FL.thread = task.spawn(function()
             local interval = 1/W.FL_RATE
             local tStart = tick()
@@ -690,7 +690,6 @@ local initFling = function()
             flOnStatus("pronto", W.Colors.accent)
         end)
     end
-
     W.flStart = flStart
     W.flStop = function()
         W.FL.active=false
@@ -706,9 +705,9 @@ local initFling = function()
 end
 initFling()
 
--- ═══════════════════════════════════════════════════════════════
---  💀 RESET / LOOP
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 💀 RESET / LOOP
+-- ════════════════════════════════════════════════════════════
 W.RETURN_POS=Vector3.new(-214.75,7.68,3.49)
 W.TP_X=-259.91; W.TP_Z=-13.53
 W.TP_UNDERGROUND_Y=-90; W.KILLZONE_Y=-500
@@ -717,20 +716,17 @@ W.STEP_DELAY=0.001; W.FALL_TIMEOUT=8; W.CYCLE_DELAY=0.1
 W.voidFlingLoop=false; W.voidFlingThread=nil
 W.loopResetActive=false; W.loopResetThread=nil; W.loopResetCharConn=nil
 
--- ⬅️ FIX DO TP VOID E HEALTH
 W._microTPReset = function(char)
     local c = char or LP.Character
     if not c then return false end
     local hrp = c:FindFirstChild("HumanoidRootPart")
     local hum = c:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return false end
-
-    task.wait(0.5) -- Aguarda carregar
+    task.wait(0.5)
     if not c or not c.Parent then return false end
     hrp = c:FindFirstChild("HumanoidRootPart")
     hum = c:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return false end
-
     local savedCollide = {}
     local function applyNoclip()
         if not c or not c.Parent then return end
@@ -741,23 +737,19 @@ W._microTPReset = function(char)
             end
         end
     end
-    
     applyNoclip()
     local nt = task.spawn(function()
-        while LP.Character == c do
-            applyNoclip()
-            task.wait(0.1)
-        end
+        while LP.Character == c do applyNoclip(); task.wait(0.1) end
     end)
-
-    pcall(function() hum.PlatformStand = false; hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true) end)
-
+    pcall(function()
+        hum.PlatformStand = false
+        hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+    end)
     local bv = Instance.new("BodyVelocity")
     bv.Name = "__ResetBV"
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Velocity = Vector3.zero
     bv.Parent = hrp
-
     local bp = Instance.new("BodyPosition")
     bp.Name = "__ResetBP"
     bp.MaxForce = Vector3.new(0, math.huge, 0)
@@ -765,36 +757,24 @@ W._microTPReset = function(char)
     bp.D = 10000
     bp.Position = hrp.Position
     bp.Parent = hrp
-
     local cy = W.TP_UNDERGROUND_Y
     local ty = W.KILLZONE_Y + W.STOP_ABOVE_KILLZONE
     local startTime = tick()
-
-    -- Loop de micro-TPs (versão antiga, sem forçar Health=0)
     while LP.Character == c and hum.Health > 0 and tick() - startTime < 3 do
         local chrp = c:FindFirstChild("HumanoidRootPart")
         if not chrp then break end
-
         bp.Position = Vector3.new(W.TP_X, cy, W.TP_Z)
         pcall(function()
             chrp.CFrame = CFrame.new(W.TP_X, cy, W.TP_Z)
             chrp.AssemblyLinearVelocity = Vector3.zero
         end)
-
-        if cy > ty then
-            cy = cy - W.MICRO_STEP
-            if cy < ty then cy = ty end
-        end
+        if cy > ty then cy = cy - W.MICRO_STEP; if cy < ty then cy = ty end end
         task.wait(W.STEP_DELAY)
     end
-
     if bv.Parent then bv:Destroy() end
     if bp.Parent then bp:Destroy() end
     if nt then task.cancel(nt) end
-
-    -- ⬅️ CHECAGEM DE HEALTH
     if LP.Character == c and hum.Health > 0 then
-        -- Se sim (vivo): faz voltar na hora
         local ts = tick()
         while LP.Character == c and (tick() - ts) < 5 do
             local hh = c:FindFirstChild("HumanoidRootPart")
@@ -809,7 +789,6 @@ W._microTPReset = function(char)
         end
         return false
     else
-        -- Se não (morto): espera voltar (o CharacterAdded no startLoopReset cuida disso)
         return true
     end
 end
@@ -819,40 +798,30 @@ W.startLoopReset = function()
     if W.loopResetCharConn then W.loopResetCharConn:Disconnect(); W.loopResetCharConn=nil end
     W.loopResetActive = true
     W.loopResetCycle = 0
-
     local function doReset(nc)
         task.spawn(function()
             W.loopResetCycle = W.loopResetCycle + 1
             local target = nc or LP.Character
-            if target then
-                pcall(W._microTPReset, target)
-            end
+            if target then pcall(W._microTPReset, target) end
             task.wait(W.CYCLE_DELAY)
         end)
     end
-
     W.loopResetCharConn = LP.CharacterAdded:Connect(function(nc)
         if not W.loopResetActive then return end
         doReset(nc)
     end)
-
     W.loopResetThread = task.spawn(function()
         while W.loopResetActive do task.wait(0.5) end
         if W.loopResetCharConn then W.loopResetCharConn:Disconnect(); W.loopResetCharConn=nil end
         W.loopResetThread = nil
     end)
-
-    if LP.Character then
-        doReset(LP.Character)
-    end
+    if LP.Character then doReset(LP.Character) end
 end
-
 W.stopLoopReset = function()
     W.loopResetActive=false
     if W.loopResetThread then task.cancel(W.loopResetThread); W.loopResetThread=nil end
     if W.loopResetCharConn then W.loopResetCharConn:Disconnect(); W.loopResetCharConn=nil end
 end
-
 W.voidFlingOnce = function()
     local died=W._microTPReset(LP.Character)
     if died then
@@ -868,7 +837,12 @@ W.voidFlingOnce = function()
         while LP.Character and (tick()-ts)<20 do
             local cc=LP.Character
             local hh=cc and cc:FindFirstChild("HumanoidRootPart")
-            if hh then pcall(function() hh.CFrame=CFrame.new(W.RETURN_POS); hh.AssemblyLinearVelocity=Vector3.zero end) end
+            if hh then
+                pcall(function()
+                    hh.CFrame=CFrame.new(W.RETURN_POS)
+                    hh.AssemblyLinearVelocity=Vector3.zero
+                end)
+            end
             if W.isInTeam() then break end
             task.wait(0.12)
         end
@@ -876,7 +850,6 @@ W.voidFlingOnce = function()
     end
     return false
 end
-
 W.startVoidFling = function(onFinish)
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread=nil end
     W.voidFlingLoop=true
@@ -907,9 +880,9 @@ W.stopVoidFling = function()
     if W.voidFlingThread then task.cancel(W.voidFlingThread); W.voidFlingThread=nil end
 end
 
--- ═══════════════════════════════════════════════════════════════
---  🔄 AUTO-REJOIN
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🔄 AUTO-REJOIN
+-- ════════════════════════════════════════════════════════════
 local REJOIN_URL = "https://raw.githubusercontent.com/willplucasrezende09567-cloud/script.lua/refs/heads/main/Alternativo%20touch%20soccer"
 GuiS.ErrorMessageChanged:Connect(function(e)
     if e and e~="" then
@@ -927,14 +900,12 @@ GuiS.ErrorMessageChanged:Connect(function(e)
     end
 end)
 
--- ═══════════════════════════════════════════════════════════════
---  🎨 UI BASE — FROSTED GLASS
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🎨 BASE UI — VIDRO FOSCO
+-- ════════════════════════════════════════════════════════════
 local initUIBase = function()
     pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
-
     local C = W.Colors
-
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name="WillnzxGUI"
     ScreenGui.ResetOnSpawn=false
@@ -942,7 +913,6 @@ local initUIBase = function()
     ScreenGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
     pcall(function() ScreenGui.Parent=CoreGui end)
     if not ScreenGui.Parent then ScreenGui.Parent=LP:WaitForChild("PlayerGui") end
-
     local MainFrame = Instance.new("Frame")
     MainFrame.Size=UDim2.new(0,0,0,0)
     MainFrame.Position=UDim2.new(0.5,0,0.5,0)
@@ -953,7 +923,6 @@ local initUIBase = function()
     MainFrame.ClipsDescendants=true
     MainFrame.ZIndex=1
     MainFrame.Parent=ScreenGui
-
     Instance.new("UICorner", MainFrame).CornerRadius=UDim.new(0,16)
     local BgGrad = Instance.new("UIGradient", MainFrame)
     BgGrad.Color = ColorSequence.new({
@@ -961,11 +930,9 @@ local initUIBase = function()
         ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 240, 255))
     })
     BgGrad.Rotation = 45
-
     local Stroke = Instance.new("UIStroke", MainFrame)
-    Stroke.Thickness=1.5; Stroke.Color=Color3.fromRGB(255,255,255); Stroke.Transparency=0.2
+    Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(255,255,255); Stroke.Transparency = 0.2
     Stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-
     local Title = Instance.new("TextLabel", MainFrame)
     Title.Size=UDim2.new(1,-130,0,22); Title.Position=UDim2.new(0,16,0,12)
     Title.BackgroundTransparency=1
@@ -973,7 +940,6 @@ local initUIBase = function()
     Title.TextColor3=C.textDark; Title.TextSize=14
     Title.Font=Enum.Font.GothamBold; Title.TextXAlignment=Enum.TextXAlignment.Left
     Title.ZIndex=3
-
     local function makeCtrlBtn(text, color, xOffset)
         local btn = Instance.new("TextButton", MainFrame)
         btn.Size=UDim2.new(0,26,0,26)
@@ -985,7 +951,6 @@ local initUIBase = function()
         btn.Font=Enum.Font.GothamBold; btn.AutoButtonColor=false
         btn.ZIndex=3
         Instance.new("UICorner", btn).CornerRadius=UDim.new(0,8)
-
         btn.MouseEnter:Connect(function()
             TS:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency=0}):Play()
         end)
@@ -994,10 +959,8 @@ local initUIBase = function()
         end)
         return btn
     end
-
     local MinBtn = makeCtrlBtn("−", C.textDark, -62)
     local CloseBtn = makeCtrlBtn("×", C.red, -32)
-
     local TabBar = Instance.new("Frame", MainFrame)
     TabBar.Size=UDim2.new(0,90,1,-56); TabBar.Position=UDim2.new(0,14,0,46)
     TabBar.BackgroundColor3=C.btnIdle; TabBar.BackgroundTransparency=0.5
@@ -1005,7 +968,6 @@ local initUIBase = function()
     Instance.new("UICorner", TabBar).CornerRadius=UDim.new(0,10)
     local tbStroke=Instance.new("UIStroke", TabBar)
     tbStroke.Thickness=1; tbStroke.Color=C.accent; tbStroke.Transparency=0.6
-
     local tabButtons={}
     local tabKeys={"tab_atq","tab_bola","tab_fling","tab_outros"}
     for i,key in ipairs(tabKeys) do
@@ -1017,7 +979,6 @@ local initUIBase = function()
         tab.AutoButtonColor=false; tab.ZIndex=3
         Instance.new("UICorner", tab).CornerRadius=UDim.new(0,8)
         local s=Instance.new("UIStroke", tab); s.Thickness=1; s.Color=C.accent; s.Transparency=0.5
-
         tab.MouseEnter:Connect(function()
             if not tab:GetAttribute("IsTabActive") then
                 TS:Create(tab, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(240,245,255)}):Play()
@@ -1030,11 +991,9 @@ local initUIBase = function()
         end)
         tabButtons[i]=tab
     end
-
     local ContentArea = Instance.new("Frame", MainFrame)
     ContentArea.Size=UDim2.new(1,-124,1,-56); ContentArea.Position=UDim2.new(0,112,0,46)
     ContentArea.BackgroundTransparency=1; ContentArea.ClipsDescendants=true; ContentArea.ZIndex=2
-
     local function makeScroll(parent)
         local s=Instance.new("ScrollingFrame", parent)
         s.Size=UDim2.new(1,0,1,0); s.BackgroundTransparency=1; s.BorderSizePixel=0
@@ -1045,7 +1004,6 @@ local initUIBase = function()
         s.ElasticBehavior=Enum.ElasticBehavior.Never
         return s
     end
-
     local function makeButton(parent, text, y, name)
         local C2 = W.Colors
         local btn = Instance.new("TextButton", parent)
@@ -1054,12 +1012,10 @@ local initUIBase = function()
         btn.Text=text; btn.TextSize=13; btn.Font=Enum.Font.GothamBold
         btn.TextColor3=C2.accent; btn.AutoButtonColor=false
         btn.ClipsDescendants=true; btn.Active=true; btn.ZIndex=5
-        if name then btn.Name=name end
+        if name then btn.Name = name end
         Instance.new("UICorner", btn).CornerRadius=UDim.new(0,10)
-
         local s=Instance.new("UIStroke", btn)
         s.Thickness=1.5; s.Color=C2.accent; s.Transparency=0.3
-
         local Shimmer = Instance.new("Frame", btn)
         Shimmer.Size=UDim2.new(0,30,1,0); Shimmer.Position=UDim2.new(-0.5,0,0,0)
         Shimmer.BackgroundColor3=Color3.fromRGB(255,255,255)
@@ -1071,18 +1027,15 @@ local initUIBase = function()
             NumberSequenceKeypoint.new(0.5, 0.5),
             NumberSequenceKeypoint.new(1, 1)
         })
-
         btn.MouseEnter:Connect(function()
             TS:Create(s, TweenInfo.new(0.2), {Transparency=0}):Play()
             Shimmer.Position = UDim2.new(-0.5, 0, 0, 0)
-            TS:Create(Shimmer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Position = UDim2.new(1.5, 0, 0, 0)
-            }):Play()
+            TS:Create(Shimmer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { Position = UDim2.new(1.5, 0, 0, 0) }):Play()
         end)
         btn.MouseLeave:Connect(function()
             TS:Create(s, TweenInfo.new(0.2), {Transparency=0.3}):Play()
         end)
-
         local function createRipple()
             local Ripple = Instance.new("Frame", btn)
             Ripple.Size = UDim2.new(0, 0, 0, 0)
@@ -1098,7 +1051,6 @@ local initUIBase = function()
             }):Play()
             task.delay(0.6, function() Ripple:Destroy() end)
         end
-
         btn.MouseButton1Down:Connect(function()
             createRipple()
             TS:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
@@ -1118,11 +1070,9 @@ local initUIBase = function()
             }):Play()
             TS:Create(s, TweenInfo.new(0.25), {Transparency=0.3}):Play()
         end)
-
         btn:SetAttribute("IsActive", false)
         return btn
     end
-
     W.UI.ScreenGui=ScreenGui
     W.UI.MainFrame=MainFrame
     W.UI.Stroke=Stroke
@@ -1136,18 +1086,16 @@ local initUIBase = function()
 end
 initUIBase()
 
--- ═══════════════════════════════════════════════════════════════
---  ⚽ TAB ATQ
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- ⚽ ABA ATQ
+-- ════════════════════════════════════════════════════════════
 local initTabATQ = function()
     local C = W.Colors
     local Tab = W.UI.makeScroll(W.UI.ContentArea)
     W.UI.Tab1 = Tab
-
     local GoalFrame = Instance.new("Frame", Tab)
     GoalFrame.Size=UDim2.new(1,-4,0,30); GoalFrame.Position=UDim2.new(0,2,0,4)
     GoalFrame.BackgroundTransparency=1
-
     local function makeGoalBtn(text, x)
         local b = Instance.new("TextButton", GoalFrame)
         b.Size=UDim2.new(0.5,-3,1,0); b.Position=UDim2.new(x,0,0,0)
@@ -1160,7 +1108,6 @@ local initTabATQ = function()
     end
     local BtnGoalA = makeGoalBtn(W.t("goal_a"), 0)
     local BtnGoalB = makeGoalBtn(W.t("goal_b"), 0.5)
-
     local function updGoals()
         for i,b in ipairs({BtnGoalA, BtnGoalB}) do
             if W.selectedGoalIndex == i then
@@ -1175,30 +1122,25 @@ local initTabATQ = function()
     W.addTap(BtnGoalA, function() W.selectedGoalIndex=1; updGoals() end)
     W.addTap(BtnGoalB, function() W.selectedGoalIndex=2; updGoals() end)
     updGoals()
-
-    local Button = W.UI.makeButton(Tab, W.btn("auto_gol", false), 40, "AutoGolBtn")
+    local AutoGolBtn = W.UI.makeButton(Tab, W.btn("auto_gol", false), 40, "AutoGolBtn")
     local TpGoalBtn = W.UI.makeButton(Tab, W.btn("tp_goal", false), 82, "TpGoalBtn")
     local TouchGoalBtn = W.UI.makeButton(Tab, W.btn("touch_goal", false), 124, "TouchGoalBtn")
     local SkyBtn = W.UI.makeButton(Tab, W.btn("sky", false), 166, "SkyBtn")
     local BoostAllBtn = W.UI.makeButton(Tab, W.btn("boost", false), 208, "BoostAllBtn")
-
     local SliderFrame = Instance.new("Frame", Tab)
     SliderFrame.Size=UDim2.new(1,-4,0,50); SliderFrame.Position=UDim2.new(0,2,0,250)
     SliderFrame.BackgroundColor3=C.btnIdle; SliderFrame.BackgroundTransparency=0.3
     SliderFrame.BorderSizePixel=0
     Instance.new("UICorner", SliderFrame).CornerRadius=UDim.new(0,10)
     local sfs=Instance.new("UIStroke", SliderFrame); sfs.Thickness=1; sfs.Color=C.accent; sfs.Transparency=0.5
-
     local SL = Instance.new("TextLabel", SliderFrame)
     SL.Size=UDim2.new(1,0,0,14); SL.Position=UDim2.new(0,0,0,4)
-    SL.BackgroundTransparency=1; SL.Text=W.t("multiplier").."3x"
+    SL.BackgroundTransparency=1; SL.Text=W.t("multiplicador").."3x"
     SL.TextColor3=C.accent; SL.TextSize=11; SL.Font=Enum.Font.GothamBold
-
     local Track = Instance.new("Frame", SliderFrame)
     Track.Size=UDim2.new(1,-20,0,4); Track.Position=UDim2.new(0,10,0,34)
     Track.BackgroundColor3=Color3.fromRGB(220,230,250); Track.BorderSizePixel=0
     Instance.new("UICorner", Track).CornerRadius=UDim.new(0,2)
-
     local dotButtons={}
     for i=1,6 do
         local dot = Instance.new("TextButton", Track)
@@ -1208,7 +1150,6 @@ local initTabATQ = function()
         Instance.new("UICorner", dot).CornerRadius=UDim.new(1,0)
         table.insert(dotButtons, dot)
     end
-
     local Knob = Instance.new("TextButton", Track)
     Knob.Size=UDim2.new(0,22,0,22); Knob.Position=UDim2.new(2/5,-11,0.5,-11)
     Knob.BackgroundColor3=C.accent; Knob.Text="3"
@@ -1216,20 +1157,21 @@ local initTabATQ = function()
     Knob.Font=Enum.Font.GothamBold; Knob.AutoButtonColor=false
     Knob.ZIndex=6
     Instance.new("UICorner", Knob).CornerRadius=UDim.new(1,0)
-
     W.updDots = function(v)
         for i,d in ipairs(dotButtons) do
             d.BackgroundColor3 = i<=v and C.accent or Color3.fromRGB(200,210,240)
         end
-        SL.Text=W.t("multiplier")..v.."x"
+        SL.Text=W.t("multiplicador")..v.."x"
         Knob.Text=tostring(v); W.boostMultiplier=v
     end
-    local drag=false
+    local dragging=false
     Knob.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=true end
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            dragging=true
+        end
     end)
     UIS.InputChanged:Connect(function(i)
-        if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+        if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
             local w=Track.AbsoluteSize.X
             local rx=math.clamp((i.Position.X-Track.AbsolutePosition.X)/w,0,1)
             local v=math.clamp(math.floor(rx*5+0.5)+1,1,6)
@@ -1237,19 +1179,20 @@ local initTabATQ = function()
         end
     end)
     UIS.InputEnded:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
     end)
     for i,d in ipairs(dotButtons) do
         W.addTap(d, function() Knob.Position=UDim2.new((i-1)/5,-11,0.5,-11); W.updDots(i) end)
     end
     W.updDots(3)
-
-    W.addTap(Button, function()
+    W.addTap(AutoGolBtn, function()
         if W.states.isActive then
-            W.states.isActive=false; W.setBtnInactive(Button, W.btn("auto_gol", false))
+            W.states.isActive=false; W.setBtnInactive(AutoGolBtn, W.btn("auto_gol", false))
             if W.states.loopThread then task.cancel(W.states.loopThread); W.states.loopThread=nil end
         else
-            W.states.isActive=true; W.setBtnActive(Button, W.btn("auto_gol", true)); W.startAutoGoal()
+            W.states.isActive=true; W.setBtnActive(AutoGolBtn, W.btn("auto_gol", true)); W.startAutoGoal()
         end
     end)
     W.addTap(TpGoalBtn, function()
@@ -1293,14 +1236,13 @@ local initTabATQ = function()
 end
 initTabATQ()
 
--- ═══════════════════════════════════════════════════════════════
---  ⚽ TAB BOLA
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- ⚽ ABA BOLA
+-- ════════════════════════════════════════════════════════════
 local initTabBall = function()
     local Tab = W.UI.makeScroll(W.UI.ContentArea)
     Tab.Visible=false
     W.UI.Tab2 = Tab
-
     local BringBtn = W.UI.makeButton(Tab, W.btn("bring", false), 4, "BringBtn")
     local LoopBringBtn = W.UI.makeButton(Tab, W.btn("loop_bring", false), 46, "LoopBringBtn")
     local MoveBallBtn = W.UI.makeButton(Tab, W.btn("move", false), 88, "MoveBallBtn")
@@ -1308,7 +1250,6 @@ local initTabBall = function()
     local FreezeAllBtn = W.UI.makeButton(Tab, W.btn("freeze", false), 172, "FreezeAllBtn")
     local BugBallBtn = W.UI.makeButton(Tab, W.btn("bug", false), 214, "BugBallBtn")
     local DefendGoalBtn = W.UI.makeButton(Tab, W.btn("defend", false), 256, "DefendGoalBtn")
-
     W.addTap(BringBtn, function()
         W.states.isBringing=true; W.setBtnActive(BringBtn, W.btn("bring", true)); W.startBring()
     end)
@@ -1340,8 +1281,11 @@ local initTabBall = function()
         end
     end)
     W.addTap(FreezeAllBtn, function()
-        if W.states.isFreezing then W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, W.btn("freeze", false))
-        else W.setBtnActive(FreezeAllBtn, W.btn("freeze", true)); W.startFreeze() end
+        if W.states.isFreezing then
+            W.stopFreeze(); W.setBtnInactive(FreezeAllBtn, W.btn("freeze", false))
+        else
+            W.setBtnActive(FreezeAllBtn, W.btn("freeze", true)); W.startFreeze()
+        end
     end)
     W.addTap(BugBallBtn, function()
         if W.states.isBugBall then
@@ -1353,7 +1297,8 @@ local initTabBall = function()
         end
     end)
     W.addTap(DefendGoalBtn, function()
-        if W.states.isDefending then W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
+        if W.states.isDefending then
+            W.stopDefend(); W.setBtnInactive(DefendGoalBtn, W.btn("defend", false))
         else
             W.setBtnActive(DefendGoalBtn, W.btn("defend", true))
             W.states.isDefending=true; W.startDefend()
@@ -1362,15 +1307,14 @@ local initTabBall = function()
 end
 initTabBall()
 
--- ═══════════════════════════════════════════════════════════════
---  🚶 TAB FLING
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🚶 ABA FLING
+-- ════════════════════════════════════════════════════════════
 local initTabFling = function()
     local C = W.Colors
     local Tab = W.UI.makeScroll(W.UI.ContentArea)
     Tab.Visible=false; Tab.CanvasSize=UDim2.new(0,0,0,500)
     W.UI.Tab3 = Tab
-
     local function makeInput(placeholder, value, x, w, y)
         local box = Instance.new("TextBox", Tab)
         box.Size=UDim2.new(w,-6,0,30); box.Position=UDim2.new(x,4,0,y)
@@ -1384,7 +1328,6 @@ local initTabFling = function()
         local s=Instance.new("UIStroke", box); s.Thickness=1; s.Color=C.accent; s.Transparency=0.4
         return box
     end
-
     local function makeStatus(y)
         local s = Instance.new("TextLabel", Tab)
         s.Size=UDim2.new(1,-8,0,14); s.Position=UDim2.new(0,4,0,y)
@@ -1396,18 +1339,15 @@ local initTabFling = function()
         s.TextTruncate=Enum.TextTruncate.AtEnd
         return s
     end
-
     local ConfigLabel = Instance.new("TextLabel", Tab)
     ConfigLabel.Size=UDim2.new(1,-4,0,16); ConfigLabel.Position=UDim2.new(0,2,0,2)
     ConfigLabel.BackgroundTransparency=1
-    ConfigLabel.Text="⚙️ CONFIGS DO FLING"
+    ConfigLabel.Text="⚙️ CONFIGURAÇÕES DO FLING"
     ConfigLabel.TextColor3=C.textDark; ConfigLabel.TextSize=11
     ConfigLabel.Font=Enum.Font.GothamBold; ConfigLabel.TextXAlignment=Enum.TextXAlignment.Left
-
     local YBox = makeInput("Y", "1.5", 0, 0.34, 22)
     local StudBox = makeInput("stud", "1.25", 0.34, 0.33, 22)
     local DropBox = makeInput("drop", "3", 0.67, 0.33, 22)
-
     YBox.FocusLost:Connect(function()
         local n=tonumber(YBox.Text); if n and n>0 then W.FL_Y=n else YBox.Text=tostring(W.FL_Y) end
     end)
@@ -1417,19 +1357,16 @@ local initTabFling = function()
     DropBox.FocusLost:Connect(function()
         local n=tonumber(DropBox.Text); if n and n>0 then W.FL_DROP=n else DropBox.Text=tostring(W.FL_DROP) end
     end)
-
     local TiltBox = makeInput("tilt", "45", 0, 1, 60)
     TiltBox.FocusLost:Connect(function()
         local n=tonumber(TiltBox.Text)
         if n and n>0 and n<90 then W.FL_TILT=n else TiltBox.Text=tostring(W.FL_TILT) end
     end)
-
     local KillLabel = Instance.new("TextLabel", Tab)
     KillLabel.Size=UDim2.new(1,-4,0,16); KillLabel.Position=UDim2.new(0,2,0,100)
-    KillLabel.BackgroundTransparency=1; KillLabel.Text="🔥 KILL PLAYER"
+    KillLabel.BackgroundTransparency=1; KillLabel.Text="🔥 MATAR JOGADOR"
     KillLabel.TextColor3=C.red; KillLabel.TextSize=11
     KillLabel.Font=Enum.Font.GothamBold; KillLabel.TextXAlignment=Enum.TextXAlignment.Left
-
     local KillNameBox = Instance.new("TextBox", Tab)
     KillNameBox.Size=UDim2.new(0.62,-6,0,30); KillNameBox.Position=UDim2.new(0,2,0,120)
     KillNameBox.BackgroundColor3=C.btnIdle; KillNameBox.BackgroundTransparency=0.3
@@ -1440,49 +1377,52 @@ local initTabFling = function()
     KillNameBox.ClearTextOnFocus=false
     Instance.new("UICorner", KillNameBox).CornerRadius=UDim.new(0,8)
     local KNS=Instance.new("UIStroke", KillNameBox); KNS.Thickness=1; KNS.Color=C.red; KNS.Transparency=0.4
-
     local KillBtn = Instance.new("TextButton", Tab)
     KillBtn.Size=UDim2.new(0.38,-6,0,30); KillBtn.Position=UDim2.new(0.62,2,0,120)
     KillBtn.BackgroundColor3=C.red
-    KillBtn.Text="🔥 KILL"; KillBtn.TextSize=12
+    KillBtn.Text="🔥 MATAR"; KillBtn.TextSize=12
     KillBtn.Font=Enum.Font.GothamBold; KillBtn.TextColor3=C.textLight
     KillBtn.AutoButtonColor=false
     Instance.new("UICorner", KillBtn).CornerRadius=UDim.new(0,8)
     local KBs=Instance.new("UIStroke", KillBtn); KBs.Thickness=1.5; KBs.Color=C.red; KBs.Transparency=0.2
-    KillBtn.MouseEnter:Connect(function() TS:Create(KillBtn, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(255,120,140)}):Play() end)
-    KillBtn.MouseLeave:Connect(function() TS:Create(KillBtn, TweenInfo.new(0.2), {BackgroundColor3=C.red}):Play() end)
-
+    KillBtn.MouseEnter:Connect(function()
+        TS:Create(KillBtn, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(255,120,140)}):Play()
+    end)
+    KillBtn.MouseLeave:Connect(function()
+        TS:Create(KillBtn, TweenInfo.new(0.2), {BackgroundColor3=C.red}):Play()
+    end)
     local KillStatus = makeStatus(154)
-
     KillNameBox:GetPropertyChangedSignal("Text"):Connect(function()
         local q = KillNameBox.Text
-        if q == "" then KillStatus.Text="aguardando..."; KillStatus.TextColor3=C.accent; return end
+        if q == "" then
+            KillStatus.Text="aguardando..."; KillStatus.TextColor3=C.accent; return
+        end
         local p = W.kpFindPlayer(q)
-        if p then KillStatus.Text="🎯 "..p.Name; KillStatus.TextColor3=C.green
-        else KillStatus.Text="❌ nenhum match"; KillStatus.TextColor3=C.red end
+        if p then
+            KillStatus.Text="🎯 "..p.Name; KillStatus.TextColor3=C.green
+        else
+            KillStatus.Text="❌ nenhuma correspondência"; KillStatus.TextColor3=C.red
+        end
     end)
-
     W.addTap(KillBtn, function()
         if W.FL.active then
-            W.flStop(); KillBtn.Text="🔥 KILL"
+            W.flStop(); KillBtn.Text="🔥 MATAR"
             KillStatus.Text="parado"; KillStatus.TextColor3=C.accent; return
         end
         local q = KillNameBox.Text
         if q=="" then KillStatus.Text="⚠️ digite o nome"; KillStatus.TextColor3=C.red; return end
         local p = W.kpFindPlayer(q)
         if not p then KillStatus.Text="❌ não encontrado"; KillStatus.TextColor3=C.red; return end
-        if W.flIsDead(p) then KickStatus.Text="❌ alvo morto"; KillStatus.TextColor3=C.red; return end
+        if W.flIsDead(p) then KillStatus.Text="❌ alvo morto"; KillStatus.TextColor3=C.red; return end
         W.flStart(p, "full")
-        KillBtn.Text="🛑 STOP"
+        KillBtn.Text="🛑 PARE"
         KillStatus.Text="🔥 flingando "..p.Name; KillStatus.TextColor3=C.red
     end)
-
     local KickLabel = Instance.new("TextLabel", Tab)
     KickLabel.Size=UDim2.new(1,-4,0,16); KickLabel.Position=UDim2.new(0,2,0,178)
     KickLabel.BackgroundTransparency=1; KickLabel.Text="💥 KICK FLING (força reduzida)"
     KickLabel.TextColor3=C.accent; KickLabel.TextSize=11
     KickLabel.Font=Enum.Font.GothamBold; KickLabel.TextXAlignment=Enum.TextXAlignment.Left
-
     local KickNameBox = Instance.new("TextBox", Tab)
     KickNameBox.Size=UDim2.new(0.62,-6,0,30); KickNameBox.Position=UDim2.new(0,2,0,198)
     KickNameBox.BackgroundColor3=C.btnIdle; KickNameBox.BackgroundTransparency=0.3
@@ -1493,7 +1433,6 @@ local initTabFling = function()
     KickNameBox.ClearTextOnFocus=false
     Instance.new("UICorner", KickNameBox).CornerRadius=UDim.new(0,8)
     local KNKS=Instance.new("UIStroke", KickNameBox); KNKS.Thickness=1; KNKS.Color=C.accent; KNKS.Transparency=0.4
-
     local KickBtn = Instance.new("TextButton", Tab)
     KickBtn.Size=UDim2.new(0.38,-6,0,30); KickBtn.Position=UDim2.new(0.62,2,0,198)
     KickBtn.BackgroundColor3=C.accent
@@ -1502,19 +1441,25 @@ local initTabFling = function()
     KickBtn.AutoButtonColor=false
     Instance.new("UICorner", KickBtn).CornerRadius=UDim.new(0,8)
     local KNKS2=Instance.new("UIStroke", KickBtn); KNKS2.Thickness=1.5; KNKS2.Color=C.accent; KNKS2.Transparency=0.2
-    KickBtn.MouseEnter:Connect(function() TS:Create(KickBtn, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(130,180,255)}):Play() end)
-    KickBtn.MouseLeave:Connect(function() TS:Create(KickBtn, TweenInfo.new(0.2), {BackgroundColor3=C.accent}):Play() end)
-
+    KickBtn.MouseEnter:Connect(function()
+        TS:Create(KickBtn, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(130,180,255)}):Play()
+    end)
+    KickBtn.MouseLeave:Connect(function()
+        TS:Create(KickBtn, TweenInfo.new(0.2), {BackgroundColor3=C.accent}):Play()
+    end)
     local KickStatus = makeStatus(232)
-
     KickNameBox:GetPropertyChangedSignal("Text"):Connect(function()
         local q = KickNameBox.Text
-        if q == "" then KickStatus.Text="aguardando..."; KickStatus.TextColor3=C.accent; return end
+        if q == "" then
+            KickStatus.Text="aguardando..."; KickStatus.TextColor3=C.accent; return
+        end
         local p = W.kpFindPlayer(q)
-        if p then KickStatus.Text="🎯 "..p.Name; KickStatus.TextColor3=C.green
-        else KickStatus.Text="❌ nenhum match"; KickStatus.TextColor3=C.red end
+        if p then
+            KickStatus.Text="🎯 "..p.Name; KickStatus.TextColor3=C.green
+        else
+            KickStatus.Text="❌ nenhum match"; KickStatus.TextColor3=C.red
+        end
     end)
-
     W.addTap(KickBtn, function()
         if W.FL.active then
             W.flStop(); KickBtn.Text="💥 KICK"
@@ -1526,10 +1471,9 @@ local initTabFling = function()
         if not p then KickStatus.Text="❌ não encontrado"; KickStatus.TextColor3=C.red; return end
         if W.flIsDead(p) then KickStatus.Text="❌ alvo morto"; KickStatus.TextColor3=C.red; return end
         W.flStart(p, "reduced")
-        KickBtn.Text="🛑 STOP"
+        KickBtn.Text="🛑 PARE"
         KickStatus.Text="💥 flingando "..p.Name; KickStatus.TextColor3=C.accent
     end)
-
     local WFStatus = Instance.new("TextLabel", Tab)
     WFStatus.Size=UDim2.new(1,-4,0,60); WFStatus.Position=UDim2.new(0,2,0,256)
     WFStatus.BackgroundTransparency=1
@@ -1539,18 +1483,16 @@ local initTabFling = function()
     WFStatus.TextXAlignment=Enum.TextXAlignment.Left
     WFStatus.TextYAlignment=Enum.TextYAlignment.Top
     WFStatus.TextWrapped=true
-
     W.flOnStatus(function(txt, col)
         WFStatus.Text = txt
         WFStatus.TextColor3 = col or C.accent
     end)
-
     task.spawn(function()
         while _G.Willnzx_ANTIDUP do
             task.wait(0.3)
             if not W.FL.active then
-                if KillBtn.Text ~= "🔥 KILL" then
-                    KillBtn.Text="🔥 KILL"
+                if KillBtn.Text ~= "🔥 MATAR" then
+                    KillBtn.Text="🔥 MATAR"
                     KillStatus.Text="parado"; KillStatus.TextColor3=C.accent
                 end
                 if KickBtn.Text ~= "💥 KICK" then
@@ -1563,25 +1505,25 @@ local initTabFling = function()
 end
 initTabFling()
 
--- ═══════════════════════════════════════════════════════════════
---  🔧 TAB OUTROS
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 🔧 ABA OUTROS
+-- ════════════════════════════════════════════════════════════
 local initTabOutros = function()
-    local C = W.Colors
     local Tab = W.UI.makeScroll(W.UI.ContentArea)
     Tab.Visible=false; Tab.CanvasSize=UDim2.new(0,0,0,400)
     W.UI.Tab4 = Tab
-
     local FarmCoinsBtn = W.UI.makeButton(Tab, W.btn("farm", false), 4, "FarmCoinsBtn")
     local TrackerGABtn = W.UI.makeButton(Tab, W.fnNames.tracker, 46, "TrackerGABtn")
     local LoopResetBtn = W.UI.makeButton(Tab, "♾️ LOOP RESET: OFF", 88, "LoopResetBtn")
     LoopResetBtn.TextSize=12
     local ResetMatchBtn = W.UI.makeButton(Tab, "🔄 RESET PARTIDA", 130, "ResetMatchBtn")
     ResetMatchBtn.TextSize=12
-
     W.addTap(FarmCoinsBtn, function()
-        if W.states.isFarming then W.stopFarmCoins(); W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
-        else W.startFarmCoins(); W.setBtnActive(FarmCoinsBtn, W.btn("farm", true)) end
+        if W.states.isFarming then
+            W.stopFarmCoins(); W.setBtnInactive(FarmCoinsBtn, W.btn("farm", false))
+        else
+            W.startFarmCoins(); W.setBtnActive(FarmCoinsBtn, W.btn("farm", true))
+        end
     end)
     W.addTap(TrackerGABtn, function()
         pcall(function()
@@ -1605,21 +1547,19 @@ local initTabOutros = function()
             W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
         else
             W.setBtnActive(ResetMatchBtn, "🔄 RESETANDO...")
-            W.startVoidFling(function() W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA") end)
+            W.startVoidFling(function()
+                W.setBtnInactive(ResetMatchBtn, "🔄 RESET PARTIDA")
+            end)
         end
     end)
 end
 initTabOutros()
 
--- ═══════════════════════════════════════════════════════════════
---  🔑 + 🌐 KEY & LANG OVERLAYS — FROSTED
--- ═══════════════════════════════════════════════════════════════
-local initKeyLang = function()
+-- ════════════════════════════════════════════════════════════
+-- 🌐 SELEÇÃO DE IDIOMA  (SEM KEYSYSTEM)
+-- ════════════════════════════════════════════════════════════
+local initLang = function()
     local C = W.Colors
-    local MINHA_KEY = "87748599204675"
-    W.keyValidated = false
-
-    W.UI.keyBlur = nil
     W.UI.langBlur = nil
     local LangOverlay, LTitle, PtBtn, EnBtn, finishLang
 
@@ -1634,83 +1574,6 @@ local initKeyLang = function()
         s.Thickness=1.5; s.Color=C.accent; s.Transparency=0.3
         return o
     end
-
-    local KeyOverlay = makeOverlay()
-    KeyOverlay.Name="KeyOverlay"
-
-    local KTitle = Instance.new("TextLabel", KeyOverlay)
-    KTitle.Size=UDim2.new(1,-20,0,26); KTitle.Position=UDim2.new(0,10,0,50)
-    KTitle.BackgroundTransparency=1; KTitle.Text="🔑 Verificação de Key"
-    KTitle.TextColor3=C.textDark; KTitle.TextSize=16
-    KTitle.Font=Enum.Font.GothamBold; KTitle.ZIndex=101
-
-    local KBox = Instance.new("TextBox", KeyOverlay)
-    KBox.Size=UDim2.new(1,-40,0,42); KBox.Position=UDim2.new(0,20,0,120)
-    KBox.BackgroundColor3=C.btnIdle; KBox.BackgroundTransparency=0
-    KBox.PlaceholderText="Digite a key..."
-    KBox.PlaceholderColor3=C.accent
-    KBox.Text=""; KBox.TextColor3=C.textDark
-    KBox.TextSize=14; KBox.Font=Enum.Font.GothamBold
-    KBox.ClearTextOnFocus=false; KBox.ZIndex=101
-    Instance.new("UICorner", KBox).CornerRadius=UDim.new(0,10)
-    local KS=Instance.new("UIStroke", KBox); KS.Thickness=1.5; KS.Color=C.accent; KS.Transparency=0.3
-
-    local KBtn = Instance.new("TextButton", KeyOverlay)
-    KBtn.Size=UDim2.new(1,-40,0,42); KBtn.Position=UDim2.new(0,20,0,178)
-    KBtn.BackgroundColor3=C.accent
-    KBtn.Text="✔ Verificar"; KBtn.TextSize=14
-    KBtn.Font=Enum.Font.GothamBold; KBtn.TextColor3=C.textLight
-    KBtn.AutoButtonColor=false; KBtn.ZIndex=101
-    Instance.new("UICorner", KBtn).CornerRadius=UDim.new(0,10)
-    local KBs=Instance.new("UIStroke", KBtn); KBs.Thickness=1.5; KBs.Color=C.accent; KBs.Transparency=0.2
-    KBtn.MouseEnter:Connect(function() TS:Create(KBtn, TweenInfo.new(0.2), {BackgroundColor3=Color3.fromRGB(130,180,255)}):Play() end)
-    KBtn.MouseLeave:Connect(function() TS:Create(KBtn, TweenInfo.new(0.2), {BackgroundColor3=C.accent}):Play() end)
-
-    local KError = Instance.new("TextLabel", KeyOverlay)
-    KError.Size=UDim2.new(1,-40,0,20); KError.Position=UDim2.new(0,20,0,230)
-    KError.BackgroundTransparency=1; KError.Text=""
-    KError.TextColor3=C.red; KError.TextSize=12
-    KError.Font=Enum.Font.GothamBold; KError.ZIndex=101
-
-    local function tentarKey()
-        if KBox.Text == MINHA_KEY then
-            W.keyValidated = true
-            KError.Text="✔ Key correta!"; KError.TextColor3=C.green
-            task.wait(0.15)
-            TS:Create(KeyOverlay, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                BackgroundTransparency=1, Size=UDim2.new(0.85,0,0.85,0),
-                Position=UDim2.new(0.075,0,0.075,0)
-            }):Play()
-            TS:Create(KTitle, TweenInfo.new(0.2), {TextTransparency=1}):Play()
-            TS:Create(KBox, TweenInfo.new(0.2), {TextTransparency=1, BackgroundTransparency=1}):Play()
-            TS:Create(KBtn, TweenInfo.new(0.2), {TextTransparency=1, BackgroundTransparency=1}):Play()
-            TS:Create(KError, TweenInfo.new(0.2), {TextTransparency=1}):Play()
-            task.wait(0.4)
-            if W.UI.keyBlur and W.UI.keyBlur.Parent then W.UI.keyBlur:Destroy() end
-            if KeyOverlay and KeyOverlay.Parent then KeyOverlay:Destroy() end
-            task.wait(0.1)
-            if LangOverlay and LangOverlay.Parent then
-                LangOverlay.Visible=true
-                if not W.UI.langBlur or not W.UI.langBlur.Parent then
-                    W.UI.langBlur=Instance.new("BlurEffect"); W.UI.langBlur.Size=12; W.UI.langBlur.Parent=Lighting
-                end
-            end
-        else
-            KError.Text="❌ Key incorreta."
-            KBox.Text=""
-        end
-    end
-    W.addTap(KBtn, tentarKey)
-    KBox.FocusLost:Connect(function(e) if e then tentarKey() end end)
-
-    task.delay(0.65, function()
-        if KeyOverlay and KeyOverlay.Parent and not W.keyValidated then
-            KeyOverlay.Visible=true
-            if not W.UI.keyBlur or not W.UI.keyBlur.Parent then
-                W.UI.keyBlur=Instance.new("BlurEffect"); W.UI.keyBlur.Size=12; W.UI.keyBlur.Parent=Lighting
-            end
-        end
-    end)
 
     LangOverlay = makeOverlay()
     LangOverlay.Name="LangOverlay"
@@ -1731,19 +1594,24 @@ local initKeyLang = function()
         b.AutoButtonColor=false; b.ZIndex=101
         Instance.new("UICorner", b).CornerRadius=UDim.new(0,10)
         local s=Instance.new("UIStroke", b); s.Thickness=1.5; s.Color=color; s.Transparency=0.2
-        b.MouseEnter:Connect(function() TS:Create(b, TweenInfo.new(0.2), {BackgroundTransparency=0.2}):Play() end)
-        b.MouseLeave:Connect(function() TS:Create(b, TweenInfo.new(0.2), {BackgroundTransparency=0}):Play() end)
+        b.MouseEnter:Connect(function()
+            TS:Create(b, TweenInfo.new(0.2), {BackgroundTransparency=0.2}):Play()
+        end)
+        b.MouseLeave:Connect(function()
+            TS:Create(b, TweenInfo.new(0.2), {BackgroundTransparency=0}):Play()
+        end)
         return b
     end
 
     PtBtn = makeLangBtn("🇧🇷 Português (BR)", C.green, 125)
-    EnBtn = makeLangBtn("🇺🇸 English", C.accent, 178)
+    EnBtn = makeLangBtn("🇺🇸 English",        C.accent, 178)
 
     function finishLang(choice)
         W.lang = choice
         TS:Create(LangOverlay, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            BackgroundTransparency=1, Size=UDim2.new(0.85,0,0.85,0),
-            Position=UDim2.new(0.075,0,0.075,0)
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0.85,0,0.85,0),
+            Position = UDim2.new(0.075,0,0.075,0)
         }):Play()
         TS:Create(LTitle, TweenInfo.new(0.2), {TextTransparency=1}):Play()
         TS:Create(PtBtn, TweenInfo.new(0.2), {TextTransparency=1}):Play()
@@ -1755,18 +1623,29 @@ local initKeyLang = function()
 
     W.addTap(PtBtn, function() finishLang("pt") end)
     W.addTap(EnBtn, function() finishLang("en") end)
-end
-initKeyLang()
 
--- ═══════════════════════════════════════════════════════════════
---  ❓ CONFIRM + MINIMIZE + CLOSE + DRAG
--- ═══════════════════════════════════════════════════════════════
+    -- Sem verificação de chave: abre direto após a GUI ser carregada
+    task.delay(0.65, function()
+        if LangOverlay and LangOverlay.Parent then
+            LangOverlay.Visible = true
+            if not W.UI.langBlur or not W.UI.langBlur.Parent then
+                W.UI.langBlur = Instance.new("BlurEffect")
+                W.UI.langBlur.Size = 12
+                W.UI.langBlur.Parent = Lighting
+            end
+        end
+    end)
+end
+initLang()
+
+-- ════════════════════════════════════════════════════════════
+-- ❓ CONFIRM / MINIMIZE / CLOSE / DRAG
+-- ════════════════════════════════════════════════════════════
 local initOpenClose = function()
     local C = W.Colors
     local FULL = UDim2.new(0, 400, 0, 480)
-    local MIN = UDim2.new(0, 400, 0, 46)
+    local MIN  = UDim2.new(0, 400, 0, 46)
     W.HOME_POS = UDim2.new(0.5, -200, 0.5, -240)
-
     local minimized=false
     local animating=false
 
@@ -1777,34 +1656,31 @@ local initOpenClose = function()
     ConfirmOverlay.Active=true; ConfirmOverlay.Visible=false
     Instance.new("UICorner", ConfirmOverlay).CornerRadius=UDim.new(0,16)
     local COS=Instance.new("UIStroke", ConfirmOverlay); COS.Thickness=1.5; COS.Color=C.accent; COS.Transparency=0.3
-
     local COTitle = Instance.new("TextLabel", ConfirmOverlay)
     COTitle.Size=UDim2.new(1,-20,0,32); COTitle.Position=UDim2.new(0,10,0,100)
     COTitle.BackgroundTransparency=1
-    COTitle.Text="❓ Você quer fechar a GUI?"
+    COTitle.Text="❓ Deseja fechar a GUI?"
     COTitle.TextColor3=C.textDark; COTitle.TextSize=15
     COTitle.Font=Enum.Font.GothamBold; COTitle.ZIndex=201
-
-    local SimBtn = Instance.new("TextButton", ConfirmOverlay)
-    SimBtn.Size=UDim2.new(0.5,-25,0,44); SimBtn.Position=UDim2.new(0,20,0,170)
-    SimBtn.BackgroundColor3=C.red
-    SimBtn.Text="✔ SIM"; SimBtn.TextSize=14
-    SimBtn.Font=Enum.Font.GothamBold; SimBtn.TextColor3=C.textLight
-    SimBtn.AutoButtonColor=false; SimBtn.ZIndex=201
-    Instance.new("UICorner", SimBtn).CornerRadius=UDim.new(0,10)
-
-    local NaoBtn = Instance.new("TextButton", ConfirmOverlay)
-    NaoBtn.Size=UDim2.new(0.5,-25,0,44); NaoBtn.Position=UDim2.new(0.5,5,0,170)
-    NaoBtn.BackgroundColor3=C.green
-    NaoBtn.Text="✖ NÃO"; NaoBtn.TextSize=14
-    NaoBtn.Font=Enum.Font.GothamBold; NaoBtn.TextColor3=C.textLight
-    NaoBtn.AutoButtonColor=false; NaoBtn.ZIndex=201
-    Instance.new("UICorner", NaoBtn).CornerRadius=UDim.new(0,10)
-
+    local YesBtn = Instance.new("TextButton", ConfirmOverlay)
+    YesBtn.Size=UDim2.new(0.5,-25,0,44); YesBtn.Position=UDim2.new(0,20,0,170)
+    YesBtn.BackgroundColor3=C.red
+    YesBtn.Text="✔ SIM"; YesBtn.TextSize=14
+    YesBtn.Font=Enum.Font.GothamBold; YesBtn.TextColor3=C.textLight
+    YesBtn.AutoButtonColor=false; YesBtn.ZIndex=201
+    Instance.new("UICorner", YesBtn).CornerRadius=UDim.new(0,10)
+    local NoBtn = Instance.new("TextButton", ConfirmOverlay)
+    NoBtn.Size=UDim2.new(0.5,-25,0,44); NoBtn.Position=UDim2.new(0.5,5,0,170)
+    NoBtn.BackgroundColor3=C.green
+    NoBtn.Text="✖ NÃO"; NoBtn.TextSize=14
+    NoBtn.Font=Enum.Font.GothamBold; NoBtn.TextColor3=C.textLight
+    NoBtn.AutoButtonColor=false; NoBtn.ZIndex=201
+    Instance.new("UICorner", NoBtn).CornerRadius=UDim.new(0,10)
     local COBlur=nil
+
     local function showConfirm()
         if not COBlur or not COBlur.Parent then
-            COBlur=Instance.new("BlurEffect"); COBlur.Size=14; COBlur.Parent=Lighting
+            COBlur = Instance.new("BlurEffect"); COBlur.Size = 14; COBlur.Parent = Lighting
         end
         ConfirmOverlay.Visible=true
         ConfirmOverlay.BackgroundTransparency=1
@@ -1812,24 +1688,20 @@ local initOpenClose = function()
     end
 
     local function closeGUI()
-        -- ⬅️ FIX ANTI-DUPLICAÇÃO: Limpa as flags PRIMEIRO para permitir re-executar
         _G.Willnzx_ANTIDUP = nil
         _G.Willnzx = nil
         W.loaded_base = nil
-        
         pcall(function() W.flStop() end)
         pcall(function() W.stopVoidFling() end)
         pcall(function() W.stopLoopReset() end)
         pcall(function() W.stopFreeze() end)
         pcall(function() W.stopDefend() end)
         pcall(function() W.stopFarmCoins() end)
-
         W.states.isActive=false; W.states.isBringing=false; W.states.isLoopBringing=false
         W.states.isFreezing=false; W.states.isBoostingAll=false
         W.states.isSkying=false; W.states.isTouchGoal=false; W.states.isMoveBall=false
         W.states.isOrbitBall=false; W.states.isBugBall=false
         W.states.isTpGoal=false; W.states.isDefending=false; W.states.isFarming=false
-
         local threads = {
             W.states.loopThread, W.states.tpGoalThread, W.states.bringThread,
             W.states.loopBringThread, W.states.freezeThread, W.states.boostAllThread,
@@ -1840,41 +1712,35 @@ local initOpenClose = function()
         for _, t in ipairs(threads) do
             if t then pcall(function() task.cancel(t) end) end
         end
-
         pcall(function()
             W.UI.TabBar.Visible=false; W.UI.ContentArea.Visible=false
             local tw=TS:Create(W.UI.MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size=UDim2.new(0,0,0,0), Position=UDim2.new(0.5,0,0.5,0),
-                Rotation=15, BackgroundTransparency=1
+                Size=UDim2.new(0,0,0,0),
+                Position=UDim2.new(0.5,0,0.5,0),
+                Rotation=15,
+                BackgroundTransparency=1
             })
             tw:Play()
             TS:Create(W.UI.Stroke, TweenInfo.new(0.3), {Transparency=1}):Play()
             tw.Completed:Wait()
         end)
-
         pcall(function()
             if COBlur and COBlur.Parent then COBlur:Destroy() end
-            if W.UI.keyBlur and W.UI.keyBlur.Parent then W.UI.keyBlur:Destroy() end
             if W.UI.langBlur and W.UI.langBlur.Parent then W.UI.langBlur:Destroy() end
-
             for _, v in ipairs(Lighting:GetChildren()) do
-                if v:IsA("BlurEffect") then
-                    v:Destroy()
-                end
+                if v:IsA("BlurEffect") then v:Destroy() end
             end
         end)
-
         pcall(function() W.UI.ScreenGui:Destroy() end)
     end
 
-    W.addTap(SimBtn, function() ConfirmOverlay.Visible=false; closeGUI() end)
-    W.addTap(NaoBtn, function()
+    W.addTap(YesBtn, function() ConfirmOverlay.Visible=false; closeGUI() end)
+    W.addTap(NoBtn, function()
         TS:Create(ConfirmOverlay, TweenInfo.new(0.2), {BackgroundTransparency=1}):Play()
         task.wait(0.2)
         ConfirmOverlay.Visible=false
         if COBlur and COBlur.Parent then COBlur:Destroy(); COBlur=nil end
     end)
-
     W.addTap(W.UI.MinBtn, function()
         if animating then return end
         if minimized then
@@ -1893,11 +1759,9 @@ local initOpenClose = function()
             tw.Completed:Connect(function() animating=false end)
         end
     end)
-
     W.addTap(W.UI.CloseBtn, function()
         if animating then return end
         if ConfirmOverlay.Visible then return end
-
         if minimized then
             minimized = false
             animating = true
@@ -1909,44 +1773,42 @@ local initOpenClose = function()
             tw.Completed:Wait()
             animating = false
         end
-
         showConfirm()
     end)
 
-    do
-        local dragging, dragInput, dragStart, startPos
-        local function update(input)
-            local delta = input.Position - dragStart
-            W.UI.MainFrame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-        end
-        W.UI.MainFrame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                startPos = W.UI.MainFrame.Position
-                TS:Create(W.UI.MainFrame, TweenInfo.new(0.2), {BackgroundTransparency=0.05}):Play()
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                        TS:Create(W.UI.MainFrame, TweenInfo.new(0.3), {BackgroundTransparency=0.15}):Play()
-                    end
-                end)
-            end
-        end)
-        W.UI.MainFrame.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-            end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then update(input) end
-        end)
+    -- Drag
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        W.UI.MainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
     end
+    W.UI.MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = W.UI.MainFrame.Position
+            TS:Create(W.UI.MainFrame, TweenInfo.new(0.2), {BackgroundTransparency=0.05}):Play()
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    TS:Create(W.UI.MainFrame, TweenInfo.new(0.3), {BackgroundTransparency=0.15}):Play()
+                end
+            end)
+        end
+    end)
+    W.UI.MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
 
     local tabContents = {W.UI.Tab1, W.UI.Tab2, W.UI.Tab3, W.UI.Tab4}
     W.switchTab = function(index)
@@ -1973,7 +1835,9 @@ local initOpenClose = function()
             end
         end
     end
-    for i,t in ipairs(W.UI.tabButtons) do W.addTap(t, function() W.switchTab(i) end) end
+    for i,t in ipairs(W.UI.tabButtons) do
+        W.addTap(t, function() W.switchTab(i) end)
+    end
     W.switchTab(1)
 
     task.spawn(function()
@@ -1981,51 +1845,57 @@ local initOpenClose = function()
         W.UI.MainFrame.BackgroundTransparency = 1
         W.UI.Stroke.Transparency = 1
         TS:Create(W.UI.MainFrame, TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = FULL, Position = W.HOME_POS, BackgroundTransparency = 0.15
+            Size = FULL,
+            Position = W.HOME_POS,
+            BackgroundTransparency = 0.15
         }):Play()
         TS:Create(W.UI.Stroke, TweenInfo.new(0.5), {Transparency = 0.2}):Play()
     end)
 end
 initOpenClose()
 
--- ═══════════════════════════════════════════════════════════════
---  📡 CHAT COMMANDS
--- ═══════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════
+-- 📡 CHAT COMMANDS
+-- ════════════════════════════════════════════════════════════
 W.processCommand = function(msg)
     local m = msg:lower():gsub("^%s+",""):gsub("%s+$","")
     if m:sub(1,1)==";" then m = m:sub(2) end
     if m == "cmds" then W.loadModule("cmds"); return end
-    if m == "control" then W.loadModule("control"); return end
+    if m == "controle" then W.loadModule("controle"); return end
     if m == "trackerga" then W.loadModule("trackerga"); return end
-    if m == "resetpos" then if W.UI.MainFrame then W.UI.MainFrame.Position = W.HOME_POS end; return end
+    if m == "resetpos" then
+        if W.UI.MainFrame then W.UI.MainFrame.Position = W.HOME_POS end
+        return
+    end
     if m == "loopreset" or m == "autobug" then
-        if W.loopResetActive then W.stopLoopReset() else W.stopVoidFling(); W.startLoopReset() end
+        if W.loopResetActive then W.stopLoopReset()
+        else W.stopVoidFling(); W.startLoopReset() end
     elseif m == "resetpartida" or m == "voidfling" then
-        if W.voidFlingLoop then W.stopVoidFling() else W.startVoidFling() end
+        if W.voidFlingLoop then W.stopVoidFling()
+        else W.startVoidFling() end
     elseif m == "lang pt" then W.lang = "pt"
-    elseif m == "lang en" then W.lang = "en" end
+    elseif m == "lang en" then W.lang = "en"
+    end
 end
-
 LP.Chatted:Connect(W.processCommand)
-
 _G.Willnzx = W
-print("[Willnzx] ✅ Frosted Glass — Kill/Kick + Loop Reset (Health check)")
+print("[Willnzx] ✅ GUI carregada — sem KeySystem")
 
--- ═══════════════════════════════════════════════════════════════
---  ⚙️ CONFIGS DO FLING
--- ═══════════════════════════════════════════════════════════════
-W.FL_Y            = 1.5
-W.FL_STUD         = 1.25
-W.FL_DROP         = 3
-W.FL_TILT         = 45
-W.FL_HEAD_DIST    = 5
-W.FL_KILL_XZ      = 9e7
-W.FL_KILL_Y       = 9e8
-W.FL_KILL_ROT     = 9e8
-W.FL_KICK_XZ      = 4e7
-W.FL_KICK_Y       = 4e8
-W.FL_KICK_ROT     = 4e8
-W.FL_RATE         = 90
-W.FL_MAX_TIME     = 5
-W.FL_LIFT         = 3
-W.FL_REFILL       = true
+-- ════════════════════════════════════════════════════════════
+-- ⚙️ CONFIG FLING
+-- ════════════════════════════════════════════════════════════
+W.FL_Y = 1.5
+W.FL_STUD = 1.25
+W.FL_DROP = 3
+W.FL_TILT = 45
+W.FL_HEAD_DIST = 5
+W.FL_KILL_XZ = 9e7
+W.FL_KILL_Y = 9e8
+W.FL_KILL_ROT = 9e8
+W.FL_KICK_XZ = 4e7
+W.FL_KICK_Y = 4e8
+W.FL_KICK_ROT = 4e8
+W.FL_RATE = 90
+W.FL_MAX_TIME = 5
+W.FL_LIFT = 3
+W.FL_REFILL = true
