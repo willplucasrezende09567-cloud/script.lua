@@ -1,0 +1,919 @@
+-- [[ nyx Control Parts (Clean Blue Edition) — nyx Hub — Delta | Fluxus | Arceus X ]]
+-- client-side. Buraco Negro visual, Orbit 16, Velocidades e Freeze Time (SÓ NÃO ANCORADAS).
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local Workspace        = game:GetService("Workspace")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui          = game:GetService("CoreGui")
+local LP               = Players.LocalPlayer
+
+print("[nyx CP] carregando Clean Blue Edition...")
+
+-- ==================== CLEANUP ====================
+_G.NYX_CP_RUNNING = false
+_G.NYX_CP_CONNS = _G.NYX_CP_CONNS or {}
+for _, conn in ipairs(_G.NYX_CP_CONNS) do pcall(function() conn:Disconnect() end) end
+_G.NYX_CP_CONNS = {}
+
+if _G.NYX_CP_FROZEN then
+    for _, p in ipairs(_G.NYX_CP_FROZEN) do
+        if p and p.Parent then pcall(function() p.Anchored = false; p.CanCollide = true end) end
+    end
+end
+_G.NYX_CP_FROZEN = {}
+if _G.NYX_CP then pcall(function() _G.NYX_CP:Destroy() end); _G.NYX_CP = nil end
+local oldF = Workspace:FindFirstChild("__nyxCPFolder")
+if oldF then oldF:Destroy() end
+
+-- ==================== CONFIG ====================
+local CFG = {
+    RISE_SPEED       = 14,
+    SINK_SPEED       = 20,
+    REPEL_SPEED      = 50,
+    LAUNCH_SPEED     = 200,
+    VORTEX_SPEED     = 25,
+    ORBIT_DIST       = 16,
+    ORBIT_SPEED      = 3,
+    CAPTURE_RADIUS   = 100,
+    FREEZE_RADIUS    = 150,
+    CAPTURE_INTERVAL = 0.4,
+    FREEZE_DIST      = 12,
+}
+
+-- ==================== STATE ====================
+local currentMode    = "NONE"
+local savedPosition  = nil
+local frozenSet      = {}
+local nyxNetSet      = {}
+local orbitOffsets   = {}
+
+local modeData = {
+    PULL   = { list = {}, set = {} },
+    RISE   = { list = {}, set = {} },
+    SINK   = { list = {}, set = {} },
+    VORTEX = { list = {}, set = {} },
+    REPEL  = { list = {}, set = {} },
+    LAUNCH = { list = {}, set = {} },
+    ORBIT  = { list = {}, set = {} },
+    FREEZE = { list = {}, set = {} },
+}
+
+local function addConn(conn) table.insert(_G.NYX_CP_CONNS, conn); return conn end
+
+-- ==================== HELPERS ====================
+local function isCharacterPart(part)
+    if not part then return true end
+    local curr = part
+    while curr and curr ~= Workspace do
+        if curr:FindFirstChildOfClass("Humanoid") then return true end
+        if Players:GetPlayerFromCharacter(curr) then return true end
+        if curr:IsA("Accessory") or curr:IsA("Tool") then return true end
+        curr = curr.Parent
+    end
+    return false
+end
+
+local function isActivePart(part)
+    for _, data in pairs(modeData) do
+        if data.set[part] then return true end
+    end
+    return false
+end
+
+local function clearMovers(v)
+    for _, x in ipairs(v:GetChildren()) do
+        if x:IsA("BodyMover") or x:IsA("RocketPropulsion")
+        or x:IsA("AlignPosition") or x:IsA("Torque")
+        or x:IsA("LinearVelocity") 
+        or x.Name == "IY_Force" or x.Name == "NexusGravidBV" or x.Name:sub(1, 6) == "__nyx" then
+            x:Destroy()
+        end
+    end
+end
+
+local function trackPart(mode, part)
+    modeData[mode].set[part] = true
+    table.insert(modeData[mode].list, part)
+end
+
+local function RetainPart(Part)
+    if not Part or not Part:IsA("BasePart") then return end
+    if not Part:IsDescendantOf(Workspace) then return end
+    if isCharacterPart(Part) then return end
+    nyxNetSet[Part] = true
+    Part.CanCollide = false
+    pcall(function() Part:SetNetworkOwner(LP) end)
+end
+
+local function ReleasePart(Part)
+    if nyxNetSet[Part] then nyxNetSet[Part] = nil end
+end
+
+local function pushSimRadius()
+    pcall(function() sethiddenproperty(LP, "SimulationRadius", math.huge) end)
+    pcall(function() sethiddenproperty(LP, "MaxSimulationRadius", math.huge) end)
+    pcall(function() LP.ReplicationFocus = Workspace end)
+end
+
+local function freezePart(part)
+    if not part or not part.Parent then return end
+    clearMovers(part)
+    pcall(function()
+        part.AssemblyLinearVelocity = Vector3.zero
+        part.AssemblyAngularVelocity = Vector3.zero
+    end)
+    part.Anchored   = true
+    part.CanCollide = true
+    if not frozenSet[part] then
+        frozenSet[part] = true
+        table.insert(_G.NYX_CP_FROZEN, part)
+    end
+    ReleasePart(part)
+end
+
+-- CORREÇÃO: Só congela se a part NÃO ESTIVER ANCORADA
+local function freezeTimePart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if isCharacterPart(v) then return end
+    if v.Anchored then return end -- AQUI: Ignora o chão e o que já tá preso
+    
+    if not frozenSet[v] then
+        frozenSet[v] = true
+        table.insert(_G.NYX_CP_FROZEN, v)
+        trackPart("FREEZE", v)
+    end
+    
+    pcall(function() v:SetNetworkOwner(LP) end)
+    nyxNetSet[v] = true 
+    
+    clearMovers(v)
+    v.AssemblyLinearVelocity = Vector3.zero
+    v.AssemblyAngularVelocity = Vector3.zero
+    v.Anchored = true
+    v.CanCollide = true
+end
+
+local function unfreezeAll()
+    local count = #_G.NYX_CP_FROZEN
+    for _, p in ipairs(_G.NYX_CP_FROZEN) do
+        if p and p.Parent then
+            pcall(function()
+                p.Anchored = false
+                p.CanCollide = true
+            end)
+        end
+    end
+    _G.NYX_CP_FROZEN = {}
+    frozenSet = {}
+    return count
+end
+
+-- ==================== PULL TARGET + VISUAL ====================
+local Folder = Instance.new("Folder")
+Folder.Name   = "__nyxCPFolder"
+Folder.Parent = Workspace
+
+local PullTarget = Instance.new("Part")
+PullTarget.Name         = "__nyxCPTarget"
+PullTarget.Anchored     = true
+PullTarget.CanCollide   = false
+PullTarget.Transparency = 1
+PullTarget.Size         = Vector3.new(0.1, 0.1, 0.1)
+PullTarget.Parent       = Folder
+
+local BlackHoleVisual = Instance.new("Part")
+BlackHoleVisual.Name = "__nyxBlackHoleGlow"
+BlackHoleVisual.Shape = Enum.PartType.Ball
+BlackHoleVisual.Size = Vector3.new(14, 14, 14)
+BlackHoleVisual.Material = Enum.Material.Neon
+BlackHoleVisual.Color = Color3.fromRGB(140, 0, 255)
+BlackHoleVisual.Transparency = 1 
+BlackHoleVisual.Anchored = true
+BlackHoleVisual.CanCollide = false
+BlackHoleVisual.Parent = Folder
+
+local BlackHoleCore = Instance.new("Part")
+BlackHoleCore.Name = "__nyxBlackHoleCore"
+BlackHoleCore.Shape = Enum.PartType.Ball
+BlackHoleCore.Size = Vector3.new(8, 8, 8)
+BlackHoleCore.Material = Enum.Material.SmoothPlastic
+BlackHoleCore.Color = Color3.fromRGB(0, 0, 0)
+BlackHoleCore.Transparency = 1 
+BlackHoleCore.Anchored = true
+BlackHoleCore.CanCollide = false
+BlackHoleCore.Parent = Folder
+
+local BH_Light = Instance.new("PointLight")
+BH_Light.Color = Color3.fromRGB(140, 0, 255)
+BH_Light.Range = 25
+BH_Light.Brightness = 5
+BH_Light.Enabled = false 
+BH_Light.Parent = BlackHoleVisual
+
+-- ==================== MODES ====================
+local function pullPart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) or v.Parent == Folder then return end
+    clearMovers(v); v.CanCollide = false
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "__nyxPullBV"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.P = 5000
+    bv.Velocity = Vector3.zero
+    bv.Parent = v
+
+    RetainPart(v); trackPart("PULL", v)
+end
+
+local function risePart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "__nyxRiseBV"
+    bv.Velocity = Vector3.new(0, CFG.RISE_SPEED, 0)
+    bv.MaxForce = Vector3.new(0, math.huge, 0)
+    bv.P = 5000; bv.Parent = v
+
+    RetainPart(v); trackPart("RISE", v)
+end
+
+local function sinkPart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "__nyxSinkBV"
+    bv.Velocity = Vector3.new(0, -CFG.SINK_SPEED, 0)
+    bv.MaxForce = Vector3.new(0, math.huge, 0)
+    bv.P = 5000; bv.Parent = v
+
+    RetainPart(v); trackPart("SINK", v)
+end
+
+local function vortexPart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+    RetainPart(v); trackPart("VORTEX", v)
+end
+
+local function repelPart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+    RetainPart(v); trackPart("REPEL", v)
+end
+
+local function launchPart(v, dir)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "__nyxLaunchBV"
+    bv.Velocity = dir * CFG.LAUNCH_SPEED
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.P = 5000; bv.Parent = v
+
+    RetainPart(v); trackPart("LAUNCH", v)
+end
+
+local function orbitPart(v)
+    if not v or not v:IsA("BasePart") then return end
+    if v.Anchored or isActivePart(v) or frozenSet[v] then return end
+    if isCharacterPart(v) then return end
+    clearMovers(v); v.CanCollide = false
+
+    local bp = Instance.new("BodyPosition")
+    bp.Name = "__nyxOrbitBP"
+    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bp.P = 100000; bp.D = 1000; bp.Parent = v
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "__nyxOrbitBG"
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 10000; bg.D = 1000; bg.Parent = v
+
+    orbitOffsets[v] = { offset = math.random() * math.pi * 2, height = math.random(-3, 3) }
+    RetainPart(v); trackPart("ORBIT", v)
+end
+
+-- ==================== STOP ====================
+local function stopCurrentMode()
+    local mode = currentMode
+    currentMode = "NONE"
+    local data = modeData[mode]
+    if data then
+        for _, p in ipairs(data.list) do
+            if p and p.Parent then pcall(freezePart, p) end
+        end
+        modeData[mode] = { list = {}, set = {} }
+    end
+    if mode == "ORBIT" then orbitOffsets = {} end
+    if mode == "PULL" then
+        BlackHoleVisual.Transparency = 1
+        BlackHoleCore.Transparency = 1
+        BH_Light.Enabled = false
+    end
+end
+
+-- ==================== LOOPS ====================
+addConn(RunService.RenderStepped:Connect(function()
+    if currentMode == "PULL" and savedPosition then
+        PullTarget.CFrame = CFrame.new(savedPosition)
+        BlackHoleVisual.CFrame = CFrame.new(savedPosition) * CFrame.Angles(math.random(), math.random(), math.random())
+        BlackHoleCore.CFrame = BlackHoleVisual.CFrame
+        
+        BlackHoleVisual.Transparency = 0.5
+        BlackHoleCore.Transparency = 0
+        BH_Light.Enabled = true
+    end
+end))
+
+addConn(RunService.Heartbeat:Connect(function()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if currentMode == "PULL" and savedPosition then
+        local list = modeData.PULL.list
+        for i = #list, 1, -1 do
+            local p = list[i]
+            if not p or not p.Parent then
+                modeData.PULL.set[p] = nil; table.remove(list, i)
+            elseif isCharacterPart(p) then
+                clearMovers(p); modeData.PULL.set[p] = nil; table.remove(list, i)
+            else
+                local bv = p:FindFirstChild("__nyxPullBV")
+                local dist = (p.Position - savedPosition).Magnitude
+                
+                if dist <= CFG.FREEZE_DIST then
+                    freezePart(p); modeData.PULL.set[p] = nil; table.remove(list, i)
+                else
+                    if bv then
+                        local dir = (savedPosition - p.Position).Unit
+                        local suctionSpeed = math.clamp(1000 / (dist + 1), 30, 300)
+                        bv.Velocity = dir * suctionSpeed
+                    end
+                end
+            end
+        end
+        return
+    end
+
+    if not root then return end
+    local center = root.Position
+
+    if currentMode == "VORTEX" then
+        for _, p in ipairs(modeData.VORTEX.list) do
+            if p and p.Parent and not p.Anchored then
+                local off = p.Position - center
+                off = Vector3.new(off.X, 0, off.Z)
+                if off.Magnitude > 1 then
+                    local tangent = Vector3.new(-off.Z, 0, off.X).Unit
+                    local inward  = -off.Unit * (CFG.VORTEX_SPEED * 0.15)
+                    pcall(function() p.AssemblyLinearVelocity = tangent * CFG.VORTEX_SPEED + inward + Vector3.new(0, 2, 0) end)
+                end
+            end
+        end
+    elseif currentMode == "REPEL" then
+        for _, p in ipairs(modeData.REPEL.list) do
+            if p and p.Parent and not p.Anchored then
+                local off = p.Position - center
+                if off.Magnitude > 0.5 then
+                    pcall(function() p.AssemblyLinearVelocity = off.Unit * CFG.REPEL_SPEED end)
+                end
+            end
+        end
+    elseif currentMode == "ORBIT" then
+        local currentTime = tick() * CFG.ORBIT_SPEED
+        for part, data in pairs(orbitOffsets) do
+            if part and part.Parent then
+                local bp = part:FindFirstChild("__nyxOrbitBP")
+                local bg = part:FindFirstChild("__nyxOrbitBG")
+                if bp and bg then
+                    local angle = currentTime + data.offset
+                    local targetPos = center + Vector3.new(
+                        math.cos(angle) * CFG.ORBIT_DIST,
+                        data.height,
+                        math.sin(angle) * CFG.ORBIT_DIST
+                    )
+                    bp.Position = targetPos
+                    bg.CFrame = CFrame.new(part.Position, center)
+                else
+                    orbitOffsets[part] = nil
+                end
+            else
+                orbitOffsets[part] = nil
+            end
+        end
+    end
+end))
+
+-- ==================== CLEAN BLUE UI ====================
+local Colors = {
+    bg          = Color3.fromRGB(255, 255, 255),
+    stroke      = Color3.fromRGB(225, 225, 230),
+    textDark    = Color3.fromRGB(30, 35, 45),
+    textLight   = Color3.fromRGB(255, 255, 255),
+    blue        = Color3.fromRGB(0, 122, 255),
+    blueHover   = Color3.fromRGB(50, 150, 255),
+    bluePress   = Color3.fromRGB(0, 100, 220),
+    red         = Color3.fromRGB(255, 80, 90),
+    redHover    = Color3.fromRGB(255, 100, 110),
+    btnCtrl     = Color3.fromRGB(240, 240, 245)
+}
+
+pcall(function() CoreGui:FindFirstChild("WillnzxGUI"):Destroy() end)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "WillnzxGUI"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LP:WaitForChild("PlayerGui") end
+_G.NYX_CP = ScreenGui
+
+local Shadow = Instance.new("Frame")
+Shadow.Size                   = UDim2.new(0, 280, 0, 400)
+Shadow.Position               = UDim2.new(0.5, -140, 0.5, -200)
+Shadow.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+Shadow.BackgroundTransparency = 0.85
+Shadow.BorderSizePixel        = 0
+Shadow.ZIndex                 = 0
+Shadow.Parent                 = ScreenGui
+Instance.new("UICorner", Shadow).CornerRadius = UDim.new(0, 16)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size                   = UDim2.new(0, 280, 0, 400)
+MainFrame.Position               = UDim2.new(0.5, -140, 0.5, -200)
+MainFrame.BackgroundColor3       = Colors.bg
+MainFrame.BorderSizePixel        = 0
+MainFrame.Active                 = true
+MainFrame.ClipsDescendants       = true
+MainFrame.ZIndex                 = 1
+MainFrame.Parent                 = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 16)
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Thickness       = 1
+Stroke.Color           = Colors.stroke
+Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+Stroke.Parent          = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size                   = UDim2.new(1, -80, 0, 24)
+Title.Position               = UDim2.new(0, 16, 0, 12)
+Title.BackgroundTransparency = 1
+Title.Text                   = "nyx Hub | Clean"
+Title.TextColor3             = Colors.textDark
+Title.TextSize               = 14
+Title.Font                   = Enum.Font.GothamBold
+Title.TextXAlignment         = Enum.TextXAlignment.Left
+Title.ZIndex                 = 3
+Title.Parent                 = MainFrame
+
+local function makeCtrlBtn(text, color, xOffset)
+    local btn = Instance.new("TextButton")
+    btn.Size             = UDim2.new(0, 26, 0, 26)
+    btn.Position         = UDim2.new(1, xOffset, 0, 11)
+    btn.BackgroundColor3 = Colors.btnCtrl
+    btn.Text             = text
+    btn.TextSize         = 16
+    btn.TextColor3       = color
+    btn.Font             = Enum.Font.GothamBold
+    btn.AutoButtonColor  = false
+    btn.ZIndex           = 3
+    btn.Parent           = MainFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(225, 225, 230)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.btnCtrl}):Play()
+    end)
+    return btn
+end
+
+local MinBtn = makeCtrlBtn("−", Colors.textDark, -62)
+local CloseBtn = makeCtrlBtn("×", Colors.red, -32)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -24, 1, -60)
+Scroll.Position = UDim2.new(0, 12, 0, 48)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 2
+Scroll.ScrollBarImageColor3 = Colors.stroke
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 460)
+Scroll.Parent = MainFrame
+
+local BW, BH, GAP = 122, 38, 8
+local C1X, C2X = 0, BW + GAP
+local ROW0 = 0
+local RH = BH + GAP
+
+local function mkCleanBtn(text, color, hoverColor, x, y, w)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.fromOffset(w, BH)
+    b.Position = UDim2.fromOffset(x, y)
+    b.BackgroundColor3 = color
+    b.Text = text
+    b.TextColor3 = Colors.textLight
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 12
+    b.AutoButtonColor = false
+    b.ClipsDescendants = true
+    b.Parent = Scroll
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = color}):Play()
+    end)
+    b.MouseButton1Down:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(w - 4, BH - 4), Position = UDim2.fromOffset(x + 2, y + 2)}):Play()
+    end)
+    b.MouseButton1Up:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.fromOffset(w, BH), Position = UDim2.fromOffset(x, y)}):Play()
+    end)
+    return b
+end
+
+local SaveBtn     = mkCleanBtn("SALVAR LOCAL", Colors.blue, Colors.blueHover, C1X, ROW0, BW)
+local PullBtn     = mkCleanBtn("BURACO NEGRO", Colors.blue, Colors.blueHover, C2X, ROW0, BW)
+local RiseBtn     = mkCleanBtn("SUBIR", Colors.blue, Colors.blueHover, C1X, ROW0+RH, BW)
+local SinkBtn     = mkCleanBtn("AFUNDAR", Colors.blue, Colors.blueHover, C2X, ROW0+RH, BW)
+local VortexBtn   = mkCleanBtn("VÓRTICE", Colors.blue, Colors.blueHover, C1X, ROW0+RH*2, BW)
+local RepelBtn    = mkCleanBtn("REPELIR", Colors.blue, Colors.blueHover, C2X, ROW0+RH*2, BW)
+local LaunchBtn   = mkCleanBtn("LANÇAR", Colors.blue, Colors.blueHover, C1X, ROW0+RH*3, BW)
+local OrbitBtn    = mkCleanBtn("ORBIT 16", Colors.blue, Colors.blueHover, C2X, ROW0+RH*3, BW)
+local FreezeBtn   = mkCleanBtn("CONGELAR TEMPO", Colors.blue, Colors.blueHover, C1X, ROW0+RH*4, BW)
+local UnfreezeBtn = mkCleanBtn("DESCONGELAR", Colors.red, Colors.redHover, C2X, ROW0+RH*4, BW)
+local StopBtn     = mkCleanBtn("PARAR TUDO", Colors.red, Colors.redHover, C1X, ROW0+RH*5, BW*2+GAP)
+
+-- Controles de Velocidade
+local RiseLabel = Instance.new("TextLabel")
+RiseLabel.Size = UDim2.fromOffset(BW*2+GAP, 20); RiseLabel.Position = UDim2.fromOffset(C1X, ROW0+RH*6)
+RiseLabel.BackgroundTransparency = 1; RiseLabel.Text = "Velocidade do Subir: " .. CFG.RISE_SPEED
+RiseLabel.TextColor3 = Colors.textDark; RiseLabel.Font = Enum.Font.GothamBold
+RiseLabel.TextSize = 12; RiseLabel.TextXAlignment = Enum.TextXAlignment.Left; RiseLabel.Parent = Scroll
+
+local RiseMinus = mkCleanBtn("-", Colors.btnCtrl, Color3.fromRGB(220, 220, 225), C1X, ROW0+RH*6+22, 40)
+RiseMinus.TextColor3 = Colors.textDark
+local RisePlus  = mkCleanBtn("+", Colors.btnCtrl, Color3.fromRGB(220, 220, 225), C2X, ROW0+RH*6+22, 40)
+RisePlus.TextColor3 = Colors.textDark
+
+local OrbitLabel = Instance.new("TextLabel")
+OrbitLabel.Size = UDim2.fromOffset(BW*2+GAP, 20); OrbitLabel.Position = UDim2.fromOffset(C1X, ROW0+RH*6+70)
+OrbitLabel.BackgroundTransparency = 1; OrbitLabel.Text = "Velocidade do Orbit: " .. CFG.ORBIT_SPEED
+OrbitLabel.TextColor3 = Colors.textDark; OrbitLabel.Font = Enum.Font.GothamBold
+OrbitLabel.TextSize = 12; OrbitLabel.TextXAlignment = Enum.TextXAlignment.Left; OrbitLabel.Parent = Scroll
+
+local OrbitMinus = mkCleanBtn("-", Colors.btnCtrl, Color3.fromRGB(220, 220, 225), C1X, ROW0+RH*6+92, 40)
+OrbitMinus.TextColor3 = Colors.textDark
+local OrbitPlus  = mkCleanBtn("+", Colors.btnCtrl, Color3.fromRGB(220, 220, 225), C2X, ROW0+RH*6+92, 40)
+OrbitPlus.TextColor3 = Colors.textDark
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -32, 0, 20)
+Status.Position = UDim2.new(0, 16, 1, -25)
+Status.BackgroundTransparency = 1
+Status.Text = "Modo: NONE"
+Status.TextColor3 = Colors.textDark
+Status.Font = Enum.Font.Gotham
+Status.TextSize = 11
+Status.TextXAlignment = Enum.TextXAlignment.Left
+Status.ZIndex = 3
+Status.Parent = MainFrame
+
+-- ==================== UI HANDLERS ====================
+local function resetBtnColors()
+    PullBtn.BackgroundColor3 = Colors.blue
+    RiseBtn.BackgroundColor3 = Colors.blue
+    SinkBtn.BackgroundColor3 = Colors.blue
+    VortexBtn.BackgroundColor3 = Colors.blue
+    RepelBtn.BackgroundColor3 = Colors.blue
+    LaunchBtn.BackgroundColor3 = Colors.blue
+    OrbitBtn.BackgroundColor3 = Colors.blue
+    FreezeBtn.BackgroundColor3 = Colors.blue
+end
+
+local function setActive(btn)
+    resetBtnColors()
+    btn.BackgroundColor3 = Colors.bluePress
+end
+
+SaveBtn.MouseButton1Click:Connect(function()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        savedPosition = root.Position
+        Status.Text = "Local Salvo!"; Status.TextColor3 = Colors.blue
+    end
+end)
+
+PullBtn.MouseButton1Click:Connect(function()
+    if currentMode == "PULL" then stopCurrentMode(); resetBtnColors(); return end
+    if not savedPosition then Status.Text = "Salve um local primeiro!"; Status.TextColor3 = Colors.red; return end
+    stopCurrentMode(); unfreezeAll(); setActive(PullBtn); currentMode = "PULL"; pushSimRadius()
+    for _, v in ipairs(Workspace:GetDescendants()) do pullPart(v) end
+    addConn(Workspace.DescendantAdded:Connect(function(v) if currentMode == "PULL" then task.defer(function() if currentMode == "PULL" then pullPart(v) end end) end end))
+end)
+
+RiseBtn.MouseButton1Click:Connect(function()
+    if currentMode == "RISE" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(RiseBtn); currentMode = "RISE"; pushSimRadius()
+end)
+
+SinkBtn.MouseButton1Click:Connect(function()
+    if currentMode == "SINK" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(SinkBtn); currentMode = "SINK"; pushSimRadius()
+end)
+
+VortexBtn.MouseButton1Click:Connect(function()
+    if currentMode == "VORTEX" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(VortexBtn); currentMode = "VORTEX"; pushSimRadius()
+end)
+
+RepelBtn.MouseButton1Click:Connect(function()
+    if currentMode == "REPEL" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(RepelBtn); currentMode = "REPEL"; pushSimRadius()
+end)
+
+LaunchBtn.MouseButton1Click:Connect(function()
+    if currentMode == "LAUNCH" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(LaunchBtn); currentMode = "LAUNCH"; pushSimRadius()
+    local cam = Workspace.CurrentCamera
+    local dir = cam and cam.CFrame.LookVector or Vector3.new(0, 1, 0)
+    for _, v in ipairs(Workspace:GetDescendants()) do if v:IsA("BasePart") then launchPart(v, dir) end end
+end)
+
+OrbitBtn.MouseButton1Click:Connect(function()
+    if currentMode == "ORBIT" then stopCurrentMode(); resetBtnColors(); return end
+    stopCurrentMode(); unfreezeAll(); setActive(OrbitBtn); currentMode = "ORBIT"; pushSimRadius()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v.Anchored and not isActivePart(v) and not frozenSet[v] and not isCharacterPart(v) then
+                if (v.Position - root.Position).Magnitude <= CFG.CAPTURE_RADIUS then orbitPart(v) end
+            end
+        end
+    end
+end)
+
+FreezeBtn.MouseButton1Click:Connect(function()
+    if currentMode == "FREEZE" then 
+        stopCurrentMode(); resetBtnColors(); 
+        Status.Text = "Tempo voltou."; Status.TextColor3 = Colors.textDark
+        return 
+    end
+    stopCurrentMode(); unfreezeAll(); setActive(FreezeBtn); currentMode = "FREEZE"; pushSimRadius()
+    Status.Text = "ZA WARUDO!"; Status.TextColor3 = Colors.blue
+    
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            -- Filtro pra só pegar o que tá solto
+            if v:IsA("BasePart") and not v.Anchored and not isCharacterPart(v) then
+                if (v.Position - root.Position).Magnitude <= CFG.FREEZE_RADIUS then freezeTimePart(v) end
+            end
+        end
+    end
+    
+    addConn(Workspace.DescendantAdded:Connect(function(v)
+        if currentMode == "FREEZE" and v:IsA("BasePart") and not v.Anchored then
+            task.defer(function()
+                if currentMode == "FREEZE" then
+                    local char = LP.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root and (v.Position - root.Position).Magnitude <= CFG.FREEZE_RADIUS then
+                        freezeTimePart(v)
+                    end
+                end
+            end)
+        end
+    end))
+end)
+
+RiseMinus.MouseButton1Click:Connect(function()
+    CFG.RISE_SPEED = math.max(5, CFG.RISE_SPEED - 5)
+    RiseLabel.Text = "Velocidade do Subir: " .. CFG.RISE_SPEED
+    for _, p in ipairs(modeData.RISE.list) do
+        local bv = p:FindFirstChild("__nyxRiseBV")
+        if bv then bv.Velocity = Vector3.new(0, CFG.RISE_SPEED, 0) end
+    end
+end)
+
+RisePlus.MouseButton1Click:Connect(function()
+    CFG.RISE_SPEED = CFG.RISE_SPEED + 5
+    RiseLabel.Text = "Velocidade do Subir: " .. CFG.RISE_SPEED
+    for _, p in ipairs(modeData.RISE.list) do
+        local bv = p:FindFirstChild("__nyxRiseBV")
+        if bv then bv.Velocity = Vector3.new(0, CFG.RISE_SPEED, 0) end
+    end
+end)
+
+OrbitMinus.MouseButton1Click:Connect(function()
+    CFG.ORBIT_SPEED = math.max(1, CFG.ORBIT_SPEED - 1)
+    OrbitLabel.Text = "Velocidade do Orbit: " .. CFG.ORBIT_SPEED
+end)
+
+OrbitPlus.MouseButton1Click:Connect(function()
+    CFG.ORBIT_SPEED = CFG.ORBIT_SPEED + 1
+    OrbitLabel.Text = "Velocidade do Orbit: " .. CFG.ORBIT_SPEED
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    stopCurrentMode(); resetBtnColors()
+    Status.Text = "Tudo parado | Congeladas: " .. #_G.NYX_CP_FROZEN
+end)
+
+UnfreezeBtn.MouseButton1Click:Connect(function()
+    if currentMode ~= "NONE" then stopCurrentMode(); resetBtnColors() end
+    local count = unfreezeAll()
+    Status.Text = "Descongeladas: " .. count; Status.TextColor3 = Colors.textDark
+end)
+
+-- Minimizar
+local minimized = false
+local FULL_SIZE = UDim2.new(0, 280, 0, 400)
+local MIN_SIZE  = UDim2.new(0, 280, 0, 48)
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    TweenService:Create(MinBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Rotation = minimized and 180 or 0
+    }):Play()
+    
+    if minimized then
+        task.delay(0.2, function() MinBtn.Text = "+" end)
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = MIN_SIZE}):Play()
+        TweenService:Create(Shadow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = MIN_SIZE}):Play()
+        
+        TweenService:Create(Scroll, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 1, Position = UDim2.new(0, 16, 0, 70)
+        }):Play()
+        Scroll.Visible = false
+        Status.Visible = false
+    else
+        task.delay(0.2, function() MinBtn.Text = "−" end)
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = FULL_SIZE}):Play()
+        TweenService:Create(Shadow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = FULL_SIZE}):Play()
+        
+        Scroll.Visible = true
+        Status.Visible = true
+        TweenService:Create(Scroll, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, 48)
+        }):Play()
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    local t = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    })
+    t:Play()
+    TweenService:Create(Shadow, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(Stroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
+    t.Completed:Wait()
+    _G.NYX_CP_RUNNING = false; stopCurrentMode()
+    for _, conn in ipairs(_G.NYX_CP_CONNS) do pcall(function() conn:Disconnect() end) end
+    ScreenGui:Destroy(); _G.NYX_CP = nil
+end)
+
+-- Arrastar
+do
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+        Shadow.Position = MainFrame.Position + UDim2.new(0, 0, 0, 5)
+    end
+    
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = input.Position
+            startPos  = MainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+-- Animação de Abertura
+task.spawn(function()
+    task.wait(0.1)
+    MainFrame.BackgroundTransparency = 1
+    Shadow.BackgroundTransparency = 1
+    Stroke.Transparency = 1
+    
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = FULL_SIZE,
+        Position = UDim2.new(0.5, -140, 0.5, -200),
+        BackgroundTransparency = 0
+    }):Play()
+    
+    TweenService:Create(Shadow, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = FULL_SIZE,
+        Position = UDim2.new(0.5, -140, 0.5, -195),
+        BackgroundTransparency = 0.85
+    }):Play()
+    
+    TweenService:Create(Stroke, TweenInfo.new(0.5), {Transparency = 0}):Play()
+end)
+
+-- ==================== LOOPS DE CAPTURA ====================
+_G.NYX_CP_RUNNING = true
+
+task.spawn(function()
+    while _G.NYX_CP_RUNNING and ScreenGui.Parent do
+        task.wait(CFG.CAPTURE_INTERVAL)
+        local m = currentMode
+        if m == "RISE" or m == "SINK" or m == "VORTEX" or m == "REPEL" or m == "ORBIT" or m == "FREEZE" then
+            local char = LP.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local pos = root.Position
+                for _, v in ipairs(Workspace:GetDescendants()) do
+                    local isFreeze = (m == "FREEZE")
+                    local radius = isFreeze and CFG.FREEZE_RADIUS or CFG.CAPTURE_RADIUS
+                    
+                    -- AQUI: Filtro global pra ignorar o que já tá ancorado no mapa
+                    if v:IsA("BasePart") and not v.Anchored and not isCharacterPart(v) and (v.Position - pos).Magnitude <= radius then
+                        if isFreeze then
+                            if not frozenSet[v] then
+                                freezeTimePart(v)
+                            end
+                        else
+                            if not isActivePart(v) and not frozenSet[v] then
+                                if m == "RISE" then risePart(v)
+                                elseif m == "SINK" then sinkPart(v)
+                                elseif m == "VORTEX" then vortexPart(v)
+                                elseif m == "REPEL" then repelPart(v)
+                                elseif m == "ORBIT" then orbitPart(v)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while _G.NYX_CP_RUNNING and ScreenGui.Parent do
+        task.wait(0.4)
+        local m = currentMode
+        if m == "FREEZE" then
+            Status.Text = "ZA WARUDO! | Congeladas: " .. #_G.NYX_CP_FROZEN
+        elseif m == "NONE" then
+            Status.Text = "Modo: NONE"
+        else
+            local count = modeData[m] and #modeData[m].list or 0
+            Status.Text = string.format("Modo: %s | Ativos: %d | Congelados: %d", m, count, #_G.NYX_CP_FROZEN)
+        end
+    end
+end)
+
+task.spawn(function()
+    while _G.NYX_CP_RUNNING and ScreenGui.Parent do task.wait(1); pushSimRadius() end
+end)
+
+print("[nyx CP] Clean Blue Edition carregado.")
